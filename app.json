@@ -4,7 +4,7 @@
     "slug": "1storage",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
@@ -19,22 +19,50 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.onestorage.app"
+      "bundleIdentifier": "com.onestorage.app",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleTypeRole": "Editor",
+            "CFBundleURLName": "com.onestorage.app",
+            "CFBundleURLSchemes": ["onestorage"]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.onestorage.app"
+      "package": "com.onestorage.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "onestorage",
+              "host": "*",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      "@react-native-google-signin/google-signin",
+      "expo-auth-session"
+    ],
+    "scheme": "onestorage",
     "extra": {
-      "eas": {
-        "projectId": "your-project-id"
-      }
+      "googleWebClientId": "310812752601-4mtg7dj18ld7qjc8o8habfb4qer2chp9.apps.googleusercontent.com",
+      "appScheme": "onestorage",
+      "appName": "OneStorage"
     }
   }
 }

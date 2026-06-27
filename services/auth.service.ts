@@ -1,12 +1,13 @@
 // services/auth.service.ts
 // Core authentication service interface and factory
+// Auth is handled via Google OAuth directly – no Firebase dependency.
 
-import { FirebaseAuthService } from './auth/firebase-auth.service';
+import GoogleAuthService from './auth/google-auth.service';
 
 export interface AuthCredentials {
   email?: string;
   password?: string;
-  provider?: 'google' | 'apple' | 'email';
+  provider?: 'google' | 'apple';
   token?: string;
 }
 
@@ -25,19 +26,16 @@ export interface User {
 
 export interface AuthService {
   initialize(): Promise<void>;
-  signIn(credentials: AuthCredentials): Promise<AuthResult>;
-  signUp(email: string, password: string): Promise<AuthResult>;
+  signIn(): Promise<AuthResult>;
   signOut(): Promise<void>;
   getCurrentUser(): Promise<User | null>;
   getAuthToken(): Promise<string | null>;
-  resetPassword(email: string): Promise<void>;
-  linkProvider(provider: string): Promise<AuthResult>;
 }
 
-// Factory function for creating auth service instances
+// Only Google Auth is active for now.
+// Extend the factory when Apple / other providers are added.
 const createAuthService = (): AuthService => {
-  // In a real implementation, this would be configurable
-  return new FirebaseAuthService();
+  return new GoogleAuthService();
 };
 
 export const authService = createAuthService();

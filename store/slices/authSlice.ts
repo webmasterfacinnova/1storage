@@ -54,8 +54,8 @@ export const authSlice = createSlice({
       }
     },
     
-    // Set error state
-    setError: (state, action: PayloadAction<string>) => {
+    // Set error state (pass null to clear)
+    setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
       state.loading = false;
     },
