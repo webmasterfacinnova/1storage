@@ -1,27 +1,31 @@
 // services/auth/google-auth.service.ts
 // Google Authentication service — direct OAuth, no Firebase
+// Uses expo-auth-session's promptAsync (non-hook-based approach) for
+// environments where hooks cannot be used (service class context).
 
-import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri, DiscoveryDocument, exchangeCodeAsync, TokenResponse } from 'expo-auth-session';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import Constants from 'expo-constants';
 import { AuthService, AuthResult, User } from '../auth.service';
 import { saveAuthToken, getAuthToken, clearAuthToken } from '../../utils/secureStorage';
 import { userService } from '../user.service';
+
+// Required for any auth session to work
+WebBrowser.maybeCompleteAuthSession();
 
 // OAuth scopes we request
 const SCOPES = [
   'openid',
   'profile',
   'email',
-  'https://www.googleapis.com/auth/drive.file',
 ];
 
 class GoogleAuthService implements AuthService {
   private clientId: string = '';
 
   async initialize(): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Constants = require('expo-constants');
-    this.clientId = Constants.expoConfig?.extra?.googleWebClientId ?? '';
+    this.clientId = Constants.expoConfig?.extra?.googleWebClientId ?? Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
 
     if (!this.clientId) {
       console.warn('Google Auth: GOOGLE_WEB_CLIENT_ID not found in app config');
@@ -41,34 +45,47 @@ class GoogleAuthService implements AuthService {
 
   async signIn(): Promise<AuthResult> {
     try {
-      // Step 1: Launch Expo AuthSession OAuth flow
-      const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
-      const discovery = AuthSession.useAutoDiscovery('https://accounts.google.com');
+      const config = {
+        clientId: this.clientId,
+        scopes: SCOPES,
+        redirectUri: makeRedirectUri({
+          // useProxy: true is required for Expo Go
+          // For production builds, use a custom scheme
+          useProxy: true,
+        }),
+      };
 
-      const authUrl = `${discovery.authorizationEndpoint}?` +
+      // Build the authorization URL manually using the discovery doc
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         new URLSearchParams({
           client_id: this.clientId,
-          redirect_uri: redirectUri,
-          response_type: 'id_token token',
+          redirect_uri: config.redirectUri,
+          response_type: 'token id_token',
           scope: SCOPES.join(' '),
           prompt: 'select_account',
+          include_granted_scopes: 'true',
         }).toString();
 
-      const result = await AuthSession.startAsync({
-        authUrl,
-        returnUrl: redirectUri,
-      });
+      // Open the browser for OAuth
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, config.redirectUri);
 
       if (result.type !== 'success') {
-        throw result.type === 'error'
-          ? new Error(result.error?.message || 'Google sign-in failed')
-          : new Error('Google sign-in cancelled');
+        throw result.type === 'cancel'
+          ? new Error('Google sign-in cancelled')
+          : new Error('Google sign-in failed');
       }
 
-      const { access_token, id_token } = result.params;
+      // Parse the redirect URL params
+      const params = new URLSearchParams(result.url.split('#')[1] || result.url.split('?')[1]);
+      const accessToken = params.get('access_token');
+      const idToken = params.get('id_token');
 
-      // Step 2: Fetch user info from Google
-      const userInfo = await this.getUserInfo(access_token);
+      if (!accessToken) {
+        throw new Error('No access token received from Google');
+      }
+
+      // Fetch user info from Google
+      const userInfo = await this.getUserInfo(accessToken);
 
       const user: User = {
         id: userInfo.sub ?? userInfo.id,
@@ -77,25 +94,27 @@ class GoogleAuthService implements AuthService {
         photoURL: userInfo.picture,
       };
 
-      // Step 3: Save tokens locally
-      await saveAuthToken(access_token);
+      // Save tokens locally
+      await saveAuthToken(accessToken);
 
-      // Step 4: Sync user to MongoDB (create/update profile)
+      // Sync user to MongoDB (create/update profile) — non-critical
       try {
-        await userService.upsertUser({
-          googleId: user.id,
-          email: user.email,
-          name: user.name,
-          photoURL: user.photoURL,
-          idToken: id_token,
-          accessToken: access_token,
-        });
+        if (userInfo.sub) {
+          await userService.upsertUser({
+            googleId: userInfo.sub,
+            email: user.email || '',
+            name: user.name,
+            photoURL: user.photoURL,
+            idToken: idToken || '',
+            accessToken,
+          });
+        }
       } catch (dbError) {
         // Non-critical: user can still use the app with local session
         console.error('Failed to sync user to database:', dbError);
       }
 
-      return { user, token: access_token, provider: 'google' };
+      return { user, token: accessToken, provider: 'google' };
     } catch (error) {
       console.error('Google sign-in error:', error);
       throw this.handleAuthError(error);
@@ -106,6 +125,7 @@ class GoogleAuthService implements AuthService {
     try {
       await GoogleSignin.signOut();
       await clearAuthToken();
+      await userService.clearCache();
     } catch (error) {
       console.error('Google sign-out error:', error);
       throw this.handleAuthError(error);
@@ -136,17 +156,6 @@ class GoogleAuthService implements AuthService {
     return getAuthToken();
   }
 
-  // Unused methods – kept for interface compatibility
-  async signUp(_email: string, _password: string): Promise<AuthResult> {
-    throw new Error('Sign up not available – use Google sign-in');
-  }
-  async resetPassword(_email: string): Promise<void> {
-    throw new Error('Password reset not available for Google authentication');
-  }
-  async linkProvider(_provider: string): Promise<AuthResult> {
-    throw new Error('Provider linking not implemented');
-  }
-
   // Private helpers
   private async getUserInfo(token: string): Promise<any> {
     const response = await fetch('https://www.googleapis.com/userinfo/v2/me', {
@@ -159,10 +168,14 @@ class GoogleAuthService implements AuthService {
   }
 
   private handleAuthError(error: any): Error {
-    const msg = (error.message ?? '').toLowerCase();
+    if (!error || !error.message) {
+      return new Error('Google authentication failed – please try again');
+    }
+    const msg = error.message.toLowerCase();
     if (msg.includes('network')) return new Error('Network error – check your connection');
-    if (msg.includes('cancelled')) return new Error('Sign-in cancelled');
-    return new Error('Google authentication failed – please try again');
+    if (msg.includes('cancelled') || msg.includes('cancel')) return new Error('Sign-in cancelled');
+    if (msg.includes('timeout')) return new Error('Request timed out – please try again');
+    return new Error(error.message || 'Google authentication failed – please try again');
   }
 }
 

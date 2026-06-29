@@ -11,9 +11,12 @@ import { setCredentials, setLoading } from './store/slices/authSlice';
 
 const App = () => {
   useEffect(() => {
-    // Check for existing authentication on app start
-    const checkAuth = async () => {
+    const init = async () => {
       try {
+        // 1️⃣ Initialize auth service (configures Google Sign-In)
+        await authService.initialize();
+
+        // 2️⃣ Check for existing session
         store.dispatch(setLoading(true));
         const user = await authService.getCurrentUser();
         if (user) {
@@ -23,13 +26,13 @@ const App = () => {
           }
         }
       } catch (error) {
-        console.error('Auth check error:', error);
+        console.error('Auth init error:', error);
       } finally {
         store.dispatch(setLoading(false));
       }
     };
     
-    checkAuth();
+    init();
   }, []);
   
   return (
