@@ -43,6 +43,7 @@ const SCOPES = [
   'openid',
   'profile',
   'email',
+  'https://www.googleapis.com/auth/drive.readonly',
 ];
 
 class GoogleAuthService implements AuthService {
