@@ -54,10 +54,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      "@react-native-google-signin/google-signin",
-      "expo-auth-session"
-    ],
+    "plugins": [],
     "scheme": "onestorage",
     "extra": {
       "googleWebClientId": "310812752601-4mtg7dj18ld7qjc8o8habfb4qer2chp9.apps.googleusercontent.com",

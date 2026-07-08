@@ -3,9 +3,9 @@
 // Uses expo-auth-session's promptAsync (non-hook-based approach) for
 // environments where hooks cannot be used (service class context).
 
+import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri, DiscoveryDocument, exchangeCodeAsync, TokenResponse } from 'expo-auth-session';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { makeRedirectUri } from 'expo-auth-session';
 import Constants from 'expo-constants';
 import { AuthService, AuthResult, User } from '../auth.service';
 import { saveAuthToken, getAuthToken, clearAuthToken } from '../../utils/secureStorage';
@@ -13,6 +13,18 @@ import { userService } from '../user.service';
 
 // Required for any auth session to work
 WebBrowser.maybeCompleteAuthSession();
+
+// @react-native-google-signin/google-signin is a native-only module and is
+// not available on web. Load it lazily so the web bundle stays clean.
+const getGoogleSignin = (): any | null => {
+  if (Platform.OS === 'web') return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('@react-native-google-signin/google-signin').GoogleSignin;
+  } catch {
+    return null;
+  }
+};
 
 // OAuth scopes we request
 const SCOPES = [
@@ -29,6 +41,13 @@ class GoogleAuthService implements AuthService {
 
     if (!this.clientId) {
       console.warn('Google Auth: GOOGLE_WEB_CLIENT_ID not found in app config');
+    }
+
+    const GoogleSignin = getGoogleSignin();
+    if (!GoogleSignin) {
+      // Web (or module unavailable): OAuth runs through expo-auth-session,
+      // so no native configuration is required.
+      return;
     }
 
     try {
@@ -123,7 +142,10 @@ class GoogleAuthService implements AuthService {
 
   async signOut(): Promise<void> {
     try {
-      await GoogleSignin.signOut();
+      const GoogleSignin = getGoogleSignin();
+      if (GoogleSignin) {
+        await GoogleSignin.signOut();
+      }
       await clearAuthToken();
       await userService.clearCache();
     } catch (error) {

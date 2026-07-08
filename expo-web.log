@@ -1,0 +1,32 @@
+Starting project at C:\Users\hvasq\OneDrive\Documentos\Codes\1storage
+env: load .env
+env: export EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_APP_NAME EXPO_PUBLIC_APP_SCHEME
+Starting Metro Bundler
+
+TypeScript: The tsconfig.json has been updated (Use EXPO_NO_TYPESCRIPT_SETUP to skip)
+
+› Required modifications made to the tsconfig.json:
+
+  extends is now expo/tsconfig.base
+
+
+The following packages should be updated for best compatibility with the installed expo version:
+  @react-native-async-storage/async-storage@1.24.0 - expected version: 1.21.0
+  react-native@0.74.0 - expected version: 0.73.6
+  react-native-safe-area-context@4.10.1 - expected version: 4.8.2
+  @types/react@18.3.31 - expected version: ~18.2.45
+Your project may not work correctly until you install the correct versions of the packages.
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Web Bundled 45955ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
+transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
+transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
+transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
+transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
+transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
+transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
+transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
+transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
+transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
+transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
+Web Bundled 11995ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
