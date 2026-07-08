@@ -54,10 +54,10 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [],
+    "plugins": ["@react-native-google-signin/google-signin"],
     "scheme": "onestorage",
     "extra": {
-      "googleWebClientId": "310812752601-4mtg7dj18ld7qjc8o8habfb4qer2chp9.apps.googleusercontent.com",
+      "googleWebClientId": "310812752601-7iuvt1sr6oq1stplb5j7cc66gm9h4r8i.apps.googleusercontent.com",
       "appScheme": "onestorage",
       "appName": "OneStorage"
     }

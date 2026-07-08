@@ -5,14 +5,26 @@
 
 import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri } from 'expo-auth-session';
+import {
+  makeRedirectUri,
+  AuthRequest,
+  ResponseType,
+  exchangeCodeAsync,
+} from 'expo-auth-session';
 import Constants from 'expo-constants';
 import { AuthService, AuthResult, User } from '../auth.service';
 import { saveAuthToken, getAuthToken, clearAuthToken } from '../../utils/secureStorage';
 import { userService } from '../user.service';
 
-// Required for any auth session to work
+// Required for any auth session to work (closes the popup/redirect on web)
 WebBrowser.maybeCompleteAuthSession();
+
+// Google's OpenID Connect endpoints (Authorization Code + PKCE flow)
+const DISCOVERY = {
+  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenEndpoint: 'https://oauth2.googleapis.com/token',
+  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+};
 
 // @react-native-google-signin/google-signin is a native-only module and is
 // not available on web. Load it lazily so the web bundle stays clean.
@@ -35,9 +47,14 @@ const SCOPES = [
 
 class GoogleAuthService implements AuthService {
   private clientId: string = '';
+  private clientSecret: string = '';
 
   async initialize(): Promise<void> {
     this.clientId = Constants.expoConfig?.extra?.googleWebClientId ?? Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
+    // Google "Web application" clients require the client secret at the token
+    // exchange step. It is read from EXPO_PUBLIC_GOOGLE_CLIENT_SECRET (kept in
+    // .env.local, which is git-ignored). See the security note in signIn().
+    this.clientSecret = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_SECRET ?? '';
 
     if (!this.clientId) {
       console.warn('Google Auth: GOOGLE_WEB_CLIENT_ID not found in app config');
@@ -64,40 +81,55 @@ class GoogleAuthService implements AuthService {
 
   async signIn(): Promise<AuthResult> {
     try {
-      const config = {
+      // Exact redirect URI must be registered in the Google Cloud Console
+      // (APIs & Services → Credentials → OAuth Web Client → Authorized redirect URIs).
+      const redirectUri = makeRedirectUri({ preferLocalhost: true });
+      console.log('[GoogleAuth] redirectUri =', redirectUri);
+
+      // Authorization Code + PKCE flow (replaces the deprecated implicit flow).
+      // NOTE: client_secret must NOT be sent in the authorization request —
+      // Google rejects it ("Parameter not allowed... client_secret"). It is
+      // only used later in the token exchange (exchangeCodeAsync).
+      const request = new AuthRequest({
         clientId: this.clientId,
         scopes: SCOPES,
-        redirectUri: makeRedirectUri({
-          // useProxy: true is required for Expo Go
-          // For production builds, use a custom scheme
-          useProxy: true,
-        }),
-      };
-
-      // Build the authorization URL manually using the discovery doc
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-        new URLSearchParams({
-          client_id: this.clientId,
-          redirect_uri: config.redirectUri,
-          response_type: 'token id_token',
-          scope: SCOPES.join(' '),
+        redirectUri,
+        responseType: ResponseType.Code,
+        usePKCE: true,
+        extraParams: {
+          access_type: 'offline',
           prompt: 'select_account',
-          include_granted_scopes: 'true',
-        }).toString();
+        },
+      });
 
-      // Open the browser for OAuth
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, config.redirectUri);
+      // Opens the OAuth screen (popup on web, in-app browser on native)
+      const result = await request.promptAsync(DISCOVERY);
 
-      if (result.type !== 'success') {
-        throw result.type === 'cancel'
-          ? new Error('Google sign-in cancelled')
-          : new Error('Google sign-in failed');
+      if (result.type !== 'success' || !result.params?.code) {
+        if (result.type === 'cancel' || result.type === 'dismiss') {
+          throw new Error('Google sign-in cancelled');
+        }
+        const errDesc = (result as any)?.params?.error_description || (result as any)?.error?.message;
+        throw new Error(errDesc || 'Google sign-in failed');
       }
 
-      // Parse the redirect URL params
-      const params = new URLSearchParams(result.url.split('#')[1] || result.url.split('?')[1]);
-      const accessToken = params.get('access_token');
-      const idToken = params.get('id_token');
+      // Exchange the authorization code for tokens (PKCE code_verifier proves
+      // this is the same client that started the flow).
+      const tokenResponse = await exchangeCodeAsync(
+        {
+          clientId: this.clientId,
+          clientSecret: this.clientSecret || undefined,
+          code: result.params.code,
+          redirectUri,
+          extraParams: request.codeVerifier
+            ? { code_verifier: request.codeVerifier }
+            : {},
+        },
+        DISCOVERY,
+      );
+
+      const accessToken = tokenResponse.accessToken;
+      const idToken = tokenResponse.idToken ?? '';
 
       if (!accessToken) {
         throw new Error('No access token received from Google');

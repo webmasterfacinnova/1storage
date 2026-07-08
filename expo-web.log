@@ -1,15 +1,8 @@
 Starting project at C:\Users\hvasq\OneDrive\Documentos\Codes\1storage
-env: load .env
-env: export EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_APP_NAME EXPO_PUBLIC_APP_SCHEME
+env: load .env.local .env
+env: export EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_APP_NAME EXPO_PUBLIC_APP_SCHEME EXPO_PUBLIC_GOOGLE_CLIENT_SECRET
 Starting Metro Bundler
-
-TypeScript: The tsconfig.json has been updated (Use EXPO_NO_TYPESCRIPT_SETUP to skip)
-
-› Required modifications made to the tsconfig.json:
-
-  extends is now expo/tsconfig.base
-
-
+warning: Bundler cache is empty, rebuilding (this may take a minute)
 The following packages should be updated for best compatibility with the installed expo version:
   @react-native-async-storage/async-storage@1.24.0 - expected version: 1.21.0
   react-native@0.74.0 - expected version: 0.73.6
@@ -18,7 +11,6 @@ The following packages should be updated for best compatibility with the install
 Your project may not work correctly until you install the correct versions of the packages.
 Waiting on http://localhost:8081
 Logs for your project will appear below.
-Web Bundled 45955ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
 transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
 transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
 transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
@@ -29,4 +21,11 @@ transform[stderr]: Missing transform.routerRoot option in Metro bundling request
 transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
 transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
 transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
-Web Bundled 11995ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
+Web Bundled 21158ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
+Web Bundled 22107ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
+Web Bundled 104ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
+Web Bundled 102ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
+Web Bundled 98ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
+Web Bundled 207ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
+Web Bundled 272ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
+Web Bundled 101ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
