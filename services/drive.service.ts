@@ -27,6 +27,10 @@ export interface DriveFile {
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
 
 class DriveService {
+  private async getToken(): Promise<string | null> {
+    return getAuthToken();
+  }
+
   /**
    * Fetch the user's Google Drive storage quota.
    * Returns null if the token is missing or the request fails.

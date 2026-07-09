@@ -4,7 +4,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { DriveStorageQuota } from '../../services/drive.service';
 
-interface DriveState {
+export interface DriveState {
   quota: DriveStorageQuota | null;
   loading: boolean;
   error: string | null;

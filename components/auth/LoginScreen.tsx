@@ -9,7 +9,7 @@ import GoogleSignInButton from './GoogleSignInButton';
 
 const LoginScreen = () => {
   const dispatch = useDispatch();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const loading = useSelector(selectAuthLoading);
   const error = useSelector(selectAuthError);
 

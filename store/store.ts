@@ -4,11 +4,13 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import driveReducer from './slices/driveSlice';
+import driveFilesReducer from './slices/driveFilesSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     drive: driveReducer,
+    driveFiles: driveFilesReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

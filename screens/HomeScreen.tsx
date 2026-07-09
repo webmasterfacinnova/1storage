@@ -1,5 +1,5 @@
 // screens/HomeScreen.tsx
-// Home screen after successful authentication — shows real Google Drive storage
+// Home screen after successful authentication - shows real Google Drive storage
 
 import React, { useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshControl } from 'react-native';
@@ -56,7 +56,7 @@ const HomeScreen = () => {
         />
         <Text style={styles.title}>1storage</Text>
       </View>
-      
+
       <ScrollView style={styles.content} refreshControl={
         <RefreshControl refreshing={quotaLoading} onRefresh={fetchStorageQuota} />
       }>
@@ -74,11 +74,11 @@ const HomeScreen = () => {
             <Text style={styles.welcomeSubtext}>Google Drive connected</Text>
           </View>
         </View>
-        
+
         {/* Storage Quota Card */}
         <View style={styles.storageCard}>
           <Text style={styles.storageTitle}>Google Drive Storage</Text>
-          
+
           {quotaLoading ? (
             <Text style={styles.loadingText}>Loading storage info...</Text>
           ) : quotaError ? (
@@ -101,7 +101,7 @@ const HomeScreen = () => {
                   <Text style={styles.quotaLabel}>Trash</Text>
                 </View>
               </View>
-              
+
               {/* Progress bar */}
               {quota.limit && (
                 <View style={styles.progressBarContainer}>
@@ -123,11 +123,11 @@ const HomeScreen = () => {
             <Text style={styles.loadingText}>Tap to load storage info</Text>
           )}
         </View>
-        
+
         {/* Configuration Options */}
         <Text style={styles.sectionTitle}>Configuration</Text>
-        
-        <TouchableOpacity style={styles.configCard} onPress={() => {}}>
+
+        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('StorageBreakdown')}>
           <View style={styles.configIcon}>
             <Text style={styles.configIconText}>📁</Text>
           </View>
@@ -137,8 +137,8 @@ const HomeScreen = () => {
           </View>
           <Text style={styles.configArrow}>›</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.configCard} onPress={() => {}}>
+
+        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('CleanTrash')}>
           <View style={styles.configIcon}>
             <Text style={styles.configIconText}>🗑️</Text>
           </View>
@@ -150,7 +150,7 @@ const HomeScreen = () => {
           </View>
           <Text style={styles.configArrow}>›</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.configCard} onPress={() => {}}>
           <View style={styles.configIcon}>
             <Text style={styles.configIconText}>🔗</Text>
@@ -161,7 +161,7 @@ const HomeScreen = () => {
           </View>
           <Text style={styles.configArrow}>›</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.configCard} onPress={() => {}}>
           <View style={styles.configIcon}>
             <Text style={styles.configIconText}>⚙️</Text>
@@ -173,7 +173,7 @@ const HomeScreen = () => {
           <Text style={styles.configArrow}>›</Text>
         </TouchableOpacity>
       </ScrollView>
-      
+
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutText}>Sign Out</Text>
       </TouchableOpacity>

@@ -8,6 +8,9 @@ import { useSelector } from 'react-redux';
 import { selectCurrentUser } from '../store/slices/authSlice';
 import LoginScreen from '../components/auth/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
+import StorageBreakdownScreen from '../screens/StorageBreakdownScreen';
+import FileListScreen from '../screens/FileListScreen';
+import CleanTrashScreen from '../screens/CleanTrashScreen';
 
 const Stack = createStackNavigator();
 
@@ -19,7 +22,12 @@ const AppNavigator = () => {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {user ? (
           // Authenticated routes
-          <Stack.Screen name="Home" component={HomeScreen} />
+          <>
+            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="StorageBreakdown" component={StorageBreakdownScreen} />
+            <Stack.Screen name="FileList" component={FileListScreen} />
+            <Stack.Screen name="CleanTrash" component={CleanTrashScreen} />
+          </>
         ) : (
           // Unauthenticated routes
           <>
