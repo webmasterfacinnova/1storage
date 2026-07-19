@@ -198,7 +198,7 @@ const ManagerFilesScreen: React.FC = () => {
         <Text style={s.sectionCount}>{filtered.length} file{filtered.length !== 1 ? 's' : ''}</Text>
       </View>
 
-      {/* FlatList — only the file items, no nested ScrollView inside */}
+      {/* FlatList — fill remaining space so it can scroll */}
       <FlatList
         data={filtered}
         keyExtractor={item => item.id}
@@ -208,8 +208,9 @@ const ManagerFilesScreen: React.FC = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1a237e" />}
         onEndReached={onEnd}
         onEndReachedThreshold={0.3}
-        style={{ flex: 1 }}
+        style={{ flex: 1, minHeight: 1 }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={filtered.length === 0 ? { flexGrow: 1 } : undefined}
       />
     </View>
   );
