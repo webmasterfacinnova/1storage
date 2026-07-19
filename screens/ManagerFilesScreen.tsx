@@ -30,6 +30,7 @@ function previewToUnified(p: DriveFilePreview): UnifiedFile {
     provider: 'google-drive',
     providerName: 'Google Drive',
     iconLink: p.iconLink,
+    thumbnailLink: p.details?.thumbnailLink,
     parents: p.parents,
     trashed: p.trashed,
     webViewLink: p.details?.webViewLink,

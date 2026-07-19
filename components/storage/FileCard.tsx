@@ -15,6 +15,7 @@ export interface UnifiedFile {
   providerName: string;
   webViewLink?: string;
   iconLink?: string;
+  thumbnailLink?: string;
   parents?: string[];
   trashed?: boolean;
 }
@@ -80,12 +81,15 @@ export function formatFileDate(isoDate: string): string {
 
 const FileCard: React.FC<FileCardProps> = ({ file, onPress }) => {
   const typeInfo = categorizeMimeType(file.mimeType);
-  const hasThumbnail = !!file.webViewLink && (file.mimeType.startsWith('image/') || file.mimeType.startsWith('video/'));
+  const isImageOrVideo = file.mimeType.startsWith('image/') || file.mimeType.startsWith('video/');
+  const showThumbnail = !!file.thumbnailLink && isImageOrVideo;
 
   return (
     <TouchableOpacity style={styles.card} onPress={() => onPress(file)} activeOpacity={0.7}>
-      <View style={[styles.iconContainer, hasThumbnail && { backgroundColor: 'transparent', overflow: 'hidden' }]}>
-        {file.iconLink ? (
+      <View style={[styles.iconContainer, showThumbnail && { padding: 0, backgroundColor: '#eef1f8', overflow: 'hidden' }]}>
+        {showThumbnail ? (
+          <Image source={{ uri: file.thumbnailLink }} style={styles.thumbnail} resizeMode="cover" />
+        ) : file.iconLink ? (
           <Image source={{ uri: file.iconLink }} style={styles.driveIcon} resizeMode="contain" />
         ) : (
           <Text style={styles.icon}>{typeInfo.icon}</Text>
@@ -137,6 +141,10 @@ const styles = StyleSheet.create({
   driveIcon: {
     width: 32,
     height: 32,
+  },
+  thumbnail: {
+    width: 40,
+    height: 40,
   },
   info: {
     flex: 1,
