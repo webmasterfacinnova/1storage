@@ -11,6 +11,7 @@ import HomeScreen from '../screens/HomeScreen';
 import StorageBreakdownScreen from '../screens/StorageBreakdownScreen';
 import FileListScreen from '../screens/FileListScreen';
 import CleanTrashScreen from '../screens/CleanTrashScreen';
+import ManagerFilesScreen from '../screens/ManagerFilesScreen';
 
 const Stack = createStackNavigator();
 
@@ -27,6 +28,7 @@ const AppNavigator = () => {
             <Stack.Screen name="StorageBreakdown" component={StorageBreakdownScreen} />
             <Stack.Screen name="FileList" component={FileListScreen} />
             <Stack.Screen name="CleanTrash" component={CleanTrashScreen} />
+            <Stack.Screen name="ManagerFiles" component={ManagerFilesScreen} />
           </>
         ) : (
           // Unauthenticated routes

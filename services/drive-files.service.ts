@@ -1,8 +1,29 @@
 // services/drive-files.service.ts
-// Google Drive file listing — fetches files with sizes, storage breakdown by type
+// Optimised Google Drive file listing — lightweight previews first, full details on demand.
 
 import { getAuthToken } from '../utils/secureStorage';
 
+/** Full detail set (fetched on demand when user interacts with a file). */
+export interface FileDetails {
+  size: number | null;
+  modifiedTime: string;
+  webViewLink: string;
+  thumbnailLink?: string;
+}
+
+/** Lightweight preview entry — shown in the Manager Files list. */
+export interface DriveFilePreview {
+  id: string;
+  name: string;
+  mimeType: string;
+  iconLink: string;
+  parents?: string[];
+  trashed?: boolean;
+  /** Populated lazily when user taps/focuses this file. */
+  details?: FileDetails | null;
+}
+
+/** Full legacy DriveFile type (kept for backward compat with other screens). */
 export interface DriveFile {
   id: string;
   name: string;
@@ -13,11 +34,6 @@ export interface DriveFile {
   webViewLink: string;
   parents?: string[];
   trashed?: boolean;
-}
-
-export interface DriveFileListResponse {
-  files: DriveFile[];
-  nextPageToken: string | null;
 }
 
 export interface StorageByType {
@@ -32,43 +48,211 @@ export interface StorageByType {
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
 
 class DriveFilesService {
-  private async getToken(): Promise<string | null> {
-    const { getAuthToken } = require('../utils/secureStorage');
-    return getAuthToken();
+  // Minimal fields for the preview list — no sizes, no dates
+  private static readonly FIELDS_PREVIEW = 'files(id,name,mimeType,iconLink,parents),nextPageToken';
+  // Full fields when details are needed
+  private static readonly FIELDS_FULL = 'files(id,name,mimeType,size,modifiedTime,iconLink,webViewLink,thumbnailLink,parents,trashed),nextPageToken';
+  private static readonly PAGE_SIZE = 20;
+
+  /**
+   * Fetch lightweight previews from Google Drive.
+   * Only returns id, name, mimeType, iconLink — tiny payload, very fast.
+   * Ordered by name for a clean, browsable list.
+   */
+  async getPreviews(
+    pageSize: number = DriveFilesService.PAGE_SIZE,
+    pageToken?: string,
+  ): Promise<{ files: DriveFilePreview[]; nextPageToken: string | null } | null> {
+    const token = await getAuthToken();
+    if (!token) return null;
+
+    const params = new URLSearchParams({
+      pageSize: String(Math.min(pageSize, 1000)),
+      fields: DriveFilesService.FIELDS_PREVIEW,
+      orderBy: 'name',
+      q: "trashed = false",
+    });
+    if (pageToken) params.set('pageToken', pageToken);
+
+    try {
+      const res = await fetch(`${DRIVE_API_BASE}/files?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+
+      const data = await res.json();
+      return {
+        files: (data.files || []).map((f: any) => ({
+          id: f.id,
+          name: f.name,
+          mimeType: f.mimeType,
+          iconLink: f.iconLink,
+          parents: f.parents,
+          trashed: f.trashed,
+          details: null,
+        })),
+        nextPageToken: data.nextPageToken || null,
+      };
+    } catch (err) {
+      console.error('getPreviews error:', err);
+      return null;
+    }
   }
 
   /**
-   * Fetch files from Google Drive, sorted by size descending (largest first).
-   * Uses the `files.list` endpoint with size, name, mimeType, etc.
+   * Fetch full details (size, date, links, thumbnail) for a specific file.
+   * Called only when the user selects/interacts with a file.
    */
-  async getFiles(
-    pageSize: number = 100,
-    pageToken?: string,
-    query?: string,
-  ): Promise<{ files: DriveFile[]; nextPageToken: string | null } | null> {
+  async getDetail(fileId: string): Promise<FileDetails | null> {
+    const token = await getAuthToken();
+    if (!token) return null;
+
     try {
-      const token = await this.getToken();
-      if (!token) return null;
-
-      const params = new URLSearchParams({
-        pageSize: String(pageSize),
-        fields: 'files(id,name,mimeType,size,modifiedTime,iconLink,webViewLink,parents,trashed),nextPageToken',
-        orderBy: 'quotaBytesUsed desc,name',
-        q: query || "trashed = false",
-      });
-      if (pageToken) params.set('pageToken', pageToken);
-
-      const response = await fetch(
-        `${DRIVE_API_BASE}/files?${params.toString()}`,
+      const res = await fetch(
+        `${DRIVE_API_BASE}/files/${fileId}?fields=id,size,modifiedTime,webViewLink,thumbnailLink,iconLink`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
+      if (!res.ok) return null;
 
-      if (!response.ok) {
-        console.error('Drive files API error:', response.status, await response.text());
-        return null;
-      }
+      const f = await res.json();
+      return {
+        size: f.size ? parseInt(f.size, 10) : null,
+        modifiedTime: f.modifiedTime,
+        webViewLink: f.webViewLink,
+        thumbnailLink: f.thumbnailLink,
+      };
+    } catch (err) {
+      console.error('getDetail error:', err);
+      return null;
+    }
+  }
 
-      const data = await response.json();
+  // --- Legacy / backward compat methods (used by other screens) ---
+
+  async getLargestFiles(
+    pageSize: number = 50,
+    pageToken?: string,
+  ): Promise<{ files: DriveFile[]; nextPageToken: string | null } | null> {
+    return this._list({
+      pageSize,
+      pageToken,
+      fields: DriveFilesService.FIELDS_FULL,
+      orderBy: 'quotaBytesUsed desc',
+      query: 'trashed = false',
+    });
+  }
+
+  async getFilesInFolder(
+    folderId: string = 'root',
+    pageSize: number = 100,
+    pageToken?: string,
+  ): Promise<{ files: DriveFile[]; nextPageToken: string | null } | null> {
+    return this._list({
+      pageSize,
+      pageToken,
+      fields: DriveFilesService.FIELDS_FULL,
+      query: `'${folderId}' in parents and trashed = false`,
+    });
+  }
+
+  async getTrashedFiles(
+    pageSize: number = 100,
+    pageToken?: string,
+  ): Promise<{ files: DriveFile[]; nextPageToken: string | null } | null> {
+    return this._list({
+      pageSize,
+      pageToken,
+      fields: DriveFilesService.FIELDS_FULL,
+      query: 'trashed = true',
+    });
+  }
+
+  async deleteFilePermanently(fileId: string): Promise<boolean> {
+    const token = await getAuthToken();
+    if (!token) return false;
+    try {
+      const res = await fetch(`${DRIVE_API_BASE}/files/${fileId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return res.ok;
+    } catch { return false; }
+  }
+
+  async emptyTrash(): Promise<boolean> {
+    const token = await getAuthToken();
+    if (!token) return false;
+    try {
+      const res = await fetch(`${DRIVE_API_BASE}/files/trash`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return res.ok;
+    } catch { return false; }
+  }
+
+  async getStorageByType(): Promise<StorageByType[] | null> {
+    const token = await getAuthToken();
+    if (!token) return null;
+    let allFiles: any[] = [];
+    let pt: string | null = null;
+
+    do {
+      const params = new URLSearchParams({
+        pageSize: '1000',
+        fields: 'files(id,name,mimeType,size),nextPageToken',
+        q: 'trashed = false and size > 0',
+      });
+      if (pt) params.set('pageToken', pt);
+      try {
+        const res = await fetch(`${DRIVE_API_BASE}/files?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) break;
+        const data = await res.json();
+        allFiles.push(...(data.files || []));
+        pt = data.nextPageToken || null;
+      } catch { break; }
+    } while (pt && allFiles.length < 5000);
+
+    const typeMap = new Map<string, { size: number; count: number; icon: string }>();
+    for (const file of allFiles) {
+      const cat = this._categorize(file.mimeType);
+      const size = file.size ? parseInt(file.size, 10) : 0;
+      const e = typeMap.get(cat.label) || { size: 0, count: 0, icon: cat.icon };
+      e.size += size;
+      e.count += 1;
+      typeMap.set(cat.label, e);
+    }
+    const total = Array.from(typeMap.values()).reduce((s, t) => s + t.size, 0);
+    return Array.from(typeMap.entries())
+      .map(([label, d]) => ({ type: label, label, size: d.size, count: d.count, percentage: total > 0 ? (d.size / total) * 100 : 0, icon: d.icon }))
+      .sort((a, b) => b.size - a.size);
+  }
+
+  private async _list(opts: {
+    pageSize: number;
+    pageToken?: string;
+    fields: string;
+    orderBy?: string;
+    query: string;
+  }): Promise<{ files: DriveFile[]; nextPageToken: string | null } | null> {
+    const token = await getAuthToken();
+    if (!token) return null;
+    const params = new URLSearchParams({
+      pageSize: String(Math.min(opts.pageSize, 1000)),
+      fields: opts.fields,
+      q: opts.query,
+    });
+    if (opts.pageToken) params.set('pageToken', opts.pageToken);
+    if (opts.orderBy) params.set('orderBy', opts.orderBy);
+
+    try {
+      const res = await fetch(`${DRIVE_API_BASE}/files?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
       return {
         files: (data.files || []).map((f: any) => ({
           id: f.id,
@@ -83,152 +267,10 @@ class DriveFilesService {
         })),
         nextPageToken: data.nextPageToken || null,
       };
-    } catch (error) {
-      console.error('Failed to fetch Drive files:', error);
-      return null;
-    }
+    } catch { return null; }
   }
 
-  /**
-   * Fetch files in a specific folder.
-   */
-  async getFilesInFolder(
-    folderId: string = 'root',
-    pageSize: number = 100,
-    pageToken?: string,
-  ): Promise<{ files: DriveFile[]; nextPageToken: string | null } | null> {
-    const query = `'${folderId}' in parents and trashed = false`;
-    return this.getFiles(pageSize, pageToken, query);
-  }
-
-  /**
-   * Fetch files sorted by size descending (largest files first).
-   */
-  async getLargestFiles(
-    pageSize: number = 50,
-    pageToken?: string,
-  ): Promise<{ files: DriveFile[]; nextPageToken: string | null } | null> {
-    const query = 'trashed = false and size > 0';
-    return this.getFiles(pageSize, pageToken, query);
-  }
-
-  /**
-   * Fetch trashed files.
-   */
-  async getTrashedFiles(
-    pageSize: number = 100,
-    pageToken?: string,
-  ): Promise<{ files: DriveFile[]; nextPageToken: string | null } | null> {
-    const query = 'trashed = true';
-    return this.getFiles(pageSize, pageToken, query);
-  }
-
-  /**
-   * Permanently delete a file from trash.
-   */
-  async deleteFilePermanently(fileId: string): Promise<boolean> {
-    try {
-      const token = await this.getToken();
-      if (!token) return false;
-
-      const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      return response.ok;
-    } catch (error) {
-      console.error('Failed to delete file:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Empty the entire trash.
-   */
-  async emptyTrash(): Promise<boolean> {
-    try {
-      const token = await this.getToken();
-      if (!token) return false;
-
-      const response = await fetch(`${DRIVE_API_BASE}/files/trash`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      return response.ok;
-    } catch (error) {
-      console.error('Failed to empty trash:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Get storage breakdown by file type (MIME category).
-   */
-  async getStorageByType(): Promise<StorageByType[] | null> {
-    try {
-      const token = await this.getToken();
-      if (!token) return null;
-
-      // Fetch all files with their sizes and MIME types
-      let allFiles: DriveFile[] = [];
-      let pageToken: string | null = null;
-
-      do {
-        const params = new URLSearchParams({
-          pageSize: '1000',
-          fields: 'files(id,name,mimeType,size),nextPageToken',
-          q: 'trashed = false and size > 0',
-        });
-        if (pageToken) params.set('pageToken', pageToken);
-
-        const response = await fetch(
-          `${DRIVE_API_BASE}/files?${params.toString()}`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
-
-        if (!response.ok) break;
-
-        const data = await response.json();
-        allFiles.push(...(data.files || []));
-        pageToken = data.nextPageToken || null;
-      } while (pageToken && allFiles.length < 5000); // safety limit
-
-      // Group by MIME type category
-      const typeMap = new Map<string, { size: number; count: number; icon: string }>();
-
-      for (const file of allFiles) {
-        const category = this.categorizeMimeType(file.mimeType);
-        const size = file.size ? (typeof file.size === 'string' ? parseInt(file.size, 10) : file.size) : 0;
-        const existing = typeMap.get(category.label) || { size: 0, count: 0, icon: category.icon };
-        existing.size += size;
-        existing.count += 1;
-        typeMap.set(category.label, existing);
-      }
-
-      const totalSize = Array.from(typeMap.values()).reduce((sum, t) => sum + t.size, 0);
-
-      return Array.from(typeMap.entries())
-        .map(([label, data]) => ({
-          type: label,
-          label,
-          size: data.size,
-          count: data.count,
-          percentage: totalSize > 0 ? (data.size / totalSize) * 100 : 0,
-          icon: data.icon,
-        }))
-        .sort((a, b) => b.size - a.size);
-    } catch (error) {
-      console.error('Failed to get storage by type:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Categorize a MIME type into a human-readable group.
-   */
-  private categorizeMimeType(mimeType: string): { label: string; icon: string } {
+  private _categorize(mimeType: string): { label: string; icon: string } {
     if (mimeType === 'application/vnd.google-apps.folder') return { label: 'Folders', icon: '📁' };
     if (mimeType.startsWith('image/')) return { label: 'Images', icon: '🖼️' };
     if (mimeType.startsWith('video/')) return { label: 'Videos', icon: '🎬' };
@@ -238,8 +280,7 @@ class DriveFilesService {
       return { label: 'Google Docs', icon: '📝' };
     if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || mimeType.includes('gz'))
       return { label: 'Archives', icon: '🗜️' };
-    if (mimeType.includes('text/')) return { label: 'Text Files', icon: '📄' };
-    if (mimeType === 'application/vnd.google-apps.folder') return { label: 'Folders', icon: '📁' };
+    if (mimeType.includes('text/')) return { label: 'Text', icon: '📄' };
     return { label: 'Other', icon: '📦' };
   }
 }

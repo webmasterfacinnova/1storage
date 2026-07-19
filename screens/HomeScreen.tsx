@@ -127,13 +127,13 @@ const HomeScreen = () => {
         {/* Configuration Options */}
         <Text style={styles.sectionTitle}>Configuration</Text>
 
-        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('StorageBreakdown')}>
+        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('ManagerFiles')}>
           <View style={styles.configIcon}>
             <Text style={styles.configIconText}>📁</Text>
           </View>
           <View style={styles.configInfo}>
             <Text style={styles.configTitle}>Manage Files</Text>
-            <Text style={styles.configDesc}>Browse and manage your Google Drive files</Text>
+            <Text style={styles.configDesc}>Browse your files across all connected storage</Text>
           </View>
           <Text style={styles.configArrow}>›</Text>
         </TouchableOpacity>

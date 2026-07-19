@@ -13,6 +13,9 @@ export type RootStackParamList = {
     fileId?: string;
   } | undefined;
   CleanTrash: undefined;
+  ManagerFiles: {
+    typeFilter?: string;
+  } | undefined;
 };
 
 declare global {
