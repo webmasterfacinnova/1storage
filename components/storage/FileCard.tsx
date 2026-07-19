@@ -1,5 +1,5 @@
 // components/storage/FileCard.tsx
-// Individual file card with type icon, provider badge, size, and date
+// Individual file card — simple, stable, no fancy logic.
 
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
@@ -25,7 +25,6 @@ interface FileCardProps {
   onPress: (file: UnifiedFile) => void;
 }
 
-/** Determine file type category from MIME type */
 export function categorizeMimeType(mimeType: string): { label: string; icon: string } {
   if (mimeType === 'application/vnd.google-apps.folder') return { label: 'Folder', icon: '📁' };
   if (mimeType.startsWith('image/')) return { label: 'Image', icon: '🖼️' };
@@ -37,149 +36,92 @@ export function categorizeMimeType(mimeType: string): { label: string; icon: str
   if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || mimeType.includes('gz'))
     return { label: 'Archive', icon: '🗜️' };
   if (mimeType.includes('text/')) return { label: 'Text', icon: '📄' };
-  if (mimeType === 'application/vnd.google-apps.folder') return { label: 'Folder', icon: '📁' };
   return { label: 'File', icon: '📦' };
 }
 
-/** Map MIME type to a category key for filtering */
 export function mimeTypeToCategory(mimeType: string): string {
   if (mimeType === 'application/vnd.google-apps.folder') return 'folders';
   if (mimeType.startsWith('image/')) return 'images';
   if (mimeType.startsWith('video/')) return 'videos';
   if (mimeType.startsWith('audio/')) return 'audio';
   if (mimeType.includes('pdf')) return 'pdfs';
-  if (mimeType.includes('document') || mimeType.includes('spreadsheet') || mimeType.includes('presentation'))
-    return 'docs';
-  if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || mimeType.includes('gz'))
-    return 'archives';
+  if (mimeType.includes('document') || mimeType.includes('spreadsheet') || mimeType.includes('presentation')) return 'docs';
+  if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || mimeType.includes('gz')) return 'archives';
   if (mimeType.includes('text/')) return 'docs';
   return 'other';
 }
 
-/** Format bytes to human-readable string */
 export function formatFileSize(bytes: number | null): string {
-  if (bytes === null || bytes === 0) return '';
+  if (bytes == null || bytes <= 0) return '';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  const value = bytes / Math.pow(1024, i);
-  return `${value.toFixed(1)} ${units[i]}`;
-}
-
-/** Format ISO date to relative or short date */
-export function formatFileDate(isoDate: string): string {
-  if (!isoDate) return '—';
-  const date = new Date(isoDate);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 }
 
 const FileCard: React.FC<FileCardProps> = ({ file, onPress }) => {
   const typeInfo = categorizeMimeType(file.mimeType);
-  const isImageOrVideo = file.mimeType.startsWith('image/') || file.mimeType.startsWith('video/');
-  const showThumbnail = !!file.thumbnailLink && isImageOrVideo;
+  const isMedia = file.mimeType.startsWith('image/') || file.mimeType.startsWith('video/');
+  const showThumb = !!file.thumbnailLink && isMedia;
+
+  // Inline date formatting (no helper function to avoid any crash)
+  let dateLabel = '—';
+  if (file.modifiedTime) {
+    try {
+      const d = new Date(file.modifiedTime);
+      const now = new Date();
+      const diff = Math.floor((now.getTime() - d.getTime()) / 86400000);
+      if (diff === 0) dateLabel = 'Today';
+      else if (diff === 1) dateLabel = 'Yesterday';
+      else if (diff < 7) dateLabel = `${diff}d ago`;
+      else if (diff < 30) dateLabel = `${Math.floor(diff / 7)}w ago`;
+      else dateLabel = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } catch { dateLabel = file.modifiedTime; }
+  }
+
+  const sizeLabel = file.size != null && file.size > 0 ? formatFileSize(file.size) : null;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={() => onPress(file)} activeOpacity={0.7}>
-      <View style={[styles.iconContainer, showThumbnail && { padding: 0, backgroundColor: '#eef1f8', overflow: 'hidden' }]}>
-        {showThumbnail ? (
-          <Image source={{ uri: file.thumbnailLink }} style={styles.thumbnail} resizeMode="cover" />
+    <TouchableOpacity style={s.card} onPress={() => onPress(file)} activeOpacity={0.7}>
+      <View style={[s.iconBox, showThumb && { padding: 0, overflow: 'hidden' }]}>
+        {showThumb ? (
+          <Image source={{ uri: file.thumbnailLink }} style={s.thumb} resizeMode="cover" />
         ) : file.iconLink ? (
-          <Image source={{ uri: file.iconLink }} style={styles.driveIcon} resizeMode="contain" />
+          <Image source={{ uri: file.iconLink }} style={s.drIcon} resizeMode="contain" />
         ) : (
-          <Text style={styles.icon}>{typeInfo.icon}</Text>
+          <Text style={s.emoji}>{typeInfo.icon}</Text>
         )}
       </View>
 
-      <View style={styles.info}>
-        <View style={styles.topRow}>
-          <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">
-            {file.name}
-          </Text>
-          <ProviderBadge providerId={file.provider} />
-        </View>
-        <View style={styles.bottomRow}>
-          {!file.modifiedTime ? (
-            <Text style={[styles.meta, { color: '#999' }]}>—</Text>
-          ) : (
-            <Text style={[styles.meta, { color: '#333' }]}>{file.modifiedTime}</Text>
-          )}
-          {file.size != null && file.size > 0 && (
-            <Text style={[styles.meta, { color: '#333' }]}>  {String(file.size)}B</Text>
-          )}
+      <View style={s.info}>
+        <Text style={s.name} numberOfLines={1}>{file.name}</Text>
+        <View style={s.metaRow}>
+          <Text style={s.meta}>{dateLabel}</Text>
+          {sizeLabel && <Text style={s.meta}>{' • '}{sizeLabel}</Text>}
         </View>
       </View>
 
-      <Text style={styles.chevron}>›</Text>
+      <ProviderBadge providerId={file.provider} />
     </TouchableOpacity>
   );
 };
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
   },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#f0f4ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+  iconBox: {
+    width: 40, height: 40, borderRadius: 8, backgroundColor: '#f0f4ff',
+    justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
-  icon: {
-    fontSize: 20,
-  },
-  driveIcon: {
-    width: 32,
-    height: 32,
-  },
-  thumbnail: {
-    width: 40,
-    height: 40,
-  },
-  info: {
-    flex: 1,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  name: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#333',
-    flex: 1,
-    marginRight: 8,
-  },
-  bottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  meta: {
-    fontSize: 12,
-    color: '#999',
-  },
-  chevron: {
-    fontSize: 20,
-    color: '#ccc',
-    marginLeft: 8,
-  },
+  emoji: { fontSize: 20 },
+  drIcon: { width: 32, height: 32 },
+  thumb: { width: 40, height: 40, borderRadius: 8 },
+  info: { flex: 1, marginRight: 8 },
+  name: { fontSize: 15, fontWeight: '500', color: '#333', marginBottom: 3 },
+  metaRow: { flexDirection: 'row', alignItems: 'center' },
+  meta: { fontSize: 12, color: '#999' },
 });
 
 export default FileCard;
