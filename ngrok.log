@@ -1,0 +1,19 @@
+t=2026-07-18T23:34:46-0600 lvl=info msg="command usage" msg="Flag --domain has been deprecated, use --url instead"
+t=2026-07-18T23:34:46-0600 lvl=info msg="no configuration paths supplied"
+t=2026-07-18T23:34:46-0600 lvl=info msg="using configuration at default config path" path=C:\\Users\\hvasq\\AppData\\Local\\ngrok\\ngrok.yml
+t=2026-07-18T23:34:46-0600 lvl=info msg="open config file" path=C:\\Users\\hvasq\\AppData\\Local\\ngrok\\ngrok.yml err=nil
+t=2026-07-18T23:34:46-0600 lvl=info msg="FIPS 140 mode" enabled=false
+t=2026-07-18T23:34:46-0600 lvl=info msg="starting web service" obj=web addr=127.0.0.1:4040 allow_hosts=[]
+t=2026-07-18T23:34:46-0600 lvl=info msg="client session established" obj=tunnels.session
+t=2026-07-18T23:34:46-0600 lvl=info msg="tunnel session started" obj=tunnels.session
+t=2026-07-18T23:34:47-0600 lvl=info msg="started tunnel" obj=tunnels name=command_line addr=http://localhost:8081 url=https://item-exciting-turbojet.ngrok-free.dev
+t=2026-07-18T23:36:51-0600 lvl=info msg="join connections" obj=join id=db0f47384699 l=[::1]:8081 r=189.203.149.253:2180
+t=2026-07-18T23:37:47-0600 lvl=info msg="join connections" obj=join id=bee7e404a49b l=[::1]:8081 r=189.203.149.253:2274
+t=2026-07-18T23:42:58-0600 lvl=info msg="join connections" obj=join id=30dfd73fdf0f l=[::1]:8081 r=189.203.149.253:23962
+t=2026-07-18T23:43:01-0600 lvl=info msg="join connections" obj=join id=d425bb846ba8 l=[::1]:8081 r=189.203.149.253:23962
+t=2026-07-18T23:44:06-0600 lvl=info msg="join connections" obj=join id=e66634de2f0a l=[::1]:8081 r=189.203.149.253:23962
+t=2026-07-18T23:44:09-0600 lvl=info msg="join connections" obj=join id=31bc3565f93e l=[::1]:8081 r=189.203.149.253:24181
+t=2026-07-19T00:00:23-0600 lvl=eror msg="heartbeat timeout, terminating session" obj=tunnels.session obj=csess id=3264632bfdeb clientid=0b35e90ffb8c97d8f9f98b9b2010ac4c
+t=2026-07-19T00:00:23-0600 lvl=eror msg="session closed, starting reconnect loop" obj=tunnels.session obj=csess id=63686c642691 err="read tcp 192.168.68.115:49692->52.53.56.252:443: wsarecv: An existing connection was forcibly closed by the remote host."
+t=2026-07-19T00:00:26-0600 lvl=info msg="client session established" obj=tunnels.session
+t=2026-07-19T00:00:26-0600 lvl=info msg="tunnel session started" obj=tunnels.session
