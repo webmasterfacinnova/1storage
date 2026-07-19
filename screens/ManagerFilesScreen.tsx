@@ -1,7 +1,6 @@
 // screens/ManagerFilesScreen.tsx
-// Manager Files — unified view of all user files across connected providers.
-// Loads lightweight previews first (just names + icons). Full details (size, date)
-// are fetched lazily when the user taps a file.
+// Manager Files — unified view across providers.
+// Lightweight previews first, full details on tap.
 
 import React, { useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import {
@@ -13,432 +12,248 @@ import {
   RefreshControl,
   ActivityIndicator,
   TextInput,
+  ScrollView,
 } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
-import FileCard, { UnifiedFile as UnifiedFileCard } from '../components/storage/FileCard';
+import FileCard, { UnifiedFile, mimeTypeToCategory } from '../components/storage/FileCard';
 import FileTypeTabs, { FILE_TYPE_TABS } from '../components/storage/FileTypeTabs';
-import ProviderBadge, { PROVIDERS } from '../components/storage/ProviderBadge';
+import { PROVIDERS } from '../components/storage/ProviderBadge';
 import { driveFilesService, DriveFilePreview } from '../services/drive-files.service';
 
-/* ───── Convert DriveFilePreview → UnifiedFile (with lazy details) ───── */
-function previewToUnified(preview: DriveFilePreview): UnifiedFileCard {
+function previewToUnified(p: DriveFilePreview): UnifiedFile {
   return {
-    id: preview.id,
-    name: preview.name,
-    mimeType: preview.mimeType,
-    size: preview.details?.size ?? null,
-    modifiedTime: preview.details?.modifiedTime ?? '',
+    id: p.id,
+    name: p.name,
+    mimeType: p.mimeType,
+    size: p.details?.size ?? null,
+    modifiedTime: p.details?.modifiedTime ?? '',
     provider: 'google-drive',
     providerName: 'Google Drive',
-    iconLink: preview.iconLink,
-    parents: preview.parents,
-    trashed: preview.trashed,
-    webViewLink: preview.details?.webViewLink,
+    iconLink: p.iconLink,
+    parents: p.parents,
+    trashed: p.trashed,
+    webViewLink: p.details?.webViewLink,
   };
 }
 
-/* ───── Helpers shared with FileCard ───── */
-import { mimeTypeToCategory, formatFileSize } from '../components/storage/FileCard';
-
-interface StorageSummary {
-  label: string;
-  size: number;
-  count: number;
-  icon: string;
-}
+interface SummaryItem { label: string; count: number; icon: string; }
 
 const ManagerFilesScreen: React.FC = () => {
   const navigation = useNavigation();
-
-  // State: lightweight previews
   const [previews, setPreviews] = useState<DriveFilePreview[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [nextPage, setNextPage] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
-
-  // UI state
-  const [activeTypeTab, setActiveTypeTab] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
+  const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
+  const detailCache = useRef(new Set<string>());
 
-  // Keep a set of file IDs whose details have been fetched
-  const detailsFetched = useRef(new Set<string>());
-
-  /* ───── Load previews ───── */
-  const loadPreviews = useCallback(async (append: boolean = false) => {
-    const pageToken = append ? nextPageToken : undefined;
-    if (append) setLoadingMore(true);
-    else setLoading(true);
-
-    const result = await driveFilesService.getPreviews(20, pageToken);
-    if (result) {
-      setPreviews(prev => append ? [...prev, ...result.files] : result.files);
-      setNextPageToken(result.nextPageToken);
+  const load = useCallback(async (append = false) => {
+    const token = append ? nextPage : undefined;
+    if (append) setLoadingMore(true); else setLoading(true);
+    const r = await driveFilesService.getPreviews(20, token);
+    if (r) {
+      setPreviews(prev => append ? [...prev, ...r.files] : r.files);
+      setNextPage(r.nextPageToken);
     }
     setLoading(false);
     setLoadingMore(false);
-  }, [nextPageToken]);
+  }, [nextPage]);
 
-  useEffect(() => { loadPreviews(false); }, []);
+  useEffect(() => { load(false); }, []);
 
-  // Refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setPreviews([]);
-    setNextPageToken(null);
-    detailsFetched.current.clear();
-    const result = await driveFilesService.getPreviews(20);
-    if (result) {
-      setPreviews(result.files);
-      setNextPageToken(result.nextPageToken);
-    }
+    setNextPage(null);
+    detailCache.current.clear();
+    const r = await driveFilesService.getPreviews(20);
+    if (r) { setPreviews(r.files); setNextPage(r.nextPageToken); }
     setRefreshing(false);
   }, []);
 
-  // Load more
-  const onEndReached = useCallback(() => {
-    if (nextPageToken && !loadingMore && !loading) {
-      loadPreviews(true);
-    }
-  }, [nextPageToken, loadingMore, loading, loadPreviews]);
+  const onEnd = useCallback(() => {
+    if (nextPage && !loadingMore && !loading) load(true);
+  }, [nextPage, loadingMore, loading, load]);
 
-  /* ───── Lazy detail fetch ───── */
-  const fetchDetail = useCallback(async (fileId: string) => {
-    if (detailsFetched.current.has(fileId)) return;
-    detailsFetched.current.add(fileId);
-    const detail = await driveFilesService.getDetail(fileId);
-    if (detail) {
-      setPreviews(prev =>
-        prev.map(p => p.id === fileId ? { ...p, details: detail } : p),
-      );
-    }
+  const fetchDetail = useCallback(async (id: string) => {
+    if (detailCache.current.has(id)) return;
+    detailCache.current.add(id);
+    const d = await driveFilesService.getDetail(id);
+    if (d) setPreviews(prev => prev.map(p => p.id === id ? { ...p, details: d } : p));
   }, []);
 
-  const handleFilePress = useCallback((file: UnifiedFileCard) => {
-    fetchDetail(file.id);
-    // TODO: navigate to file detail / folder browse
-  }, [fetchDetail]);
+  const handlePress = useCallback((f: UnifiedFile) => { fetchDetail(f.id); }, [fetchDetail]);
 
-  /* ───── Derived data ───── */
-  const unifiedFiles = useMemo(() => previews.map(previewToUnified), [previews]);
+  const unified = useMemo(() => previews.map(previewToUnified), [previews]);
 
-  const filteredFiles = useMemo(() => {
-    let result = unifiedFiles;
-
-    if (activeTypeTab !== 'all') {
-      result = result.filter(f => mimeTypeToCategory(f.mimeType) === activeTypeTab);
+  const filtered = useMemo(() => {
+    let items = unified;
+    if (activeTab !== 'all') items = items.filter(f => mimeTypeToCategory(f.mimeType) === activeTab);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      items = items.filter(f => f.name.toLowerCase().includes(q));
     }
+    return [...items].sort((a, b) =>
+      sortBy === 'name'
+        ? a.name.localeCompare(b.name)
+        : new Date(b.modifiedTime || 0).getTime() - new Date(a.modifiedTime || 0).getTime()
+    );
+  }, [unified, activeTab, search, sortBy]);
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(f => f.name.toLowerCase().includes(q));
-    }
-
-    switch (sortBy) {
-      case 'name':
-        result = [...result].sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      case 'date':
-        result = [...result].sort(
-          (a, b) => new Date(b.modifiedTime || 0).getTime() - new Date(a.modifiedTime || 0).getTime(),
-        );
-        break;
-    }
-
-    return result;
-  }, [unifiedFiles, activeTypeTab, searchQuery, sortBy]);
-
-  const storageSummary: StorageSummary[] = useMemo(() => {
-    const map = new Map<string, StorageSummary>();
-    for (const f of unifiedFiles) {
+  const summary = useMemo(() => {
+    const map = new Map<string, SummaryItem>();
+    for (const f of unified) {
       const cat = mimeTypeToCategory(f.mimeType);
       const tab = FILE_TYPE_TABS.find(t => t.key === cat);
-      const entry = map.get(cat) || {
-        label: tab?.label || cat,
-        size: 0,
-        count: 0,
-        icon: tab?.icon || '📦',
-      };
-      entry.count += 1;
-      map.set(cat, entry);
+      const e = map.get(cat) || { label: tab?.label || cat, count: 0, icon: tab?.icon || '📦' };
+      e.count += 1;
+      map.set(cat, e);
     }
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
-  }, [unifiedFiles]);
+  }, [unified]);
 
-  /* ───── Render ───── */
+  const renderItem = useCallback(({ item }: { item: UnifiedFile }) => (
+    <FileCard file={item} onPress={handlePress} />
+  ), [handlePress]);
 
-  const renderHeader = () => (
-    <View>
-      {/* Summary bar */}
-      <View style={styles.summaryBar}>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryValue}>{previews.length}+</Text>
-          <Text style={styles.summaryLabel}>Files</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryValue}>{PROVIDERS['google-drive']?.label}</Text>
-          <Text style={styles.summaryLabel}>Providers</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryValue}>
-            {unifiedFiles.filter(f => f.size !== null).length}
-          </Text>
-          <Text style={styles.summaryLabel}>With sizes</Text>
-        </View>
+  const renderEmpty = () => {
+    if (loading) return <ActivityIndicator size="large" color="#1a237e" style={{ margin: 60 }} />;
+    return (
+      <View style={s.empty}>
+        <Text style={s.emptyIcon}>📂</Text>
+        <Text style={s.emptyTitle}>No files</Text>
+        <Text style={s.emptyDesc}>{search ? 'Try a different search' : 'Connect a provider to see files'}</Text>
       </View>
-
-      {/* Type mini-cards */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.typeSummaryScroll}
-        contentContainerStyle={styles.typeSummaryContent}
-      >
-        {storageSummary.slice(0, 6).map(item => (
-          <TouchableOpacity
-            key={item.label}
-            style={styles.typeSummaryCard}
-            onPress={() => {
-              const tab = FILE_TYPE_TABS.find(
-                t => t.label === item.label || t.key === item.label.toLowerCase(),
-              );
-              setActiveTypeTab(tab?.key || 'other');
-            }}
-          >
-            <Text style={styles.typeSummaryIcon}>{item.icon}</Text>
-            <Text style={styles.typeSummaryLabel}>{item.label}</Text>
-            <Text style={styles.typeSummarySize}>{item.count} files</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Type filter tabs */}
-      <FileTypeTabs activeTab={activeTypeTab} onTabChange={setActiveTypeTab} />
-
-      {/* Search + Sort */}
-      <View style={styles.searchRow}>
-        <TouchableOpacity style={styles.searchToggle} onPress={() => setShowSearch(!showSearch)}>
-          <Text style={styles.searchToggleText}>{showSearch ? '✕' : '🔍'}</Text>
-        </TouchableOpacity>
-
-        {showSearch && (
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search files..."
-            placeholderTextColor="#999"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoFocus
-          />
-        )}
-
-        <TouchableOpacity
-          style={styles.sortButton}
-          onPress={() => setSortBy(s => s === 'name' ? 'date' : 'name')}
-        >
-          <Text style={styles.sortButtonText}>
-            Sort: {sortBy === 'name' ? 'Name' : 'Date'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Section header */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>
-          {activeTypeTab === 'all'
-            ? 'All Files'
-            : FILE_TYPE_TABS.find(t => t.key === activeTypeTab)?.label || 'Files'}
-        </Text>
-        <Text style={styles.sectionCount}>
-          {filteredFiles.length} file{filteredFiles.length !== 1 ? 's' : ''}
-        </Text>
-      </View>
-    </View>
-  );
-
-  const renderEmpty = () => (
-    <View style={styles.emptyState}>
-      {loading ? (
-        <ActivityIndicator size="large" color="#1a237e" />
-      ) : (
-        <>
-          <Text style={styles.emptyIcon}>📂</Text>
-          <Text style={styles.emptyTitle}>No files found</Text>
-          <Text style={styles.emptyDesc}>
-            {searchQuery
-              ? 'Try a different search term'
-              : 'Connect a storage provider to see your files here'}
-          </Text>
-        </>
-      )}
-    </View>
-  );
+    );
+  };
 
   const renderFooter = () => {
-    if (!loadingMore) return <View style={{ height: 40 }} />;
+    if (!loadingMore) return <View style={{ height: 60 }} />;
     return (
-      <View style={styles.footerLoader}>
+      <View style={s.footer}>
         <ActivityIndicator size="small" color="#1a237e" />
-        <Text style={styles.footerText}>Loading more...</Text>
+        <Text style={s.footerText}>Loading more…</Text>
       </View>
     );
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backText}>‹</Text>
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Manager Files</Text>
-          <Text style={styles.headerSub}>
-            {loading ? 'Loading...' : `${previews.length} files loaded`}
-          </Text>
+    <View style={s.container}>
+      {/* Fixed header — OUTSIDE FlatList */}
+      <View style={s.headerBar}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}><Text style={s.backText}>‹</Text></TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={s.title}>Manager Files</Text>
+          <Text style={s.sub}>{loading ? 'Loading…' : `${previews.length} file previews`}</Text>
         </View>
         {loading && previews.length === 0 && <ActivityIndicator size="small" color="#1a237e" />}
       </View>
 
-      {/* List */}
-      <FlatList
-        data={filteredFiles}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <FileCard file={item} onPress={handleFilePress} />
+      {/* Summary bar — outside FlatList to avoid ScrollView nesting */}
+      <View style={s.bar}>
+        <View style={s.cell}><Text style={s.val}>{previews.length}</Text><Text style={s.lbl}>Files</Text></View>
+        <View style={s.cell}><Text style={s.val}>{PROVIDERS['google-drive']?.label}</Text><Text style={s.lbl}>Provider</Text></View>
+        <View style={s.cell}><Text style={s.val}>{unified.filter(f => f.size != null).length}</Text><Text style={s.lbl}>Details</Text></View>
+      </View>
+
+      {/* Type mini-cards — outside FlatList, horizontal ScrollView is fine here */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.typeScroll}>
+        {summary.slice(0, 7).map(item => (
+          <TouchableOpacity key={item.label} style={s.typeCard} onPress={() => {
+            const tab = FILE_TYPE_TABS.find(t => t.label === item.label || t.key === item.label.toLowerCase());
+            setActiveTab(tab?.key || 'other');
+          }}>
+            <Text style={s.typeIcon}>{item.icon}</Text>
+            <Text style={s.typeLabel}>{item.label}</Text>
+            <Text style={s.typeCount}>{item.count}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Tabs + search row — also outside FlatList so they're sticky */}
+      <FileTypeTabs activeTab={activeTab} onTabChange={setActiveTab} />
+      <View style={s.actions}>
+        <TouchableOpacity onPress={() => setShowSearch(!showSearch)} style={s.iconBtn}>
+          <Text>{showSearch ? '✕' : '🔍'}</Text>
+        </TouchableOpacity>
+        {showSearch && (
+          <TextInput style={s.searchInput} placeholder="Search files…" placeholderTextColor="#999"
+            value={search} onChangeText={setSearch} autoFocus />
         )}
-        ListHeaderComponent={renderHeader}
+        <TouchableOpacity style={s.sortBtn} onPress={() => setSortBy(s => s === 'name' ? 'date' : 'name')}>
+          <Text style={s.sortText}>Sort: {sortBy === 'name' ? 'Name' : 'Date'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Section header */}
+      <View style={s.section}>
+        <Text style={s.sectionTitle}>
+          {activeTab === 'all' ? 'All Files' : FILE_TYPE_TABS.find(t => t.key === activeTab)?.label || 'Files'}
+        </Text>
+        <Text style={s.sectionCount}>{filtered.length} file{filtered.length !== 1 ? 's' : ''}</Text>
+      </View>
+
+      {/* FlatList — only the file items, no nested ScrollView inside */}
+      <FlatList
+        data={filtered}
+        keyExtractor={item => item.id}
+        renderItem={renderItem}
         ListEmptyComponent={renderEmpty}
         ListFooterComponent={renderFooter}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#1a237e"
-          />
-        }
-        onEndReached={onEndReached}
-        onEndReachedThreshold={0.5}
-        contentContainerStyle={filteredFiles.length === 0 ? styles.emptyList : undefined}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1a237e" />}
+        onEndReached={onEnd}
+        onEndReachedThreshold={0.3}
+        style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
       />
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+
+  headerBar: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
+    paddingTop: 12, paddingBottom: 12, backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: '#e9ecef',
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
+  back: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
   backText: { fontSize: 28, color: '#1a237e', fontWeight: '300', lineHeight: 30 },
-  headerCenter: { flex: 1 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#1a237e' },
-  headerSub: { fontSize: 12, color: '#888', marginTop: 1 },
-  summaryBar: {
-    flexDirection: 'row',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-  },
-  summaryCard: { flex: 1, alignItems: 'center' },
-  summaryValue: { fontSize: 18, fontWeight: 'bold', color: '#1a237e' },
-  summaryLabel: { fontSize: 12, color: '#888', marginTop: 2 },
-  typeSummaryScroll: {
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-  },
-  typeSummaryContent: { paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
-  typeSummaryCard: {
-    width: 80,
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  typeSummaryIcon: { fontSize: 20, marginBottom: 4 },
-  typeSummaryLabel: { fontSize: 11, fontWeight: '600', color: '#555', textAlign: 'center' },
-  typeSummarySize: { fontSize: 10, color: '#999', marginTop: 2 },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-  },
-  searchToggle: {
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  searchToggleText: { fontSize: 18 },
-  searchInput: {
-    flex: 1,
-    height: 36,
-    backgroundColor: '#f0f4ff',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 14,
-    color: '#333',
-    marginRight: 8,
-  },
-  sortButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#f0f4ff',
-    borderRadius: 6,
-  },
-  sortButtonText: { fontSize: 12, color: '#1a237e', fontWeight: '600' },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
+  title: { fontSize: 20, fontWeight: 'bold', color: '#1a237e' },
+  sub: { fontSize: 12, color: '#888', marginTop: 1 },
+
+  bar: { flexDirection: 'row', padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e9ecef' },
+  cell: { flex: 1, alignItems: 'center' },
+  val: { fontSize: 18, fontWeight: 'bold', color: '#1a237e' },
+  lbl: { fontSize: 12, color: '#888', marginTop: 2 },
+
+  typeScroll: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e9ecef', paddingHorizontal: 16, paddingVertical: 12, maxHeight: 80 },
+  typeCard: { width: 80, alignItems: 'center', paddingVertical: 8, backgroundColor: '#f8f9fa', borderRadius: 8, marginRight: 10 },
+  typeIcon: { fontSize: 20, marginBottom: 4 },
+  typeLabel: { fontSize: 11, fontWeight: '600', color: '#555' },
+  typeCount: { fontSize: 10, color: '#999', marginTop: 2 },
+
+  actions: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e9ecef' },
+  iconBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
+  searchInput: { flex: 1, height: 36, backgroundColor: '#f0f4ff', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#333', marginRight: 8 },
+  sortBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#f0f4ff', borderRadius: 6 },
+  sortText: { fontSize: 12, color: '#1a237e', fontWeight: '600' },
+
+  section: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#333' },
   sectionCount: { fontSize: 13, color: '#999' },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
+
+  empty: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: '#555', marginBottom: 8 },
   emptyDesc: { fontSize: 14, color: '#999', textAlign: 'center', paddingHorizontal: 40 },
-  emptyList: { flexGrow: 1 },
-  footerLoader: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 16,
-    gap: 8,
-  },
+
+  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 20, gap: 8 },
   footerText: { fontSize: 13, color: '#999' },
 });
 
