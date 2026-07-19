@@ -1,31 +1,41 @@
-Starting project at C:\Users\hvasq\OneDrive\Documentos\Codes\1storage
 env: load .env.local .env
 env: export EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_APP_NAME EXPO_PUBLIC_APP_SCHEME EXPO_PUBLIC_GOOGLE_CLIENT_SECRET
+Starting project at C:\Users\hvasq\OneDrive\Documentos\Codes\1storage
 Starting Metro Bundler
 warning: Bundler cache is empty, rebuilding (this may take a minute)
 The following packages should be updated for best compatibility with the installed expo version:
-  @react-native-async-storage/async-storage@1.24.0 - expected version: 1.21.0
-  react-native@0.74.0 - expected version: 0.73.6
-  react-native-safe-area-context@4.10.1 - expected version: 4.8.2
-  @types/react@18.3.31 - expected version: ~18.2.45
-Your project may not work correctly until you install the correct versions of the packages.
+  @react-native-async-storage/async-storage@1.21.0 - expected version: 1.23.1
+  expo-modules-core@2.0.6 - expected version: ~2.2.3
+  metro@0.80.12 - expected version: ^0.81.0
+  react-native@0.76.0 - expected version: 0.76.9
+  react-native-screens@4.0.0 - expected version: ~4.4.0
+Your project may not work correctly until you install the expected versions of the packages.
 Waiting on http://localhost:8081
 Logs for your project will appear below.
-transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
-transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
-transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
-transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
-transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
-transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
-transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
-transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
-transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
-transform[stderr]: Missing transform.routerRoot option in Metro bundling request, falling back to `app` as routes directory.
-Web Bundled 21158ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
-Web Bundled 22107ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
-Web Bundled 104ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
-Web Bundled 102ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
-Web Bundled 98ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
-Web Bundled 207ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
-Web Bundled 272ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
-Web Bundled 101ms (C:\Users\hvasq\OneDrive\Documentos\Codes\1storage\node_modules\expo\AppEntry.js)
+| (node:37972) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:13272) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:32528) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:13376) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:10524) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:36136) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:28376) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:18160) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:36416) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:4420) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Web Bundled 18792ms node_modules\expo\AppEntry.js (554 modules)
+Web Bundled 18871ms node_modules\expo\AppEntry.js (1 module)
+Web Bundled 19064ms node_modules\expo\AppEntry.js (554 modules)
+Web Bundled 121ms node_modules\expo\AppEntry.js (1 module)
+Web Bundled 112ms node_modules\expo\AppEntry.js (1 module)
+Web Bundled 105ms node_modules\expo\AppEntry.js (1 module)
+Web Bundled 105ms node_modules\expo\AppEntry.js (1 module)
