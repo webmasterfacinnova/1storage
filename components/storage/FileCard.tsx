@@ -2,7 +2,7 @@
 // Individual file card with type icon, provider badge, size, and date
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import ProviderBadge from './ProviderBadge';
 
 export interface UnifiedFile {
@@ -66,8 +66,8 @@ export function formatFileSize(bytes: number | null): string {
 
 /** Format ISO date to relative or short date */
 export function formatFileDate(isoDate: string): string {
+  if (!isoDate) return '—';
   const date = new Date(isoDate);
-  const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
@@ -80,11 +80,16 @@ export function formatFileDate(isoDate: string): string {
 
 const FileCard: React.FC<FileCardProps> = ({ file, onPress }) => {
   const typeInfo = categorizeMimeType(file.mimeType);
+  const hasThumbnail = !!file.webViewLink && (file.mimeType.startsWith('image/') || file.mimeType.startsWith('video/'));
 
   return (
     <TouchableOpacity style={styles.card} onPress={() => onPress(file)} activeOpacity={0.7}>
-      <View style={styles.iconContainer}>
-        <Text style={styles.icon}>{typeInfo.icon}</Text>
+      <View style={[styles.iconContainer, hasThumbnail && { backgroundColor: 'transparent', overflow: 'hidden' }]}>
+        {file.iconLink ? (
+          <Image source={{ uri: file.iconLink }} style={styles.driveIcon} resizeMode="contain" />
+        ) : (
+          <Text style={styles.icon}>{typeInfo.icon}</Text>
+        )}
       </View>
 
       <View style={styles.info}>
@@ -128,6 +133,10 @@ const styles = StyleSheet.create({
   },
   icon: {
     fontSize: 20,
+  },
+  driveIcon: {
+    width: 32,
+    height: 32,
   },
   info: {
     flex: 1,
