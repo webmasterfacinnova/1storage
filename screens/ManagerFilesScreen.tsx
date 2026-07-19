@@ -1,5 +1,5 @@
 // screens/ManagerFilesScreen.tsx
-// Manager Files — simple ScrollView-based layout.
+// Manager Files — FlatList-based layout (no nested ScrollView issues).
 
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
@@ -10,12 +10,12 @@ import {
   ActivityIndicator,
   TextInput,
   ScrollView,
+  FlatList,
   RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import FileCard, { UnifiedFile, mimeTypeToCategory } from '../components/storage/FileCard';
 import FileTypeTabs, { FILE_TYPE_TABS } from '../components/storage/FileTypeTabs';
-import { PROVIDERS } from '../components/storage/ProviderBadge';
 import { driveFilesService, DriveFilePreview } from '../services/drive-files.service';
 
 function toUnified(p: DriveFilePreview): UnifiedFile {
@@ -42,7 +42,7 @@ const ManagerFilesScreen: React.FC = () => {
   const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
 
   const load = useCallback(async (append = false) => {
-    const pt = append ? nextPage : undefined;
+    const pt = append && nextPage ? nextPage : undefined;
     if (append) setLoadingMore(true); else setLoading(true);
     const r = await driveFilesService.getPreviews(20, pt);
     if (r) {
@@ -71,6 +71,18 @@ const ManagerFilesScreen: React.FC = () => {
       setNextPage(r.nextPageToken);
     }
   }, [nextPage, loadingMore, loading]);
+
+  // Fetch detail for a file when user taps it
+  const fetchDetail = useCallback(async (fileId: string) => {
+    const detail = await driveFilesService.getDetail(fileId);
+    if (detail) {
+      setPreviews(prev =>
+        prev.map(p =>
+          p.id === fileId ? { ...p, details: detail } : p
+        )
+      );
+    }
+  }, []);
 
   // fixed counts (non-reactive helpers for summary)
   const pLen = previews.length;
@@ -106,6 +118,80 @@ const ManagerFilesScreen: React.FC = () => {
     );
   }
 
+  // Render header section for FlatList's ListHeaderComponent
+  const renderHeader = useCallback(() => (
+    <>
+      {/* Summary */}
+      <View style={s.bar}>
+        <View style={s.cell}><Text style={s.val}>{pLen}</Text><Text style={s.lbl}>Files</Text></View>
+        <View style={s.cell}><Text style={s.val}>GD</Text><Text style={s.lbl}>Provider</Text></View>
+        <View style={s.cell}><Text style={s.val}>{unified.filter(f => f.size != null).length}</Text><Text style={s.lbl}>Details</Text></View>
+      </View>
+
+      {/* Type mini-cards */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.typeScroll} nestedScrollEnabled>
+        {summary.slice(0, 7).map(i => (
+          <TouchableOpacity key={i.label} style={s.typeCard} onPress={() => {
+            const t = FILE_TYPE_TABS.find(x => x.label === i.label || x.key === i.label.toLowerCase());
+            setTab(t?.key || 'other');
+          }}>
+            <Text style={s.typeIcon}>{i.icon}</Text>
+            <Text style={s.typeLabel}>{i.label}</Text>
+            <Text style={s.typeCount}>{i.count}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Tabs */}
+      <FileTypeTabs activeTab={tab} onTabChange={setTab} />
+
+      {/* Search + Sort */}
+      <View style={s.actions}>
+        <TouchableOpacity onPress={() => setShowSearch(!showSearch)}><Text>{showSearch ? '✕' : '🔍'}</Text></TouchableOpacity>
+        {showSearch && (
+          <TextInput style={s.si} placeholder="Search files…" placeholderTextColor="#999" value={search}
+            onChangeText={setSearch} autoFocus />
+        )}
+        <TouchableOpacity style={s.sb} onPress={() => setSortBy(s => s === 'name' ? 'date' : 'name')}>
+          <Text style={s.sbt}>Sort: {sortBy === 'name' ? 'Name' : 'Date'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Section */}
+      <View style={s.sec}>
+        <Text style={s.secTitle}>
+          {tab === 'all' ? 'All Files' : FILE_TYPE_TABS.find(t => t.key === tab)?.label || 'Files'}
+        </Text>
+        <Text style={s.secCount}>{filtered.length} file{filtered.length !== 1 ? 's' : ''}</Text>
+      </View>
+    </>
+  ), [pLen, unified, summary, tab, showSearch, search, sortBy, filtered.length]);
+
+  const renderFooter = useCallback(() => {
+    if (filtered.length === 0 && !loading) {
+      return (
+        <View style={s.empty}>
+          <Text style={s.emptyIcon}>📂</Text>
+          <Text style={s.emptyTitle}>No files</Text>
+          <Text style={s.emptyDesc}>{search ? 'Try a different search' : 'Connect a provider'}</Text>
+        </View>
+      );
+    }
+    return nextPage ? (
+      <TouchableOpacity style={s.lmBtn} onPress={onLoadMore} disabled={loadingMore}>
+        {loadingMore ? (
+          <ActivityIndicator size="small" color="#1a237e" />
+        ) : (
+          <Text style={s.lmText}>Load more</Text>
+        )}
+      </TouchableOpacity>
+    ) : null;
+  }, [filtered.length, loading, search, nextPage, loadingMore, onLoadMore]);
+
+  const renderFile = useCallback(({ item: f }: { item: UnifiedFile }) => (
+    <FileCard key={f.id} file={f} onPress={() => fetchDetail(f.id)} />
+  ), [fetchDetail]);
+
   return (
     <View style={s.container}>
       {/* Header */}
@@ -114,75 +200,18 @@ const ManagerFilesScreen: React.FC = () => {
         <Text style={s.title}>Manager Files</Text>
       </View>
 
-      <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1a237e" />}
-        contentContainerStyle={{ paddingBottom: 60 }}
-      >
-        {/* Summary */}
-        <View style={s.bar}>
-          <View style={s.cell}><Text style={s.val}>{pLen}</Text><Text style={s.lbl}>Files</Text></View>
-          <View style={s.cell}><Text style={s.val}>GD</Text><Text style={s.lbl}>Provider</Text></View>
-          <View style={s.cell}><Text style={s.val}>{unified.filter(f => f.size != null).length}</Text><Text style={s.lbl}>Details</Text></View>
-        </View>
-
-        {/* Type mini-cards */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.typeScroll}>
-          {summary.slice(0, 7).map(i => (
-            <TouchableOpacity key={i.label} style={s.typeCard} onPress={() => {
-              const t = FILE_TYPE_TABS.find(x => x.label === i.label || x.key === i.label.toLowerCase());
-              setTab(t?.key || 'other');
-            }}>
-              <Text style={s.typeIcon}>{i.icon}</Text>
-              <Text style={s.typeLabel}>{i.label}</Text>
-              <Text style={s.typeCount}>{i.count}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Tabs */}
-        <FileTypeTabs activeTab={tab} onTabChange={setTab} />
-
-        {/* Search + Sort */}
-        <View style={s.actions}>
-          <TouchableOpacity onPress={() => setShowSearch(!showSearch)}><Text>{showSearch ? '✕' : '🔍'}</Text></TouchableOpacity>
-          {showSearch && (
-            <TextInput style={s.si} placeholder="Search files…" placeholderTextColor="#999" value={search}
-              onChangeText={setSearch} autoFocus />
-          )}
-          <TouchableOpacity style={s.sb} onPress={() => setSortBy(s => s === 'name' ? 'date' : 'name')}>
-            <Text style={s.sbt}>Sort: {sortBy === 'name' ? 'Name' : 'Date'}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Section */}
-        <View style={s.sec}>
-          <Text style={s.secTitle}>
-            {tab === 'all' ? 'All Files' : FILE_TYPE_TABS.find(t => t.key === tab)?.label || 'Files'}
-          </Text>
-          <Text style={s.secCount}>{filtered.length} file{filtered.length !== 1 ? 's' : ''}</Text>
-        </View>
-
-        {/* Files */}
-        {filtered.length === 0 && !loading && (
-          <View style={s.empty}>
-            <Text style={s.emptyIcon}>📂</Text>
-            <Text style={s.emptyTitle}>No files</Text>
-            <Text style={s.emptyDesc}>{search ? 'Try a different search' : 'Connect a provider'}</Text>
-          </View>
-        )}
-        {filtered.map(f => <FileCard key={f.id} file={f} onPress={() => {}} />)}
-
-        {/* Load more */}
-        {nextPage && (
-          <TouchableOpacity style={s.lmBtn} onPress={onLoadMore} disabled={loadingMore}>
-            {loadingMore ? (
-              <ActivityIndicator size="small" color="#1a237e" />
-            ) : (
-              <Text style={s.lmText}>Load more</Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </ScrollView>
+      <FlatList
+        data={filtered}
+        keyExtractor={f => f.id}
+        renderItem={renderFile}
+        ListHeaderComponent={renderHeader}
+        ListFooterComponent={renderFooter}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1a237e" />
+        }
+        contentContainerStyle={{ paddingBottom: 60, flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      />
     </View>
   );
 };
