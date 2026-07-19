@@ -105,10 +105,14 @@ const FileCard: React.FC<FileCardProps> = ({ file, onPress }) => {
           <ProviderBadge providerId={file.provider} />
         </View>
         <View style={styles.bottomRow}>
-          {file.size !== null && file.size > 0 && (
-            <Text style={styles.meta}>{formatFileSize(file.size)}</Text>
+          {!file.modifiedTime ? (
+            <Text style={[styles.meta, { color: '#999' }]}>—</Text>
+          ) : (
+            <Text style={[styles.meta, { color: '#333' }]}>{file.modifiedTime}</Text>
           )}
-          <Text style={styles.meta}>{formatFileDate(file.modifiedTime)}</Text>
+          {file.size != null && file.size > 0 && (
+            <Text style={[styles.meta, { color: '#333' }]}>  {String(file.size)}B</Text>
+          )}
         </View>
       </View>
 
