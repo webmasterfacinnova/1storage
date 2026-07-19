@@ -69,6 +69,7 @@ export function formatFileSize(bytes: number | null): string {
 export function formatFileDate(isoDate: string): string {
   if (!isoDate) return '—';
   const date = new Date(isoDate);
+  const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
