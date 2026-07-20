@@ -39,27 +39,22 @@ const AddProviderScreen: React.FC = () => {
     onedrive: 'disconnected',
   });
 
-  const setProviderStatus = useCallback((id: string, status: ProviderStatus) => {
-    setProviderStatuses(prev => ({ ...prev, [id]: status }));
-  }, []);
-
-  const connectOneDrive = useCallback(async () => {
-    setProviderStatus('onedrive', 'connecting');
+  const connectOneDrive = async () => {
     try {
+      setProviderStatuses(prev => ({ ...prev, onedrive: 'connecting' }));
       const authService = new OneDriveAuthService();
       await authService.initialize();
       const result = await authService.signIn();
 
-      // Dispatch credentials so the app knows OneDrive is connected
       dispatch(setCredentials({
         user: result.user,
         token: result.token,
         provider: result.provider,
       }));
 
-      setProviderStatus('onedrive', 'connected');
+      setProviderStatuses(prev => ({ ...prev, onedrive: 'connected' }));
       Alert.alert('Connected!', 'Your Microsoft OneDrive has been connected successfully.', [
-        { text: 'OK', onPress: () => navigation.replace('Home') },
+        { text: 'OK', onPress: () => navigation.navigate('Home') },
       ]);
     } catch (err: any) {
       let message = 'Could not connect to OneDrive';
@@ -71,10 +66,10 @@ const AddProviderScreen: React.FC = () => {
         }
       }
       dispatch(setError(message));
-      setProviderStatus('onedrive', 'disconnected');
+      setProviderStatuses(prev => ({ ...prev, onedrive: 'disconnected' }));
       Alert.alert('Connection failed', message);
     }
-  }, [dispatch, navigation, setProviderStatus]);
+  };
 
   const providers: ProviderItem[] = [
     {
