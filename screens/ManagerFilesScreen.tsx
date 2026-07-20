@@ -1,5 +1,5 @@
 // screens/ManagerFilesScreen.tsx
-// Manager Files — simple ScrollView-based layout.
+// Manager Files — FlatList-based layout (no nested ScrollView issues).
 
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
@@ -10,13 +10,13 @@ import {
   ActivityIndicator,
   TextInput,
   ScrollView,
+  FlatList,
   RefreshControl,
   useWindowDimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import FileCard, { UnifiedFile, mimeTypeToCategory } from '../components/storage/FileCard';
 import FileTypeTabs, { FILE_TYPE_TABS } from '../components/storage/FileTypeTabs';
-import { PROVIDERS } from '../components/storage/ProviderBadge';
 import { driveFilesService, DriveFilePreview } from '../services/drive-files.service';
 
 function toUnified(p: DriveFilePreview): UnifiedFile {
@@ -47,7 +47,7 @@ const ManagerFilesScreen: React.FC = () => {
   const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
 
   const load = useCallback(async (append = false) => {
-    const pt = append ? nextPage : undefined;
+    const pt = append && nextPage ? nextPage : undefined;
     if (append) setLoadingMore(true); else setLoading(true);
     const r = await driveFilesService.getPreviews(20, pt);
     if (r) {
@@ -155,42 +155,44 @@ const ManagerFilesScreen: React.FC = () => {
           <View style={s.cell}><Text style={s.val}>{unified.filter(f => f.size != null).length}</Text><Text style={s.lbl}>Details</Text></View>
         </View>
 
-        {/* Type mini-cards */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.typeScroll}>
-          {summary.slice(0, 7).map(i => (
-            <TouchableOpacity key={i.label} style={s.typeCard} onPress={() => {
-              const t = FILE_TYPE_TABS.find(x => x.label === i.label || x.key === i.label.toLowerCase());
-              setTab(t?.key || 'other');
-            }}>
-              <Text style={s.typeIcon}>{i.icon}</Text>
-              <Text style={s.typeLabel}>{i.label}</Text>
-              <Text style={s.typeCount}>{i.count}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Tabs */}
-        <FileTypeTabs activeTab={tab} onTabChange={setTab} />
-
-        {/* Search + Sort */}
-        <View style={s.actions}>
-          <TouchableOpacity onPress={() => setShowSearch(!showSearch)}><Text>{showSearch ? '✕' : '🔍'}</Text></TouchableOpacity>
-          {showSearch && (
-            <TextInput style={s.si} placeholder="Search files…" placeholderTextColor="#999" value={search}
-              onChangeText={setSearch} autoFocus />
-          )}
-          <TouchableOpacity style={s.sb} onPress={() => setSortBy(s => s === 'name' ? 'date' : 'name')}>
-            <Text style={s.sbt}>Sort: {sortBy === 'name' ? 'Name' : 'Date'}</Text>
+      {/* Type mini-cards */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.typeScroll} nestedScrollEnabled>
+        {summary.slice(0, 7).map(i => (
+          <TouchableOpacity key={i.label} style={s.typeCard} onPress={() => {
+            const t = FILE_TYPE_TABS.find(x => x.label === i.label || x.key === i.label.toLowerCase());
+            setTab(t?.key || 'other');
+          }}>
+            <Text style={s.typeIcon}>{i.icon}</Text>
+            <Text style={s.typeLabel}>{i.label}</Text>
+            <Text style={s.typeCount}>{i.count}</Text>
           </TouchableOpacity>
-        </View>
+        ))}
+      </ScrollView>
 
-        {/* Section */}
-        <View style={s.sec}>
-          <Text style={s.secTitle}>
-            {tab === 'all' ? 'All Files' : FILE_TYPE_TABS.find(t => t.key === tab)?.label || 'Files'}
-          </Text>
-          <Text style={s.secCount}>{filtered.length} file{filtered.length !== 1 ? 's' : ''}</Text>
-        </View>
+      {/* Tabs */}
+      <FileTypeTabs activeTab={tab} onTabChange={setTab} />
+
+      {/* Search + Sort */}
+      <View style={s.actions}>
+        <TouchableOpacity onPress={() => setShowSearch(!showSearch)}><Text>{showSearch ? '✕' : '🔍'}</Text></TouchableOpacity>
+        {showSearch && (
+          <TextInput style={s.si} placeholder="Search files…" placeholderTextColor="#999" value={search}
+            onChangeText={setSearch} autoFocus />
+        )}
+        <TouchableOpacity style={s.sb} onPress={() => setSortBy(s => s === 'name' ? 'date' : 'name')}>
+          <Text style={s.sbt}>Sort: {sortBy === 'name' ? 'Name' : 'Date'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Section */}
+      <View style={s.sec}>
+        <Text style={s.secTitle}>
+          {tab === 'all' ? 'All Files' : FILE_TYPE_TABS.find(t => t.key === tab)?.label || 'Files'}
+        </Text>
+        <Text style={s.secCount}>{filtered.length} file{filtered.length !== 1 ? 's' : ''}</Text>
+      </View>
+    </>
+  ), [pLen, unified, summary, tab, showSearch, search, sortBy, filtered.length]);
 
         {/* Files */}
         {filtered.length === 0 && !loading && !loadingMore && !nextPage && (
