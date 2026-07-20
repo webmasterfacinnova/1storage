@@ -9,12 +9,8 @@ npm-debug.*
 *.mobileprovision
 *.orig.*
 web-build/
-.env.local
+.env
 .env.production
-
-# Keep the template .env in repo (it has no secrets)
-# .env
 
 # Google OAuth client secret files (contain client_secret — never commit)
 client_secret_*.json
-.env.local

@@ -54,7 +54,7 @@ class GoogleAuthService implements AuthService {
     this.clientId = Constants.expoConfig?.extra?.googleWebClientId ?? Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
     // Google "Web application" clients require the client secret at the token
     // exchange step. It is read from EXPO_PUBLIC_GOOGLE_CLIENT_SECRET (kept in
-    // .env.local, which is git-ignored). See the security note in signIn().
+    // .env, which is git-ignored). See the security note in signIn().
     this.clientSecret = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_SECRET ?? '';
 
     if (!this.clientId) {
