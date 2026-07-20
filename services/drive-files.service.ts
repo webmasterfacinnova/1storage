@@ -48,8 +48,8 @@ export interface StorageByType {
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
 
 class DriveFilesService {
-  // Minimal fields for the preview list — no sizes, no dates
-  private static readonly FIELDS_PREVIEW = 'files(id,name,mimeType,iconLink,parents),nextPageToken';
+  // Preview list fields — include size & modifiedTime so cards can show them (returned in the same list call, no extra requests)
+  private static readonly FIELDS_PREVIEW = 'files(id,name,mimeType,iconLink,parents,size,modifiedTime),nextPageToken';
   // Full fields when details are needed
   private static readonly FIELDS_FULL = 'files(id,name,mimeType,size,modifiedTime,iconLink,webViewLink,thumbnailLink,parents,trashed),nextPageToken';
   private static readonly PAGE_SIZE = 20;
@@ -89,7 +89,11 @@ class DriveFilesService {
           iconLink: f.iconLink,
           parents: f.parents,
           trashed: f.trashed,
-          details: null,
+          details: {
+            size: f.size ? parseInt(f.size, 10) : null,
+            modifiedTime: f.modifiedTime || '',
+            webViewLink: '',
+          },
         })),
         nextPageToken: data.nextPageToken || null,
       };

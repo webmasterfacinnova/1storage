@@ -11,6 +11,7 @@ import {
   TextInput,
   ScrollView,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import FileCard, { UnifiedFile, mimeTypeToCategory } from '../components/storage/FileCard';
@@ -31,6 +32,10 @@ function toUnified(p: DriveFilePreview): UnifiedFile {
 
 const ManagerFilesScreen: React.FC = () => {
   const nav = useNavigation();
+  const { height: windowHeight } = useWindowDimensions();
+  const [headerH, setHeaderH] = useState(56);      // measured header height
+  const [viewportH, setViewportH] = useState(0);   // measured ScrollView height
+  const [contentH, setContentH] = useState(0);     // measured ScrollView content height
   const [previews, setPreviews] = useState<DriveFilePreview[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -65,12 +70,21 @@ const ManagerFilesScreen: React.FC = () => {
 
   const onLoadMore = useCallback(async () => {
     if (!nextPage || loadingMore || loading) return;
+    setLoadingMore(true);
     const r = await driveFilesService.getPreviews(20, nextPage);
     if (r) {
       setPreviews(prev => [...prev, ...r.files]);
       setNextPage(r.nextPageToken);
     }
+    setLoadingMore(false);
   }, [nextPage, loadingMore, loading]);
+
+  // Infinite scroll — auto-load the next page when the user nears the bottom.
+  const onScroll = useCallback((e: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+    const distanceFromBottom = contentSize.height - (layoutMeasurement.height + contentOffset.y);
+    if (distanceFromBottom < 300) onLoadMore();
+  }, [onLoadMore]);
 
   // fixed counts (non-reactive helpers for summary)
   const pLen = previews.length;
@@ -86,6 +100,16 @@ const ManagerFilesScreen: React.FC = () => {
         ? a.name.localeCompare(b.name)
         : new Date(b.modifiedTime || 0).getTime() - new Date(a.modifiedTime || 0).getTime());
   }, [unified, tab, search, sortBy]);
+
+  // Auto-fill: filtering is client-side but paging is server-side. Keep pulling
+  // pages until the rendered content actually overflows the viewport (so there is
+  // something to scroll). Once it overflows, onScroll takes over. Falls back to a
+  // count check before measurements arrive.
+  useEffect(() => {
+    if (!nextPage || loadingMore || loading) return;
+    const notScrollableYet = viewportH > 0 ? contentH <= viewportH + 40 : filtered.length < 15;
+    if (notScrollableYet) onLoadMore();
+  }, [nextPage, loadingMore, loading, viewportH, contentH, filtered.length, onLoadMore]);
 
   const summary = useMemo(() => {
     const map = new Map<string, { label: string; count: number; icon: string }>();
@@ -107,16 +131,22 @@ const ManagerFilesScreen: React.FC = () => {
   }
 
   return (
-    <View style={s.container}>
+    <View style={[s.container, { height: windowHeight }]}>
       {/* Header */}
-      <View style={s.hdr}>
+      <View style={s.hdr} onLayout={e => setHeaderH(e.nativeEvent.layout.height)}>
         <TouchableOpacity onPress={() => nav.goBack()} style={s.back}><Text style={s.backTxt}>‹</Text></TouchableOpacity>
         <Text style={s.title}>Manager Files</Text>
       </View>
 
       <ScrollView
+        style={{ height: Math.max(windowHeight - headerH, 0) }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1a237e" />}
         contentContainerStyle={{ paddingBottom: 60 }}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator
+        onLayout={e => setViewportH(e.nativeEvent.layout.height)}
+        onContentSizeChange={(_, h) => setContentH(h)}
       >
         {/* Summary */}
         <View style={s.bar}>
@@ -163,7 +193,7 @@ const ManagerFilesScreen: React.FC = () => {
         </View>
 
         {/* Files */}
-        {filtered.length === 0 && !loading && (
+        {filtered.length === 0 && !loading && !loadingMore && !nextPage && (
           <View style={s.empty}>
             <Text style={s.emptyIcon}>📂</Text>
             <Text style={s.emptyTitle}>No files</Text>
@@ -172,15 +202,19 @@ const ManagerFilesScreen: React.FC = () => {
         )}
         {filtered.map(f => <FileCard key={f.id} file={f} onPress={() => {}} />)}
 
-        {/* Load more */}
+        {/* Auto-load indicator (infinite scroll / auto-fill) */}
         {nextPage && (
-          <TouchableOpacity style={s.lmBtn} onPress={onLoadMore} disabled={loadingMore}>
-            {loadingMore ? (
-              <ActivityIndicator size="small" color="#1a237e" />
-            ) : (
-              <Text style={s.lmText}>Load more</Text>
-            )}
-          </TouchableOpacity>
+          <View style={s.lmBtn}>
+            <ActivityIndicator size="small" color="#1a237e" />
+            <Text style={s.lmText}>{filtered.length > 0 ? 'Loading more…' : 'Searching…'}</Text>
+          </View>
+        )}
+
+        {/* End of list */}
+        {!nextPage && filtered.length > 0 && (
+          <View style={s.endRow}>
+            <Text style={s.endText}>· End of list ·</Text>
+          </View>
         )}
       </ScrollView>
     </View>
@@ -188,7 +222,7 @@ const ManagerFilesScreen: React.FC = () => {
 };
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, minHeight: 0, backgroundColor: '#f8f9fa' },
   hdr: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
     paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e9ecef',
@@ -222,8 +256,10 @@ const s = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: '600', color: '#555', marginBottom: 8 },
   emptyDesc: { fontSize: 14, color: '#999' },
 
-  lmBtn: { alignItems: 'center', paddingVertical: 16 },
+  lmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
   lmText: { fontSize: 14, color: '#1a237e', fontWeight: '600' },
+  endRow: { alignItems: 'center', paddingVertical: 20 },
+  endText: { fontSize: 12, color: '#bbb', fontWeight: '500', letterSpacing: 0.5 },
 });
 
 export default ManagerFilesScreen;
