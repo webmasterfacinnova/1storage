@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import React, { useCallback } from 'react';
+import { View, Text, StyleSheet, Image, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { authService } from '../../services/auth.service';
@@ -42,10 +42,14 @@ const LoginScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
-        <Text style={styles.appName}>Unified Storage</Text>
+        <Image
+          source={require('../../assets/LogoSlogan.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
       </View>
 
-      <Text style={styles.welcome}>Welcome to Unified Storage</Text>
+      <Text style={styles.welcome}>All your storage in one place</Text>
 
       <GoogleSignInButton onPress={handleGoogleSignIn} loading={loading} />
 
@@ -65,7 +69,7 @@ export default LoginScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f0f7fe',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -74,14 +78,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  appName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a237e',
+  logo: {
+    width: 240,
+    height: 80,
   },
   welcome: {
     fontSize: 18,
-    color: '#555',
+    color: '#5f6368',
     textAlign: 'center',
     marginBottom: 32,
   },
@@ -94,7 +97,7 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: 30,
     fontSize: 12,
-    color: '#777',
+    color: '#999999',
     textAlign: 'center',
   },
 });

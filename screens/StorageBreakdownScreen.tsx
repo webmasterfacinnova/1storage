@@ -191,13 +191,13 @@ const StorageBreakdownScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f0f7fe',
   },
   header: {
     padding: 16,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#d7eefb',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: '#e0ecf5',
   },
   title: {
     fontSize: 20,
@@ -210,19 +210,19 @@ const styles = StyleSheet.create({
   },
   storageCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 20,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
   },
   storageTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '700',
+    color: '#1a237e',
     marginBottom: 16,
   },
   quotaRow: {
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   },
   quotaLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#5f6368',
     marginTop: 2,
   },
   progressBarContainer: {
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   },
   progressBarBg: {
     height: 8,
-    backgroundColor: '#e9ecef',
+    backgroundColor: '#e0ecf5',
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -258,14 +258,14 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 12,
-    color: '#666',
+    color: '#5f6368',
     marginTop: 4,
     textAlign: 'right',
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '700',
+    color: '#1a237e',
     marginBottom: 12,
     marginTop: 8,
   },
@@ -274,15 +274,15 @@ const styles = StyleSheet.create({
   },
   typeCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
   },
   typeIcon: {
@@ -295,11 +295,11 @@ const styles = StyleSheet.create({
   typeLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
+    color: '#1a237e',
   },
   typeSize: {
     fontSize: 14,
-    color: '#666',
+    color: '#5f6368',
     marginTop: 2,
   },
   typeBarContainer: {
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
   typeBarBg: {
     height: 6,
     width: 100,
-    backgroundColor: '#e9ecef',
+    backgroundColor: '#e0ecf5',
     borderRadius: 3,
     overflow: 'hidden',
     marginBottom: 4,
@@ -319,22 +319,22 @@ const styles = StyleSheet.create({
   },
   typePercent: {
     fontSize: 12,
-    color: '#666',
+    color: '#5f6368',
   },
   fileList: {
     marginBottom: 20,
   },
   fileCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
   },
   fileIcon: {
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   },
   fileSize: {
     fontSize: 13,
-    color: '#666',
+    color: '#5f6368',
     marginTop: 2,
   },
   fileArrow: {
@@ -363,11 +363,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   moreText: {
-    color: '#4285f4',
+    color: '#1a73e8',
     fontSize: 14,
   },
   loadingText: {
-    color: '#999',
+    color: '#999999',
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 20,
@@ -378,13 +378,13 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
+    borderTopColor: '#e0ecf5',
   },
   navButton: {
     padding: 8,
   },
   navButtonText: {
-    color: '#4285f4',
+    color: '#1a73e8',
     fontSize: 16,
   },
 });

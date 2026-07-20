@@ -50,11 +50,10 @@ const HomeScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Image
-          source={require('../assets/logo.png')}
+          source={require('../assets/LogoSlogan.png')}
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.title}>1storage</Text>
       </View>
 
       <ScrollView style={styles.content} refreshControl={
@@ -184,25 +183,19 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f0f7fe',
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    padding: 12,
+    backgroundColor: '#d7eefb',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: '#e0ecf5',
   },
   logo: {
-    width: 32,
-    height: 32,
-    marginRight: 8,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1a237e',
+    width: 180,
+    height: 50,
   },
   content: {
     flex: 1,
@@ -210,15 +203,15 @@ const styles = StyleSheet.create({
   },
   welcomeCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 20,
     marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
   },
   userAvatar: {
@@ -231,7 +224,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#4285f4',
+    backgroundColor: '#1a73e8',
     marginRight: 16,
     justifyContent: 'center',
     alignItems: 'center',
@@ -255,19 +248,19 @@ const styles = StyleSheet.create({
   },
   storageCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 20,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
   },
   storageTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '700',
+    color: '#1a237e',
     marginBottom: 16,
   },
   quotaRow: {
@@ -285,6 +278,11 @@ const styles = StyleSheet.create({
   },
   quotaLabel: {
     fontSize: 14,
+    color: '#5f6368',
+    marginTop: 2,
+  },
+  quotaLabel: {
+    fontSize: 14,
     color: '#666',
     marginTop: 2,
   },
@@ -293,7 +291,7 @@ const styles = StyleSheet.create({
   },
   progressBarBg: {
     height: 8,
-    backgroundColor: '#e9ecef',
+    backgroundColor: '#e0ecf5',
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -303,12 +301,12 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 12,
-    color: '#666',
+    color: '#5f6368',
     marginTop: 4,
     textAlign: 'right',
   },
   loadingText: {
-    color: '#999',
+    color: '#999999',
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 20,
@@ -321,29 +319,29 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '700',
+    color: '#1a237e',
     marginBottom: 12,
     marginTop: 8,
   },
   configCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
   },
   configIcon: {
     width: 40,
     height: 40,
-    borderRadius: 8,
-    backgroundColor: '#f0f4ff',
+    borderRadius: 10,
+    backgroundColor: '#e0f7ff',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -361,7 +359,7 @@ const styles = StyleSheet.create({
   },
   configDesc: {
     fontSize: 12,
-    color: '#666',
+    color: '#5f6368',
     marginTop: 2,
   },
   configArrow: {
@@ -374,7 +372,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
+    borderTopColor: '#e0ecf5',
   },
   logoutText: {
     color: '#e53935',

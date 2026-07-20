@@ -187,13 +187,13 @@ const CleanTrashScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f0f7fe',
   },
   header: {
     padding: 16,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#d7eefb',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: '#e0ecf5',
   },
   title: {
     fontSize: 20,
@@ -202,19 +202,20 @@ const styles = StyleSheet.create({
   },
   statsCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 20,
     margin: 16,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
   },
   statsTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '700',
+    color: '#1a237e',
     marginBottom: 16,
   },
   statsRow: {
@@ -232,11 +233,11 @@ const styles = StyleSheet.create({
   },
   statsLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#5f6368',
     marginTop: 2,
   },
   emptyButton: {
-    backgroundColor: '#e53935',
+    backgroundColor: '#1a73e8',
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
@@ -266,19 +267,19 @@ const styles = StyleSheet.create({
   },
   fileCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
   },
   fileCardSelected: {
-    backgroundColor: '#f0f4ff',
+    backgroundColor: '#e3f2fd',
   },
   fileIcon: {
     marginRight: 12,
@@ -294,16 +295,16 @@ const styles = StyleSheet.create({
   },
   fileSize: {
     fontSize: 13,
-    color: '#666',
+    color: '#5f6368',
     marginTop: 2,
   },
   selectedCheck: {
     fontSize: 20,
-    color: '#4285f4',
+    color: '#1a73e8',
     marginLeft: 8,
   },
   loadingText: {
-    color: '#999',
+    color: '#999999',
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 20,

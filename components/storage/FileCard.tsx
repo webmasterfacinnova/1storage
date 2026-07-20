@@ -108,20 +108,20 @@ const FileCard: React.FC<FileCardProps> = ({ file, onPress }) => {
 const s = StyleSheet.create({
   card: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+    backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#e0ecf5',
   },
   iconBox: {
-    width: 40, height: 40, borderRadius: 8, backgroundColor: '#f0f4ff',
+    width: 40, height: 40, borderRadius: 10, backgroundColor: '#e0f7ff',
     justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
   emoji: { fontSize: 20 },
   drIcon: { width: 32, height: 32 },
-  thumb: { width: 40, height: 40, borderRadius: 8 },
+  thumb: { width: 40, height: 40, borderRadius: 10 },
   info: { flex: 1, marginRight: 8 },
   name: { fontSize: 15, fontWeight: '500', color: '#333', marginBottom: 3 },
   metaRow: { flexDirection: 'row', alignItems: 'center' },
-  meta: { fontSize: 12, color: '#999' },
+  meta: { fontSize: 12, color: '#999999' },
 });
 
 export default FileCard;

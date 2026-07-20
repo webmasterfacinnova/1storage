@@ -60,9 +60,9 @@ const FileTypeTabs: React.FC<FileTypeTabsProps> = ({ activeTab, onTabChange }) =
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#d7eefb',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: '#e0ecf5',
   },
   scrollContent: {
     paddingHorizontal: 12,
@@ -75,11 +75,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#f0f4ff',
+    backgroundColor: '#ffffff',
     marginRight: 8,
   },
   tabActive: {
-    backgroundColor: '#1a237e',
+    backgroundColor: '#1a73e8',
   },
   tabIcon: {
     fontSize: 14,
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#555',
+    color: '#5f6368',
   },
   tabLabelActive: {
     color: '#ffffff',

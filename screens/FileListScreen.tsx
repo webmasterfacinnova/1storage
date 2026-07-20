@@ -169,20 +169,20 @@ const FileListScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f0f7fe',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#d7eefb',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: '#e0ecf5',
   },
   backButton: {
     fontSize: 24,
-    color: '#4285f4',
+    color: '#1a73e8',
   },
   title: {
     fontSize: 20,
@@ -193,10 +193,10 @@ const styles = StyleSheet.create({
   },
   controls: {
     padding: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#d7eefb',
   },
   searchInput: {
-    backgroundColor: '#f0f4ff',
+    backgroundColor: '#ffffff',
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
@@ -208,15 +208,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sortButton: {
-    padding: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 6,
-    backgroundColor: '#f0f4ff',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e0ecf5',
   },
   sortButtonActive: {
-    backgroundColor: '#4285f4',
+    backgroundColor: '#1a73e8',
+    borderColor: '#1a73e8',
   },
   sortButtonText: {
-    color: '#4285f4',
+    color: '#1a73e8',
     fontSize: 14,
   },
   sortButtonTextActive: {
@@ -228,15 +232,15 @@ const styles = StyleSheet.create({
   },
   fileCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
   },
   fileIcon: {
@@ -253,7 +257,7 @@ const styles = StyleSheet.create({
   },
   fileDetails: {
     fontSize: 13,
-    color: '#666',
+    color: '#5f6368',
     marginTop: 2,
   },
   fileArrow: {
@@ -261,7 +265,7 @@ const styles = StyleSheet.create({
     color: '#ccc',
   },
   loadingText: {
-    color: '#999',
+    color: '#999999',
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 20,
