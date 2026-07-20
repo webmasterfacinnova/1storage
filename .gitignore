@@ -17,3 +17,4 @@ web-build/
 
 # Google OAuth client secret files (contain client_secret — never commit)
 client_secret_*.json
+.env.local
