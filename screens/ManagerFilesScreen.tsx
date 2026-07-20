@@ -1,5 +1,5 @@
 // screens/ManagerFilesScreen.tsx
-// Manager Files — FlatList-based layout (no nested ScrollView issues).
+// Manager Files — ScrollView layout with explicit height + measured auto-fill/infinite scroll.
 
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   TextInput,
   ScrollView,
-  FlatList,
   RefreshControl,
   useWindowDimensions,
 } from 'react-native';
@@ -184,15 +183,13 @@ const ManagerFilesScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Section */}
-      <View style={s.sec}>
-        <Text style={s.secTitle}>
-          {tab === 'all' ? 'All Files' : FILE_TYPE_TABS.find(t => t.key === tab)?.label || 'Files'}
-        </Text>
-        <Text style={s.secCount}>{filtered.length} file{filtered.length !== 1 ? 's' : ''}</Text>
-      </View>
-    </>
-  ), [pLen, unified, summary, tab, showSearch, search, sortBy, filtered.length]);
+        {/* Section */}
+        <View style={s.sec}>
+          <Text style={s.secTitle}>
+            {tab === 'all' ? 'All Files' : FILE_TYPE_TABS.find(t => t.key === tab)?.label || 'Files'}
+          </Text>
+          <Text style={s.secCount}>{filtered.length} file{filtered.length !== 1 ? 's' : ''}</Text>
+        </View>
 
         {/* Files */}
         {filtered.length === 0 && !loading && !loadingMore && !nextPage && (
