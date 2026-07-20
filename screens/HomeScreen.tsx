@@ -150,13 +150,13 @@ const HomeScreen = () => {
           <Text style={styles.configArrow}>›</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.configCard} onPress={() => {}}>
+        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('AddProvider')}>
           <View style={styles.configIcon}>
             <Text style={styles.configIconText}>🔗</Text>
           </View>
           <View style={styles.configInfo}>
             <Text style={styles.configTitle}>Add Provider</Text>
-            <Text style={styles.configDesc}>Connect Dropbox, OneDrive, or other cloud storage</Text>
+            <Text style={styles.configDesc}>Connect OneDrive, Dropbox, or other cloud storage</Text>
           </View>
           <Text style={styles.configArrow}>›</Text>
         </TouchableOpacity>

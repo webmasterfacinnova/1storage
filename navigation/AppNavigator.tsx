@@ -12,6 +12,7 @@ import StorageBreakdownScreen from '../screens/StorageBreakdownScreen';
 import FileListScreen from '../screens/FileListScreen';
 import CleanTrashScreen from '../screens/CleanTrashScreen';
 import ManagerFilesScreen from '../screens/ManagerFilesScreen';
+import AddProviderScreen from '../screens/AddProviderScreen';
 
 const Stack = createStackNavigator();
 
@@ -29,6 +30,7 @@ const AppNavigator = () => {
             <Stack.Screen name="FileList" component={FileListScreen} />
             <Stack.Screen name="CleanTrash" component={CleanTrashScreen} />
             <Stack.Screen name="ManagerFiles" component={ManagerFilesScreen} />
+            <Stack.Screen name="AddProvider" component={AddProviderScreen} />
           </>
         ) : (
           // Unauthenticated routes

@@ -12,6 +12,7 @@ export type RootStackParamList = {
     sort?: 'size' | 'name' | 'date';
     fileId?: string;
   } | undefined;
+  AddProvider: undefined;
   CleanTrash: undefined;
   ManagerFiles: {
     typeFilter?: string;

@@ -5,12 +5,16 @@ import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import driveReducer from './slices/driveSlice';
 import driveFilesReducer from './slices/driveFilesSlice';
+import onedriveReducer from './slices/onedriveSlice';
+import onedriveFilesReducer from './slices/onedriveFilesSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     drive: driveReducer,
     driveFiles: driveFilesReducer,
+    onedrive: onedriveReducer,
+    onedriveFiles: onedriveFilesReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
