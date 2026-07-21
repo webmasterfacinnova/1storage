@@ -8,6 +8,7 @@ import { store } from './store/store';
 import AppNavigator from './navigation/AppNavigator';
 import { authService } from './services/auth.service';
 import { setCredentials, setLoading } from './store/slices/authSlice';
+import { addProvider } from './store/slices/connectedProvidersSlice';
 
 const App = () => {
   useEffect(() => {
@@ -23,6 +24,13 @@ const App = () => {
           const token = await authService.getAuthToken();
           if (token) {
             store.dispatch(setCredentials({ user, token, provider: 'google' }));
+            store.dispatch(addProvider({
+              id: 'google-drive',
+              name: 'Google Drive',
+              token,
+              userPrincipalName: user.email,
+              connectedAt: new Date().toISOString(),
+            }));
           }
         }
       } catch (error) {
