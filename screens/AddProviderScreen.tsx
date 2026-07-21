@@ -1,7 +1,7 @@
 // screens/AddProviderScreen.tsx
 // Screen to connect additional storage providers (OneDrive, etc.)
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,11 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
-import { setCredentials, setError, selectAvailableProviders } from '../store/slices/authSlice';
+import { addProvider } from '../store/slices/connectedProvidersSlice';
+import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
 import OneDriveAuthService from '../services/auth/onedrive-auth.service';
 
 type ProviderStatus = 'disconnected' | 'connecting' | 'connected';
@@ -32,12 +32,20 @@ interface ProviderItem {
 const AddProviderScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const dispatch = useDispatch();
-  const availableProviders = useSelector(selectAvailableProviders);
+  const connectedProviders = useSelector(selectConnectedProviders);
 
   const [providerStatuses, setProviderStatuses] = useState<Record<string, ProviderStatus>>({
-    google: availableProviders.google ? 'connected' : 'disconnected',
-    onedrive: 'disconnected',
+    google: connectedProviders['google-drive'] ? 'connected' : 'disconnected',
+    onedrive: connectedProviders['onedrive'] ? 'connected' : 'disconnected',
   });
+
+  // Sync with Redux store on mount
+  useEffect(() => {
+    setProviderStatuses({
+      google: connectedProviders['google-drive'] ? 'connected' : 'disconnected',
+      onedrive: connectedProviders['onedrive'] ? 'connected' : 'disconnected',
+    });
+  }, [connectedProviders]);
 
   const connectOneDrive = async () => {
     try {
@@ -46,16 +54,17 @@ const AddProviderScreen: React.FC = () => {
       await authService.initialize();
       const result = await authService.signIn();
 
-      dispatch(setCredentials({
-        user: result.user,
+      // Save to connected providers store
+      dispatch(addProvider({
+        id: 'onedrive',
+        name: 'Microsoft OneDrive',
         token: result.token,
-        provider: result.provider,
+        userPrincipalName: result.user.email,
+        connectedAt: new Date().toISOString(),
       }));
 
       setProviderStatuses(prev => ({ ...prev, onedrive: 'connected' }));
-      Alert.alert('Connected!', 'Your Microsoft OneDrive has been connected successfully.', [
-        { text: 'OK', onPress: () => navigation.navigate('Home') },
-      ]);
+      Alert.alert('Connected!', 'Your Microsoft OneDrive has been connected successfully.');
     } catch (err: any) {
       let message = 'Could not connect to OneDrive';
       if (err.message) {
@@ -65,7 +74,6 @@ const AddProviderScreen: React.FC = () => {
           message = err.message;
         }
       }
-      dispatch(setError(message));
       setProviderStatuses(prev => ({ ...prev, onedrive: 'disconnected' }));
       Alert.alert('Connection failed', message);
     }
@@ -80,8 +88,7 @@ const AddProviderScreen: React.FC = () => {
       color: '#4285F4',
       status: providerStatuses.google,
       onConnect: async () => {
-        // Google is already connected via the initial auth flow
-        navigation.replace('Home');
+        Alert.alert('Already Connected', 'Google Drive is your primary provider.');
       },
     },
     {
@@ -101,7 +108,6 @@ const AddProviderScreen: React.FC = () => {
         return <Text style={styles.statusConnected}>Connected</Text>;
       case 'connecting':
         return <ActivityIndicator size="small" color="#0078D4" />;
-      case 'disconnected':
       default:
         return <Text style={styles.statusAvailable}>Available</Text>;
     }
@@ -153,6 +159,15 @@ const AddProviderScreen: React.FC = () => {
           )}
         </View>
       ))}
+
+      {providerStatuses.onedrive === 'connected' && (
+        <TouchableOpacity
+          style={styles.browseButton}
+          onPress={() => navigation.navigate('ManagerFiles', { provider: 'onedrive' })}
+        >
+          <Text style={styles.browseButtonText}>Browse OneDrive Files →</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
@@ -273,6 +288,19 @@ const styles = StyleSheet.create({
   connectedBadgeText: {
     color: '#34A853',
     fontSize: 13,
+    fontWeight: '600',
+  },
+  browseButton: {
+    backgroundColor: '#0078D4',
+    marginHorizontal: 16,
+    marginTop: 20,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  browseButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
     fontWeight: '600',
   },
   footer: {
