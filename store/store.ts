@@ -7,6 +7,7 @@ import driveReducer from './slices/driveSlice';
 import driveFilesReducer from './slices/driveFilesSlice';
 import onedriveReducer from './slices/onedriveSlice';
 import onedriveFilesReducer from './slices/onedriveFilesSlice';
+import connectedProvidersReducer from './slices/connectedProvidersSlice';
 
 export const store = configureStore({
   reducer: {
@@ -15,6 +16,7 @@ export const store = configureStore({
     driveFiles: driveFilesReducer,
     onedrive: onedriveReducer,
     onedriveFiles: onedriveFilesReducer,
+    connectedProviders: connectedProvidersReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
