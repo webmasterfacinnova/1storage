@@ -16,6 +16,9 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import FileCard, { UnifiedFile, mimeTypeToCategory } from '../components/storage/FileCard';
 import FileTypeTabs, { FILE_TYPE_TABS } from '../components/storage/FileTypeTabs';
+import { useSelector } from 'react-redux';
+import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
+import { oneDriveFilesService, OneDriveFilePreview } from '../services/onedrive-files.service';
 import { driveFilesService, DriveFilePreview } from '../services/drive-files.service';
 
 function toUnified(p: DriveFilePreview): UnifiedFile {
@@ -44,11 +47,33 @@ const ManagerFilesScreen: React.FC = () => {
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
+  const [activeProvider, setActiveProvider] = useState<string>('google-drive');
+  const connectedProviders = useSelector(selectConnectedProviders);
+  const providerKeys = Object.keys(connectedProviders);
+
+  const fetchPreviews = useCallback(async (pageSize: number, pageToken?: string) => {
+    if (activeProvider === 'onedrive') {
+      const r = await oneDriveFilesService.getPreviews(pageSize, pageToken);
+      if (!r) return null;
+      return {
+        files: r.files.map(p => ({
+          id: p.id, name: p.name, mimeType: p.mimeType,
+          size: p.size, details: {
+            modifiedTime: p.modifiedTime, size: p.size,
+            webViewLink: p.webViewLink,
+          },
+          iconLink: undefined, thumbnailLink: undefined,
+        } as DriveFilePreview)),
+        nextPageToken: r.nextPageToken,
+      };
+    }
+    return driveFilesService.getPreviews(pageSize, pageToken);
+  }, [activeProvider]);
 
   const load = useCallback(async (append = false) => {
     const pt = append && nextPage ? nextPage : undefined;
     if (append) setLoadingMore(true); else setLoading(true);
-    const r = await driveFilesService.getPreviews(20, pt);
+    const r = await fetchPreviews(20, pt);
     if (r) {
       setPreviews(prev => append ? [...prev, ...r.files] : r.files);
       setNextPage(r.nextPageToken);
@@ -62,7 +87,7 @@ const ManagerFilesScreen: React.FC = () => {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setPreviews([]); setNextPage(null);
-    const r = await driveFilesService.getPreviews(20);
+    const r = await fetchPreviews(20);
     if (r) { setPreviews(r.files); setNextPage(r.nextPageToken); }
     setRefreshing(false);
   }, []);
@@ -70,7 +95,7 @@ const ManagerFilesScreen: React.FC = () => {
   const onLoadMore = useCallback(async () => {
     if (!nextPage || loadingMore || loading) return;
     setLoadingMore(true);
-    const r = await driveFilesService.getPreviews(20, nextPage);
+    const r = await fetchPreviews(20, nextPage);
     if (r) {
       setPreviews(prev => [...prev, ...r.files]);
       setNextPage(r.nextPageToken);
@@ -150,9 +175,32 @@ const ManagerFilesScreen: React.FC = () => {
         {/* Summary */}
         <View style={s.bar}>
           <View style={s.cell}><Text style={s.val}>{pLen}</Text><Text style={s.lbl}>Files</Text></View>
-          <View style={s.cell}><Text style={s.val}>GD</Text><Text style={s.lbl}>Provider</Text></View>
+          <View style={s.cell}><Text style={s.val}>{activeProvider === 'google-drive' ? 'GD' : 'OD'}</Text><Text style={s.lbl}>{connectedProviders[activeProvider]?.name || 'Provider'}</Text></View>
           <View style={s.cell}><Text style={s.val}>{unified.filter(f => f.size != null).length}</Text><Text style={s.lbl}>Details</Text></View>
         </View>
+
+      {/* Provider selector — only when multiple providers connected */}
+      {providerKeys.length > 1 && (
+        <View style={s.providerRow}>
+          {providerKeys.map(pid => {
+            const p = connectedProviders[pid];
+            const isActive = pid === activeProvider;
+            const colors: Record<string, string> = { 'google-drive': '#34a853', 'onedrive': '#0078d4' };
+            return (
+              <TouchableOpacity
+                key={pid}
+                style={[
+                  s.providerBtn,
+                  isActive && { backgroundColor: colors[pid] || '#1a237e', borderColor: colors[pid] || '#1a237e' },
+                ]}
+                onPress={() => setActiveProvider(pid)}
+              >
+                <Text style={[s.providerBtnTxt, isActive && { color: '#fff' }]}>{p?.name || pid}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       {/* Type mini-cards */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.typeScroll} nestedScrollEnabled>
@@ -257,6 +305,15 @@ const s = StyleSheet.create({
 
   lmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
   lmText: { fontSize: 14, color: '#1a237e', fontWeight: '600' },
+  providerRow: {
+    flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10,
+    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e9ecef', gap: 8,
+  },
+  providerBtn: {
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd',
+  },
+  providerBtnTxt: { fontSize: 13, fontWeight: '600', color: '#555' },
   endRow: { alignItems: 'center', paddingVertical: 20 },
   endText: { fontSize: 12, color: '#bbb', fontWeight: '500', letterSpacing: 0.5 },
 });
