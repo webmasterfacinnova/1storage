@@ -51,14 +51,24 @@ class GoogleAuthService implements AuthService {
   private clientSecret: string = '';
 
   async initialize(): Promise<void> {
-    this.clientId = Constants.expoConfig?.extra?.googleWebClientId ?? Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
-    // Google "Web application" clients require the client secret at the token
-    // exchange step. It is read from EXPO_PUBLIC_GOOGLE_CLIENT_SECRET (kept in
-    // .env, which is git-ignored). See the security note in signIn().
-    this.clientSecret = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_SECRET ?? '';
+    // Credentials are read from environment variables (.env) first, with an
+    // optional override via Expo's app.json extra config.
+    this.clientId =
+      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
+      Constants.expoConfig?.extra?.googleWebClientId ??
+      Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
+      '';
+    this.clientSecret =
+      process.env.EXPO_PUBLIC_GOOGLE_CLIENT_SECRET ??
+      Constants.expoConfig?.extra?.googleClientSecret ??
+      Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_CLIENT_SECRET ??
+      '';
 
     if (!this.clientId) {
-      console.warn('Google Auth: GOOGLE_WEB_CLIENT_ID not found in app config');
+      console.warn('Google Auth: GOOGLE_WEB_CLIENT_ID not found');
+    }
+    if (!this.clientSecret) {
+      console.warn('Google Auth: GOOGLE_CLIENT_SECRET not found');
     }
 
     const GoogleSignin = getGoogleSignin();

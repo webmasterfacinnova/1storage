@@ -4,13 +4,14 @@
 
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
+import Constants from 'expo-constants';
 import { AuthService, AuthResult, User } from '../auth.service';
 import { saveSecureData, getSecureData, clearSecureData } from '../../utils/secureStorage';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const AUTHORIZE_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize';
-const TOKEN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
+const AUTHORIZE_URL = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize';
+const TOKEN_URL = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token';
 
 const SCOPES = [
   'openid',
@@ -27,14 +28,24 @@ class OneDriveAuthService implements AuthService {
   private clientSecret: string = '';
 
   async initialize(): Promise<void> {
-    this.clientId = process.env.EXPO_PUBLIC_ONEDRIVE_CLIENT_ID ?? '';
-    this.clientSecret = process.env.EXPO_PUBLIC_ONEDRIVE_CLIENT_SECRET ?? '';
+    // Credentials are read from environment variables (.env) first, with an
+    // optional override via Expo's app.json extra config.
+    this.clientId =
+      process.env.EXPO_PUBLIC_ONEDRIVE_CLIENT_ID ??
+      Constants.expoConfig?.extra?.onedriveClientId ??
+      Constants.expoConfig?.extra?.EXPO_PUBLIC_ONEDRIVE_CLIENT_ID ??
+      '';
+    this.clientSecret =
+      process.env.EXPO_PUBLIC_ONEDRIVE_CLIENT_SECRET ??
+      Constants.expoConfig?.extra?.onedriveClientSecret ??
+      Constants.expoConfig?.extra?.EXPO_PUBLIC_ONEDRIVE_CLIENT_SECRET ??
+      '';
 
     if (!this.clientId) {
-      console.warn('OneDrive Auth: EXPO_PUBLIC_ONEDRIVE_CLIENT_ID not set');
+      console.warn('OneDrive Auth: ONEDRIVE_CLIENT_ID not found');
     }
     if (!this.clientSecret) {
-      console.warn('OneDrive Auth: EXPO_PUBLIC_ONEDRIVE_CLIENT_SECRET not set');
+      console.warn('OneDrive Auth: ONEDRIVE_CLIENT_SECRET not found');
     }
   }
 
@@ -86,15 +97,19 @@ class OneDriveAuthService implements AuthService {
         throw new Error('No authorization code received from Microsoft');
       }
 
-      // Exchange code for token via POST with URLSearchParams
+      // Exchange code for token via POST with URLSearchParams.
+      // NOTE: Azure public clients (SPA/mobile) must NOT send client_secret.
       const tokenBody = new URLSearchParams({
         client_id: this.clientId,
-        client_secret: this.clientSecret,
         code: code,
         redirect_uri: redirectUri,
         grant_type: 'authorization_code',
         code_verifier: codeVerifier,
       });
+
+      if (this.clientSecret) {
+        tokenBody.append('client_secret', this.clientSecret);
+      }
 
       const tokenResponse = await fetch(TOKEN_URL, {
         method: 'POST',
@@ -111,13 +126,14 @@ class OneDriveAuthService implements AuthService {
       const tokenData = await tokenResponse.json();
       const accessToken = tokenData.access_token;
       const refreshToken = tokenData.refresh_token ?? '';
+      const idToken = tokenData.id_token ?? '';
 
       if (!accessToken) {
         throw new Error('No access token received from Microsoft');
       }
 
-      // Fetch user info from Microsoft Graph
-      const userInfo = await this.getUserInfo(accessToken);
+      // Fetch user info from Microsoft Graph (fallback to id_token claims)
+      const userInfo = await this.getUserInfo(accessToken, idToken);
 
       const user: User = {
         id: userInfo.id ?? userInfo.userPrincipalName ?? '',
@@ -128,6 +144,9 @@ class OneDriveAuthService implements AuthService {
 
       // Save tokens
       await saveSecureData('onedrive_token', accessToken);
+      if (idToken) {
+        await saveSecureData('onedrive_id_token', idToken);
+      }
       if (refreshToken) {
         await saveSecureData('onedrive_refresh_token', refreshToken);
       }
@@ -142,6 +161,7 @@ class OneDriveAuthService implements AuthService {
   async signOut(): Promise<void> {
     try {
       await clearSecureData('onedrive_token');
+      await clearSecureData('onedrive_id_token');
       await clearSecureData('onedrive_refresh_token');
     } catch (error) {
       console.error('OneDrive sign-out error:', error);
@@ -154,7 +174,8 @@ class OneDriveAuthService implements AuthService {
       const token = await getSecureData('onedrive_token');
       if (!token) return null;
 
-      const userInfo = await this.getUserInfo(token);
+      const idToken = await getSecureData('onedrive_id_token');
+      const userInfo = await this.getUserInfo(token, idToken ?? undefined);
       if (!userInfo) return null;
 
       return {
@@ -222,14 +243,50 @@ class OneDriveAuthService implements AuthService {
     }
   }
 
-  private async getUserInfo(token: string): Promise<any> {
+  private async getUserInfo(token: string, idToken?: string): Promise<any> {
+    // Try Microsoft Graph first
     const response = await fetch('https://graph.microsoft.com/v1.0/me', {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!response.ok) {
-      throw new Error('Failed to fetch user info from Microsoft Graph');
+
+    if (response.ok) {
+      return response.json();
     }
-    return response.json();
+
+    const errorText = await response.text();
+    console.warn('[OneDriveAuth] Graph /me failed:', response.status, errorText);
+
+    // Fallback: decode id_token to get user profile info
+    if (idToken) {
+      try {
+        const payload = this.parseJwt(idToken);
+        if (payload?.email || payload?.preferred_username) {
+          return {
+            id: payload.oid ?? payload.sub ?? '',
+            displayName: payload.name ?? '',
+            mail: payload.email ?? payload.preferred_username ?? '',
+            userPrincipalName: payload.preferred_username ?? payload.email ?? '',
+          };
+        }
+      } catch (e) {
+        console.warn('[OneDriveAuth] Failed to parse id_token:', e);
+      }
+    }
+
+    throw new Error('Failed to fetch user info from Microsoft Graph');
+  }
+
+  private parseJwt(token: string): any {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) throw new Error('Invalid JWT');
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(''),
+    );
+    return JSON.parse(jsonPayload);
   }
 
   private handleAuthError(error: any): Error {

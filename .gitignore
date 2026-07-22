@@ -13,4 +13,4 @@ web-build/
 .env.production
 
 # Google OAuth client secret files (contain client_secret — never commit)
-client_secret_*.json.env.local
+client_secret_*.json
