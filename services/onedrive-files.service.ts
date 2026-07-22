@@ -84,6 +84,54 @@ class OneDriveFilesService {
   }
 
   /**
+   * Fetch files and folders inside a specific OneDrive folder.
+   * Calls GET /me/drive/items/{folderId}/children
+   * Returns null if token is missing.
+   */
+  async getFilesInFolder(
+    folderId: string = 'root',
+    pageSize: number = OneDriveFilesService.PAGE_SIZE,
+    pageToken?: string,
+  ): Promise<{ files: OneDriveFile[]; nextPageToken: string | null } | null> {
+    const token = await this._getToken();
+    if (!token) return null;
+
+    const params = new URLSearchParams({
+      $top: String(Math.min(pageSize, 200)),
+      $select: 'id,name,file,folder,mimeType,size,lastModifiedDateTime,webUrl',
+    });
+    if (pageToken) params.set('$skiptoken', pageToken);
+
+    const endpoint =
+      folderId === 'root'
+        ? `${GRAPH_API_BASE}/me/drive/root/children`
+        : `${GRAPH_API_BASE}/me/drive/items/${folderId}/children`;
+
+    try {
+      const res = await fetch(`${endpoint}?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+
+      const data = await res.json();
+      return {
+        files: (data.value || []).map((f: any) => ({
+          id: f.id,
+          name: f.name,
+          mimeType: f.file?.mimeType ?? (f.folder ? 'application/vnd.google-apps.folder' : 'unknown'),
+          size: f.size !== undefined ? f.size : null,
+          modifiedTime: f.lastModifiedDateTime || '',
+          webViewLink: f.webUrl || '',
+        })),
+        nextPageToken: data['@odata.nextLink'] || null,
+      };
+    } catch (err) {
+      console.error('OneDrive getFilesInFolder error:', err);
+      return null;
+    }
+  }
+
+  /**
    * Fetch the largest files in OneDrive root.
    */
   async getLargestFiles(

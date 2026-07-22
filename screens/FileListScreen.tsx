@@ -1,5 +1,6 @@
 // screens/FileListScreen.tsx
 // File browser: browse files in a folder, filter by type, sort by size/name/date
+// Supports both Google Drive and OneDrive via the `provider` route param.
 
 import React, { useEffect, useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, TextInput } from 'react-native';
@@ -8,6 +9,8 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
 import { driveFilesService } from '../services/drive-files.service';
 import { driveService } from '../services/drive.service';
+import { oneDriveFilesService } from '../services/onedrive-files.service';
+import { oneDriveService } from '../services/onedrive.service';
 import {
   setFolderFilesLoading,
   setFolderFiles,
@@ -18,6 +21,16 @@ import {
   selectFolderFilesLoading,
   selectFolderFilesNextPage,
 } from '../store/slices/driveFilesSlice';
+import {
+  setFolderFilesLoading as setODFolderFilesLoading,
+  setFolderFiles as setODFolderFiles,
+  setFolderFilesError as setODFolderFilesError,
+  selectOnedriveCurrentFolderFiles,
+  selectOnedriveCurrentFolderId,
+  selectOnedriveCurrentFolderName,
+  selectOnedriveFolderFilesLoading,
+  selectOnedriveFolderFilesNextPage,
+} from '../store/slices/onedriveFilesSlice';
 
 type FileListRouteParams = {
   folderId?: string;
@@ -25,52 +38,102 @@ type FileListRouteParams = {
   typeFilter?: string;
   sort?: 'size' | 'name' | 'date';
   fileId?: string;
+  provider?: 'google-drive' | 'onedrive';
 };
 
 const FileListScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ params: FileListRouteParams }, 'params'>>();
   const dispatch = useDispatch();
-  const files = useSelector(selectCurrentFolderFiles);
-  const folderId = useSelector(selectCurrentFolderId);
-  const folderName = useSelector(selectCurrentFolderName);
-  const loading = useSelector(selectFolderFilesLoading);
-  const nextPageToken = useSelector(selectFolderFilesNextPage);
+
+  // Determine which provider we're browsing
+  const provider = route.params?.provider || 'google-drive';
+  const isOneDrive = provider === 'onedrive';
+
+  // Select from the correct Redux slice
+  const files = useSelector(isOneDrive ? selectOnedriveCurrentFolderFiles : selectCurrentFolderFiles);
+  const folderId = useSelector(isOneDrive ? selectOnedriveCurrentFolderId : selectCurrentFolderId);
+  const folderName = useSelector(isOneDrive ? selectOnedriveCurrentFolderName : selectCurrentFolderName);
+  const loading = useSelector(isOneDrive ? selectOnedriveFolderFilesLoading : selectFolderFilesLoading);
+  const nextPageToken = useSelector(isOneDrive ? selectOnedriveFolderFilesNextPage : selectFolderFilesNextPage);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'size' | 'name' | 'date'>('size');
 
+  // Track the last folder we loaded to avoid re-fetch loops
+  const lastLoadedFolderRef = React.useRef<string | null>(null);
+  // Keep a ref to the current nextPageToken so fetchFiles doesn't need it as a dependency
+  const nextPageTokenRef = React.useRef(nextPageToken);
+  nextPageTokenRef.current = nextPageToken;
+
   const fetchFiles = useCallback(async (append = false) => {
-    dispatch(setFolderFilesLoading(true));
-    const result = await driveFilesService.getFilesInFolder(
-      route.params?.folderId || folderId,
-      50,
-      append ? nextPageToken || undefined : undefined,
-    );
-    if (result) {
-      dispatch(setFolderFiles({
-        files: result.files,
-        nextPageToken: result.nextPageToken,
-        folderId: route.params?.folderId || folderId,
-        folderName: route.params?.folderName || folderName,
-        append,
-      }));
+    const targetFolderId = route.params?.folderId || 'root';
+    const targetFolderName = route.params?.folderName || (isOneDrive ? 'OneDrive' : 'My Drive');
+
+    // Prevent re-fetching the same folder (avoids loop on push navigation)
+    if (!append && lastLoadedFolderRef.current === targetFolderId) return;
+    if (!append) lastLoadedFolderRef.current = targetFolderId;
+
+    if (isOneDrive) {
+      dispatch(setODFolderFilesLoading(true));
+      const result = await oneDriveFilesService.getFilesInFolder(
+        targetFolderId,
+        50,
+        append ? nextPageTokenRef.current || undefined : undefined,
+      );
+      if (result) {
+        dispatch(setODFolderFiles({
+          files: result.files,
+          nextPageToken: result.nextPageToken,
+          folderId: targetFolderId,
+          folderName: targetFolderName,
+          append,
+        }));
+      } else {
+        dispatch(setODFolderFilesError('Could not fetch files'));
+      }
     } else {
-      dispatch(setFolderFilesError('Could not fetch files'));
+      dispatch(setFolderFilesLoading(true));
+      const result = await driveFilesService.getFilesInFolder(
+        targetFolderId,
+        50,
+        append ? nextPageTokenRef.current || undefined : undefined,
+      );
+      if (result) {
+        dispatch(setFolderFiles({
+          files: result.files,
+          nextPageToken: result.nextPageToken,
+          folderId: targetFolderId,
+          folderName: targetFolderName,
+          append,
+        }));
+      } else {
+        dispatch(setFolderFilesError('Could not fetch files'));
+      }
     }
-  }, [dispatch, folderId, folderName, nextPageToken, route.params]);
+  }, [dispatch, isOneDrive]);
 
   const onRefresh = useCallback(() => {
     fetchFiles(false);
   }, [fetchFiles]);
 
   useEffect(() => {
-    onRefresh();
-  }, [onRefresh]);
+    fetchFiles(false);
+  }, [fetchFiles, route.params?.folderId]);
 
-  const handleFolderPress = (folder: any) => {
+  const isFolder = (file: any): boolean => {
+    if (isOneDrive) {
+      // OneDrive folders have a `folder` property (not a mimeType)
+      return file.mimeType === 'application/vnd.google-apps.folder' || file.folder !== undefined;
+    }
+    return file.mimeType === 'application/vnd.google-apps.folder';
+  };
+
+  const handleFolderPress = (file: any) => {
     (navigation as any).push('FileList', {
-      folderId: folder.id,
-      folderName: folder.name,
+      folderId: file.id,
+      folderName: file.name,
+      provider,
     });
   };
 
@@ -82,13 +145,25 @@ const FileListScreen = () => {
     }
   };
 
+  const formatFileSize = (bytes: number | null): string => {
+    if (bytes == null) return '—';
+    if (isOneDrive) return oneDriveService.formatBytes(bytes);
+    return driveService.formatBytes(bytes);
+  };
+
+  const providerColor = isOneDrive ? '#0078d4' : '#1a73e8';
+  const providerLabel = isOneDrive ? 'OneDrive' : 'Google Drive';
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress}>
           <Text style={styles.backButton}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>{folderName}</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{folderName}</Text>
+          <Text style={[styles.providerLabel, { color: providerColor }]}>{providerLabel}</Text>
+        </View>
         <View style={{ width: 40 }} />
       </View>
 
@@ -127,11 +202,11 @@ const FileListScreen = () => {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
       >
         {loading && files.length === 0 ? (
-          <ActivityIndicator size="large" color="#4285f4" />
+          <ActivityIndicator size="large" color={providerColor} />
         ) : files.length > 0 ? (
           files
-            .filter(file => file.name.toLowerCase().includes(searchQuery.toLowerCase()))
-            .sort((a, b) => {
+            .filter((file: any) => file.name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .sort((a: any, b: any) => {
               if (sortBy === 'size') {
                 return (b.size || 0) - (a.size || 0);
               } else if (sortBy === 'name') {
@@ -140,22 +215,22 @@ const FileListScreen = () => {
                 return new Date(b.modifiedTime).getTime() - new Date(a.modifiedTime).getTime();
               }
             })
-            .map(file => (
+            .map((file: any) => (
               <TouchableOpacity
                 key={file.id}
                 style={styles.fileCard}
-                onPress={() => file.mimeType === 'application/vnd.google-apps.folder' ? handleFolderPress(file) : null}
+                onPress={() => isFolder(file) ? handleFolderPress(file) : null}
               >
                 <View style={styles.fileIcon}>
-                  {file.mimeType === 'application/vnd.google-apps.folder' ? '📁' : '📄'}
+                  {isFolder(file) ? '📁' : '📄'}
                 </View>
                 <View style={styles.fileInfo}>
                   <Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>
                   <Text style={styles.fileDetails}>
-                    {file.size ? driveService.formatBytes(file.size) : '—'} • {new Date(file.modifiedTime).toLocaleDateString()}
+                    {formatFileSize(file.size)} • {file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString() : '—'}
                   </Text>
                 </View>
-                <Text style={styles.fileArrow}>›</Text>
+                {isFolder(file) && <Text style={styles.fileArrow}>›</Text>}
               </TouchableOpacity>
             ))
         ) : (
@@ -184,12 +259,19 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#1a73e8',
   },
+  titleRow: {
+    flex: 1,
+    alignItems: 'center',
+  },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1a237e',
-    flex: 1,
-    textAlign: 'center',
+  },
+  providerLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
   },
   controls: {
     padding: 12,

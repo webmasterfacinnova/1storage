@@ -11,6 +11,7 @@ export type RootStackParamList = {
     typeFilter?: string;
     sort?: 'size' | 'name' | 'date';
     fileId?: string;
+    provider?: 'google-drive' | 'onedrive';
   } | undefined;
   AddProvider: undefined;
   CleanTrash: undefined;

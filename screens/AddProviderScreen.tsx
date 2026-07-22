@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { addProvider } from '../store/slices/connectedProvidersSlice';
 import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
+import { saveSecureData } from '../utils/secureStorage';
 import OneDriveAuthService from '../services/auth/onedrive-auth.service';
 
 type ProviderStatus = 'disconnected' | 'connecting' | 'connected';
@@ -62,6 +63,11 @@ const AddProviderScreen: React.FC = () => {
         userPrincipalName: result.user.email,
         connectedAt: new Date().toISOString(),
       }));
+
+      // Persist provider metadata so it survives page refresh
+      await saveSecureData('onedrive_provider_name', 'Microsoft OneDrive');
+      await saveSecureData('onedrive_provider_email', result.user.email);
+      await saveSecureData('onedrive_connected_at', new Date().toISOString());
 
       setProviderStatuses(prev => ({ ...prev, onedrive: 'connected' }));
       Alert.alert('Connected!', 'Your Microsoft OneDrive has been connected successfully.');
@@ -163,7 +169,11 @@ const AddProviderScreen: React.FC = () => {
       {providerStatuses.onedrive === 'connected' && (
         <TouchableOpacity
           style={styles.browseButton}
-          onPress={() => navigation.navigate('ManagerFiles', { provider: 'onedrive' })}
+          onPress={() => navigation.navigate('FileList', {
+            folderId: 'root',
+            folderName: 'OneDrive',
+            provider: 'onedrive',
+          })}
         >
           <Text style={styles.browseButtonText}>Browse OneDrive Files →</Text>
         </TouchableOpacity>
