@@ -1,8 +1,8 @@
 // screens/HomeScreen.tsx
 // Home screen after successful authentication - shows storage info for all connected providers
 
-import React, { useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshControl } from 'react-native';
+import React, { useEffect, useCallback, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshControl, useWindowDimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { selectCurrentUser } from '../store/slices/authSlice';
@@ -33,6 +33,9 @@ const HomeScreen = () => {
   const isOneDriveConnected = !!connectedProviders['onedrive'];
   const navigation = useNavigation();
   const dispatch = useDispatch();
+  const { height: windowHeight } = useWindowDimensions();
+  const [headerH, setHeaderH] = useState(74);   // measured header height
+  const [footerH, setFooterH] = useState(53);    // measured sign-out footer height
 
   const fetchStorageQuota = useCallback(async () => {
     dispatch(setQuotaLoading(true));
@@ -81,8 +84,8 @@ const HomeScreen = () => {
   const odBarColor = odUsagePercent > 90 ? '#e53935' : odUsagePercent > 70 ? '#fb8c00' : '#0078d4';
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, { height: windowHeight }]}>
+      <View style={styles.header} onLayout={e => setHeaderH(e.nativeEvent.layout.height)}>
         <Image
           source={require('../assets/LogoSlogan.png')}
           style={styles.logo}
@@ -90,7 +93,7 @@ const HomeScreen = () => {
         />
       </View>
 
-      <ScrollView style={styles.content} refreshControl={
+      <ScrollView style={[styles.content, { height: Math.max(windowHeight - headerH - footerH, 0) }]} refreshControl={
         <RefreshControl
           refreshing={quotaLoading || odQuotaLoading}
           onRefresh={() => { fetchStorageQuota(); if (isOneDriveConnected) fetchOneDriveQuota(); }}
@@ -284,7 +287,7 @@ const HomeScreen = () => {
         </TouchableOpacity>
       </ScrollView>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} onLayout={e => setFooterH(e.nativeEvent.layout.height)}>
         <Text style={styles.logoutText}>Sign Out</Text>
       </TouchableOpacity>
     </View>
@@ -309,7 +312,6 @@ const styles = StyleSheet.create({
     height: 50,
   },
   content: {
-    flex: 1,
     padding: 16,
   },
   welcomeCard: {
