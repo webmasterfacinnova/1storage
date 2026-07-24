@@ -22,6 +22,7 @@ type ProviderStatus = 'disconnected' | 'connecting' | 'connected';
 
 interface ProviderItem {
   id: string;
+  storeKey: string;
   name: string;
   description: string;
   icon: string;
@@ -88,6 +89,7 @@ const AddProviderScreen: React.FC = () => {
   const providers: ProviderItem[] = [
     {
       id: 'google',
+      storeKey: 'google-drive',
       name: 'Google Drive',
       description: 'Access your Google Drive files and storage',
       icon: '🔵',
@@ -99,6 +101,7 @@ const AddProviderScreen: React.FC = () => {
     },
     {
       id: 'onedrive',
+      storeKey: 'onedrive',
       name: 'Microsoft OneDrive',
       description: 'Access your OneDrive files and storage',
       icon: '☁️',
@@ -140,6 +143,11 @@ const AddProviderScreen: React.FC = () => {
             <View style={styles.providerText}>
               <Text style={styles.providerName}>{provider.name}</Text>
               <Text style={styles.providerDescription}>{provider.description}</Text>
+              {provider.status === 'connected' && connectedProviders[provider.storeKey]?.userPrincipalName ? (
+                <Text style={styles.providerAccount}>
+                  {connectedProviders[provider.storeKey]?.userPrincipalName}
+                </Text>
+              ) : null}
               {getStatusBadge(provider.status)}
             </View>
           </View>
@@ -165,19 +173,6 @@ const AddProviderScreen: React.FC = () => {
           )}
         </View>
       ))}
-
-      {providerStatuses.onedrive === 'connected' && (
-        <TouchableOpacity
-          style={styles.browseButton}
-          onPress={() => navigation.navigate('FileList', {
-            folderId: 'root',
-            folderName: 'OneDrive',
-            provider: 'onedrive',
-          })}
-        >
-          <Text style={styles.browseButtonText}>Browse OneDrive Files →</Text>
-        </TouchableOpacity>
-      )}
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
@@ -263,6 +258,12 @@ const styles = StyleSheet.create({
     color: '#888888',
     marginTop: 2,
   },
+  providerAccount: {
+    fontSize: 13,
+    color: '#1a1a1a',
+    fontWeight: '500',
+    marginTop: 4,
+  },
   statusConnected: {
     fontSize: 12,
     color: '#34A853',
@@ -298,19 +299,6 @@ const styles = StyleSheet.create({
   connectedBadgeText: {
     color: '#34A853',
     fontSize: 13,
-    fontWeight: '600',
-  },
-  browseButton: {
-    backgroundColor: '#0078D4',
-    marginHorizontal: 16,
-    marginTop: 20,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  browseButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
     fontWeight: '600',
   },
   footer: {

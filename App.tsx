@@ -9,7 +9,8 @@ import AppNavigator from './navigation/AppNavigator';
 import { authService } from './services/auth.service';
 import { setCredentials, setLoading } from './store/slices/authSlice';
 import { addProvider } from './store/slices/connectedProvidersSlice';
-import { getSecureData } from './utils/secureStorage';
+import { getSecureData, saveSecureData } from './utils/secureStorage';
+import OneDriveAuthService from './services/auth/onedrive-auth.service';
 
 const App = () => {
   useEffect(() => {
@@ -40,8 +41,24 @@ const App = () => {
         if (odToken) {
           // Restore saved provider metadata if available
           const odName = await getSecureData('onedrive_provider_name');
-          const odEmail = await getSecureData('onedrive_provider_email');
+          let odEmail = await getSecureData('onedrive_provider_email');
           const odConnectedAt = await getSecureData('onedrive_connected_at');
+
+          // Older sessions may not have persisted the email — recover it from Graph.
+          if (!odEmail) {
+            try {
+              const odAuth = new OneDriveAuthService();
+              await odAuth.initialize();
+              const odUser = await odAuth.getCurrentUser();
+              if (odUser?.email) {
+                odEmail = odUser.email;
+                await saveSecureData('onedrive_provider_email', odEmail);
+              }
+            } catch (e) {
+              console.warn('Could not recover OneDrive email:', e);
+            }
+          }
+
           store.dispatch(addProvider({
             id: 'onedrive',
             name: odName || 'Microsoft OneDrive',
