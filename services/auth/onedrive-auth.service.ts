@@ -107,9 +107,11 @@ class OneDriveAuthService implements AuthService {
         code_verifier: codeVerifier,
       });
 
-      if (this.clientSecret) {
-        tokenBody.append('client_secret', this.clientSecret);
-      }
+      // For Azure public clients (SPA/mobile), client_secret must NOT be sent
+      // Only send it if explicitly configured for confidential clients
+      // if (this.clientSecret) {
+      //   tokenBody.append('client_secret', this.clientSecret);
+      // }
 
       const tokenResponse = await fetch(TOKEN_URL, {
         method: 'POST',
@@ -192,6 +194,79 @@ class OneDriveAuthService implements AuthService {
 
   async getAuthToken(): Promise<string | null> {
     return getSecureData('onedrive_token');
+  }
+
+  /**
+   * Return a valid access token, refreshing it first if the current one
+   * appears to be expired or invalid.
+   */
+  async getValidToken(): Promise<string | null> {
+    const token = await getSecureData('onedrive_token');
+    if (!token) return null;
+
+    // Quick sanity check against Graph; if it works, return as-is.
+    const probe = await fetch('https://graph.microsoft.com/v1.0/me/drive', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (probe.ok) return token;
+
+    // Token is likely expired — try to refresh it.
+    console.warn('[OneDriveAuth] Access token rejected, attempting refresh...');
+    const refreshed = await this.refreshAccessToken();
+    return refreshed ? refreshed.accessToken : null;
+  }
+
+  /**
+   * Exchange the stored refresh_token for a new access_token.
+   */
+  async refreshAccessToken(): Promise<{ accessToken: string; refreshToken?: string } | null> {
+    const refreshToken = await getSecureData('onedrive_refresh_token');
+    if (!refreshToken) {
+      console.warn('[OneDriveAuth] No refresh token available');
+      return null;
+    }
+
+const tokenBody = new URLSearchParams({
+        client_id: this.clientId,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      });
+      // For Azure public clients (SPA/mobile), client_secret must NOT be sent
+      // Only send it if explicitly configured for confidential clients
+      // if (this.clientSecret) {
+      //   tokenBody.append('client_secret', this.clientSecret);
+      // }
+
+    try {
+      const response = await fetch(TOKEN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: tokenBody.toString(),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[OneDriveAuth] Refresh token failed:', response.status, errorText);
+        return null;
+      }
+
+      const data = await response.json();
+      const accessToken = data.access_token;
+      const newRefreshToken = data.refresh_token ?? refreshToken;
+
+      if (!accessToken) {
+        console.error('[OneDriveAuth] No access token in refresh response');
+        return null;
+      }
+
+      await saveSecureData('onedrive_token', accessToken);
+      await saveSecureData('onedrive_refresh_token', newRefreshToken);
+
+      return { accessToken, refreshToken: newRefreshToken };
+    } catch (error) {
+      console.error('[OneDriveAuth] Error refreshing token:', error);
+      return null;
+    }
   }
 
   // --- Private helpers ---
