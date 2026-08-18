@@ -11,6 +11,7 @@ npm-debug.*
 web-build/
 .env
 .env.production
+.playwright-mcp/*
 
 # Google OAuth client secret files (contain client_secret — never commit)
 client_secret_*.json

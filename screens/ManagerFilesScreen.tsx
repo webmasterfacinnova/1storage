@@ -12,6 +12,7 @@ import {
   ScrollView,
   RefreshControl,
   useWindowDimensions,
+  Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import FileCard, { UnifiedFile, mimeTypeToCategory } from '../components/storage/FileCard';
@@ -21,7 +22,14 @@ import { selectConnectedProviders } from '../store/slices/connectedProvidersSlic
 import { oneDriveFilesService, OneDriveFilePreview } from '../services/onedrive-files.service';
 import { driveFilesService, DriveFilePreview } from '../services/drive-files.service';
 
-function toUnified(p: DriveFilePreview): UnifiedFile {
+const PROVIDER_ALL = 'all';
+
+const PROVIDER_META: Record<string, { short: string; name: string; color: string }> = {
+  'google-drive': { short: 'GD', name: 'Google Drive', color: '#34a853' },
+  'onedrive': { short: 'OD', name: 'OneDrive', color: '#0078d4' },
+};
+
+function gdToUnified(p: DriveFilePreview): UnifiedFile {
   return {
     id: p.id, name: p.name, mimeType: p.mimeType,
     size: p.details?.size ?? null,
@@ -32,76 +40,137 @@ function toUnified(p: DriveFilePreview): UnifiedFile {
   };
 }
 
+function odToUnified(p: OneDriveFilePreview): UnifiedFile {
+  return {
+    id: p.id, name: p.name, mimeType: p.mimeType,
+    size: p.size ?? null,
+    modifiedTime: p.modifiedTime ?? '',
+    provider: 'onedrive', providerName: 'OneDrive',
+    webViewLink: p.webViewLink,
+  };
+}
+
+const fileKey = (f: UnifiedFile) => `${f.provider}:${f.id}`;
+
 const ManagerFilesScreen: React.FC = () => {
   const nav = useNavigation();
   const { height: windowHeight } = useWindowDimensions();
   const [headerH, setHeaderH] = useState(56);      // measured header height
   const [viewportH, setViewportH] = useState(0);   // measured ScrollView height
   const [contentH, setContentH] = useState(0);     // measured ScrollView content height
-  const [previews, setPreviews] = useState<DriveFilePreview[]>([]);
+  const [previews, setPreviews] = useState<UnifiedFile[]>([]);
+  const [tokens, setTokens] = useState<Record<string, string | null>>({}); // next-page token per provider (null = exhausted)
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [nextPage, setNextPage] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState('all');
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
-  const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
-  const [activeProvider, setActiveProvider] = useState<string>('google-drive');
+  const [sortBy, setSortBy] = useState<'name' | 'date' | 'size'>('name');
+  const [activeProvider, setActiveProvider] = useState<string>(PROVIDER_ALL);
   const connectedProviders = useSelector(selectConnectedProviders);
-  const providerKeys = Object.keys(connectedProviders);
+  const providerKeys = useMemo(() => Object.keys(connectedProviders), [connectedProviders]);
 
-  const fetchPreviews = useCallback(async (pageSize: number, pageToken?: string) => {
-    if (activeProvider === 'onedrive') {
-      const r = await oneDriveFilesService.getPreviews(pageSize, pageToken);
+  // Which providers are currently in view: all of them, or just the selected one.
+  const scope = useMemo(
+    () => (activeProvider === PROVIDER_ALL ? providerKeys : [activeProvider]),
+    [activeProvider, providerKeys],
+  );
+
+  // Collapse "all" to the single provider when only one is connected.
+  useEffect(() => {
+    if (providerKeys.length === 1 && activeProvider === PROVIDER_ALL) {
+      setActiveProvider(providerKeys[0]);
+    }
+  }, [providerKeys, activeProvider]);
+
+  // Fetch one page from a single provider, mapped to UnifiedFile (tagged with its provider).
+  const fetchProviderPage = useCallback(async (pid: string, pageToken?: string) => {
+    if (pid === 'onedrive') {
+      const r = await oneDriveFilesService.getPreviews(20, pageToken);
       if (!r) return null;
-      return {
-        files: r.files.map(p => ({
-          id: p.id, name: p.name, mimeType: p.mimeType,
-          size: p.size, details: {
-            modifiedTime: p.modifiedTime, size: p.size,
-            webViewLink: p.webViewLink,
-          },
-          iconLink: undefined, thumbnailLink: undefined,
-        } as DriveFilePreview)),
-        nextPageToken: r.nextPageToken,
-      };
+      return { files: r.files.map(odToUnified), next: r.nextPageToken };
     }
-    return driveFilesService.getPreviews(pageSize, pageToken);
-  }, [activeProvider]);
-
-  const load = useCallback(async (append = false) => {
-    const pt = append && nextPage ? nextPage : undefined;
-    if (append) setLoadingMore(true); else setLoading(true);
-    const r = await fetchPreviews(20, pt);
-    if (r) {
-      setPreviews(prev => append ? [...prev, ...r.files] : r.files);
-      setNextPage(r.nextPageToken);
-    }
-    setLoading(false);
-    setLoadingMore(false);
-  }, [nextPage]);
-
-  useEffect(() => { load(); }, []);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    setPreviews([]); setNextPage(null);
-    const r = await fetchPreviews(20);
-    if (r) { setPreviews(r.files); setNextPage(r.nextPageToken); }
-    setRefreshing(false);
+    const r = await driveFilesService.getPreviews(20, pageToken);
+    if (!r) return null;
+    return { files: r.files.map(gdToUnified), next: r.nextPageToken };
   }, []);
 
-  const onLoadMore = useCallback(async () => {
-    if (!nextPage || loadingMore || loading) return;
-    setLoadingMore(true);
-    const r = await fetchPreviews(20, nextPage);
-    if (r) {
-      setPreviews(prev => [...prev, ...r.files]);
-      setNextPage(r.nextPageToken);
+  // Load the first page of every provider in scope and merge the results.
+  const loadInitial = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
+    setError(null);
+    try {
+      const results = await Promise.all(scope.map(pid => fetchProviderPage(pid)));
+      const merged: UnifiedFile[] = [];
+      const seen = new Set<string>();
+      const nt: Record<string, string | null> = {};
+      scope.forEach((pid, i) => {
+        const r = results[i];
+        if (r) {
+          r.files.forEach(f => { if (!seen.has(fileKey(f))) { seen.add(fileKey(f)); merged.push(f); } });
+          nt[pid] = r.next;
+        } else {
+          nt[pid] = null;
+        }
+      });
+      setPreviews(merged);
+      setTokens(nt);
+    } catch (err: any) {
+      console.error('ManagerFiles loadInitial error:', err);
+      setError(err?.message || 'Could not load files');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
+  }, [scope, fetchProviderPage]);
+
+  // Reload whenever the selected provider(s) change.
+  useEffect(() => { loadInitial(); }, [loadInitial]);
+
+  const hasMore = useMemo(
+    () => scope.some(pid => tokens[pid] === undefined || !!tokens[pid]),
+    [scope, tokens],
+  );
+
+  const onLoadMore = useCallback(async () => {
+    if (loadingMore || loading) return;
+    const toLoad = scope.filter(pid => !!tokens[pid]);
+    if (toLoad.length === 0) return;
+    setLoadingMore(true);
+    const results = await Promise.all(toLoad.map(pid => fetchProviderPage(pid, tokens[pid] as string)));
+    setPreviews(prev => {
+      const seen = new Set(prev.map(fileKey));
+      const add: UnifiedFile[] = [];
+      results.forEach(r => {
+        if (r) r.files.forEach(f => { if (!seen.has(fileKey(f))) { seen.add(fileKey(f)); add.push(f); } });
+      });
+      return [...prev, ...add];
+    });
+    setTokens(prev => {
+      const nt = { ...prev };
+      toLoad.forEach((pid, i) => { nt[pid] = results[i] ? results[i]!.next : null; });
+      return nt;
+    });
     setLoadingMore(false);
-  }, [nextPage, loadingMore, loading]);
+  }, [scope, tokens, loading, loadingMore, fetchProviderPage]);
+
+  const onRefresh = useCallback(() => { loadInitial(true); }, [loadInitial]);
+
+  const handleFilePress = useCallback((file: UnifiedFile) => {
+    if (file.mimeType === 'application/vnd.google-apps.folder') {
+      (nav as any).navigate('FileList', {
+        folderId: file.id,
+        folderName: file.name,
+        provider: file.provider,
+      });
+    } else if (file.webViewLink) {
+      Linking.openURL(file.webViewLink).catch(() => {
+        // Ignore errors (e.g., no handler installed).
+      });
+    }
+  }, [nav]);
 
   // Infinite scroll — auto-load the next page when the user nears the bottom.
   const onScroll = useCallback((e: any) => {
@@ -113,16 +182,17 @@ const ManagerFilesScreen: React.FC = () => {
   // fixed counts (non-reactive helpers for summary)
   const pLen = previews.length;
 
-  const unified = useMemo(() => previews.map(toUnified), [previews]);
+  const unified = previews;
 
   const filtered = useMemo(() => {
     let r = unified;
     if (tab !== 'all') r = r.filter(f => mimeTypeToCategory(f.mimeType) === tab);
     if (search.trim()) { const q = search.toLowerCase(); r = r.filter(f => f.name.toLowerCase().includes(q)); }
-    return [...r].sort((a, b) =>
-      sortBy === 'name'
-        ? a.name.localeCompare(b.name)
-        : new Date(b.modifiedTime || 0).getTime() - new Date(a.modifiedTime || 0).getTime());
+    return [...r].sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'size') return (b.size ?? 0) - (a.size ?? 0);
+      return new Date(b.modifiedTime || 0).getTime() - new Date(a.modifiedTime || 0).getTime();
+    });
   }, [unified, tab, search, sortBy]);
 
   // Auto-fill: filtering is client-side but paging is server-side. Keep pulling
@@ -130,10 +200,10 @@ const ManagerFilesScreen: React.FC = () => {
   // something to scroll). Once it overflows, onScroll takes over. Falls back to a
   // count check before measurements arrive.
   useEffect(() => {
-    if (!nextPage || loadingMore || loading) return;
+    if (!hasMore || loadingMore || loading) return;
     const notScrollableYet = viewportH > 0 ? contentH <= viewportH + 40 : filtered.length < 15;
     if (notScrollableYet) onLoadMore();
-  }, [nextPage, loadingMore, loading, viewportH, contentH, filtered.length, onLoadMore]);
+  }, [hasMore, loadingMore, loading, viewportH, contentH, filtered.length, onLoadMore]);
 
   const summary = useMemo(() => {
     const map = new Map<string, { label: string; count: number; icon: string }>();
@@ -175,32 +245,37 @@ const ManagerFilesScreen: React.FC = () => {
         {/* Summary */}
         <View style={s.bar}>
           <View style={s.cell}><Text style={s.val}>{pLen}</Text><Text style={s.lbl}>Files</Text></View>
-          <View style={s.cell}><Text style={s.val}>{activeProvider === 'google-drive' ? 'GD' : 'OD'}</Text><Text style={s.lbl}>{connectedProviders[activeProvider]?.name || 'Provider'}</Text></View>
+          <View style={s.cell}>
+            <Text style={s.val}>{activeProvider === PROVIDER_ALL ? String(scope.length) : (PROVIDER_META[activeProvider]?.short || 'P')}</Text>
+            <Text style={s.lbl}>{activeProvider === PROVIDER_ALL ? 'Providers' : (PROVIDER_META[activeProvider]?.name || 'Provider')}</Text>
+          </View>
           <View style={s.cell}><Text style={s.val}>{unified.filter(f => f.size != null).length}</Text><Text style={s.lbl}>Details</Text></View>
         </View>
 
-      {/* Provider selector — only when multiple providers connected */}
-      {providerKeys.length > 1 && (
-        <View style={s.providerRow}>
-          {providerKeys.map(pid => {
-            const p = connectedProviders[pid];
-            const isActive = pid === activeProvider;
-            const colors: Record<string, string> = { 'google-drive': '#34a853', 'onedrive': '#0078d4' };
-            return (
-              <TouchableOpacity
-                key={pid}
-                style={[
-                  s.providerBtn,
-                  isActive && { backgroundColor: colors[pid] || '#1a237e', borderColor: colors[pid] || '#1a237e' },
-                ]}
-                onPress={() => setActiveProvider(pid)}
-              >
-                <Text style={[s.providerBtnTxt, isActive && { color: '#fff' }]}>{p?.name || pid}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
+      {/* Provider selector — "All" merges every provider; single-provider shows as active label. */}
+      <View style={s.providerRow}>
+        {[PROVIDER_ALL, ...providerKeys].map(pid => {
+          const isActive = pid === activeProvider;
+          const meta = pid === PROVIDER_ALL
+            ? { name: 'All', color: '#1a237e' }
+            : (PROVIDER_META[pid] || { name: connectedProviders[pid]?.name || pid, color: '#1a237e' });
+          const isSingleProvider = providerKeys.length <= 1;
+          return (
+            <TouchableOpacity
+              key={pid}
+              style={[
+                s.providerBtn,
+                isActive && { backgroundColor: meta.color, borderColor: meta.color },
+                isSingleProvider && !isActive && s.providerBtnHidden,
+              ]}
+              onPress={() => !isSingleProvider && setActiveProvider(pid)}
+              activeOpacity={isSingleProvider ? 1 : 0.7}
+            >
+              <Text style={[s.providerBtnTxt, isActive && { color: '#fff' }, isSingleProvider && !isActive && { color: '#bbb' }]}>{meta.name}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       {/* Type mini-cards */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.typeScroll} nestedScrollEnabled>
@@ -222,13 +297,19 @@ const ManagerFilesScreen: React.FC = () => {
       {/* Search + Sort */}
       <View style={s.actions}>
         <TouchableOpacity onPress={() => setShowSearch(!showSearch)}><Text>{showSearch ? '✕' : '🔍'}</Text></TouchableOpacity>
-        {showSearch && (
+        {showSearch ? (
           <TextInput style={s.si} placeholder="Search files…" placeholderTextColor="#999" value={search}
             onChangeText={setSearch} autoFocus />
+        ) : (
+          <View style={s.sortGroup}>
+            <Text style={s.sortLbl}>Sort:</Text>
+            {(['name', 'date', 'size'] as const).map(k => (
+              <TouchableOpacity key={k} style={[s.sb, sortBy === k && s.sbActive]} onPress={() => setSortBy(k)}>
+                <Text style={[s.sbt, sortBy === k && s.sbtActive]}>{k[0].toUpperCase() + k.slice(1)}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
-        <TouchableOpacity style={s.sb} onPress={() => setSortBy(s => s === 'name' ? 'date' : 'name')}>
-          <Text style={s.sbt}>Sort: {sortBy === 'name' ? 'Name' : 'Date'}</Text>
-        </TouchableOpacity>
       </View>
 
         {/* Section */}
@@ -240,17 +321,17 @@ const ManagerFilesScreen: React.FC = () => {
         </View>
 
         {/* Files */}
-        {filtered.length === 0 && !loading && !loadingMore && !nextPage && (
+        {filtered.length === 0 && !loading && !loadingMore && !hasMore && (
           <View style={s.empty}>
             <Text style={s.emptyIcon}>📂</Text>
             <Text style={s.emptyTitle}>No files</Text>
             <Text style={s.emptyDesc}>{search ? 'Try a different search' : 'Connect a provider'}</Text>
           </View>
         )}
-        {filtered.map(f => <FileCard key={f.id} file={f} onPress={() => {}} />)}
+        {filtered.map(f => <FileCard key={fileKey(f)} file={f} onPress={handleFilePress} />)}
 
         {/* Auto-load indicator (infinite scroll / auto-fill) */}
-        {nextPage && (
+        {hasMore && (
           <View style={s.lmBtn}>
             <ActivityIndicator size="small" color="#1a237e" />
             <Text style={s.lmText}>{filtered.length > 0 ? 'Loading more…' : 'Searching…'}</Text>
@@ -258,7 +339,7 @@ const ManagerFilesScreen: React.FC = () => {
         )}
 
         {/* End of list */}
-        {!nextPage && filtered.length > 0 && (
+        {!hasMore && filtered.length > 0 && (
           <View style={s.endRow}>
             <Text style={s.endText}>· End of list ·</Text>
           </View>
@@ -291,8 +372,12 @@ const s = StyleSheet.create({
 
   actions: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e9ecef', gap: 8 },
   si: { flex: 1, height: 36, backgroundColor: '#f0f4ff', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#333' },
+  sortGroup: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
+  sortLbl: { fontSize: 12, color: '#888', marginRight: 2 },
   sb: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#f0f4ff', borderRadius: 6 },
+  sbActive: { backgroundColor: '#1a237e' },
   sbt: { fontSize: 12, color: '#1a237e', fontWeight: '600' },
+  sbtActive: { color: '#fff' },
 
   sec: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   secTitle: { fontSize: 16, fontWeight: '700', color: '#333' },
@@ -312,6 +397,9 @@ const s = StyleSheet.create({
   providerBtn: {
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
     backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd',
+  },
+  providerBtnHidden: {
+    backgroundColor: 'transparent', borderColor: 'transparent',
   },
   providerBtnTxt: { fontSize: 13, fontWeight: '600', color: '#555' },
   endRow: { alignItems: 'center', paddingVertical: 20 },

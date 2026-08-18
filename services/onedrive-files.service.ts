@@ -2,7 +2,7 @@
 // OneDrive file listing service — fetches file previews, largest files, trash,
 // and storage breakdown from Microsoft Graph API.
 
-import { getSecureData } from '../utils/secureStorage';
+import OneDriveAuthService from './auth/onedrive-auth.service';
 
 /** Lightweight preview entry — shown in the Manager Files list. */
 export interface OneDriveFilePreview {
@@ -38,8 +38,10 @@ const GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0';
 class OneDriveFilesService {
   private static readonly PAGE_SIZE = 20;
 
-  private async _getToken(): Promise<string | null> {
-    return getSecureData('onedrive_token');
+  private async _getValidToken(): Promise<string | null> {
+    const auth = new OneDriveAuthService();
+    await auth.initialize();
+    return auth.getValidToken();
   }
 
   /**
@@ -50,12 +52,12 @@ class OneDriveFilesService {
     pageSize: number = OneDriveFilesService.PAGE_SIZE,
     pageToken?: string,
   ): Promise<{ files: OneDriveFilePreview[]; nextPageToken: string | null } | null> {
-    const token = await this._getToken();
+    const token = await this._getValidToken();
     if (!token) return null;
 
     const params = new URLSearchParams({
       $top: String(Math.min(pageSize, 200)),
-      $select: 'id,name,file,mimeType,size,lastModifiedDateTime,webUrl',
+      $select: 'id,name,file,folder,mimeType,size,lastModifiedDateTime,webUrl',
     });
     if (pageToken) params.set('$skiptoken', pageToken);
 
@@ -63,14 +65,21 @@ class OneDriveFilesService {
       const res = await fetch(`${GRAPH_API_BASE}/me/drive/root/children?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('[OneDriveFiles] getPreviews API error:', res.status, errorText);
+        return null;
+      }
 
       const data = await res.json();
+      console.log('[OneDriveFiles] getPreviews returned', (data.value || []).length, 'items');
       return {
         files: (data.value || []).map((f: any) => ({
           id: f.id,
           name: f.name,
-          mimeType: f.file?.mimeType ?? f.mimeType ?? 'unknown',
+          mimeType: f.folder
+            ? 'application/vnd.google-apps.folder'
+            : (f.file?.mimeType ?? f.mimeType ?? 'unknown'),
           size: f.size !== undefined ? f.size : null,
           modifiedTime: f.lastModifiedDateTime || '',
           webViewLink: f.webUrl || '',
@@ -78,7 +87,7 @@ class OneDriveFilesService {
         nextPageToken: data['@odata.nextLink'] || null,
       };
     } catch (err) {
-      console.error('OneDrive getPreviews error:', err);
+      console.error('[OneDriveFiles] getPreviews error:', err);
       return null;
     }
   }
@@ -93,7 +102,7 @@ class OneDriveFilesService {
     pageSize: number = OneDriveFilesService.PAGE_SIZE,
     pageToken?: string,
   ): Promise<{ files: OneDriveFile[]; nextPageToken: string | null } | null> {
-    const token = await this._getToken();
+    const token = await this._getValidToken();
     if (!token) return null;
 
     const params = new URLSearchParams({
@@ -138,7 +147,7 @@ class OneDriveFilesService {
     pageSize: number = 50,
     pageToken?: string,
   ): Promise<{ files: OneDriveFile[]; nextPageToken: string | null } | null> {
-    const token = await this._getToken();
+    const token = await this._getValidToken();
     if (!token) return null;
 
     const params = new URLSearchParams({
@@ -180,7 +189,7 @@ class OneDriveFilesService {
     pageSize: number = 100,
     pageToken?: string,
   ): Promise<{ files: OneDriveFile[]; nextPageToken: string | null } | null> {
-    const token = await this._getToken();
+    const token = await this._getValidToken();
     if (!token) return null;
 
     const params = new URLSearchParams({
@@ -218,7 +227,7 @@ class OneDriveFilesService {
    * Permanently delete a file from OneDrive.
    */
   async deleteFilePermanently(fileId: string): Promise<boolean> {
-    const token = await this._getToken();
+    const token = await this._getValidToken();
     if (!token) return false;
 
     try {
@@ -237,7 +246,7 @@ class OneDriveFilesService {
    * Iterates all non-trash files with pagination (up to 5000 files).
    */
   async getStorageByType(): Promise<StorageByType[] | null> {
-    const token = await this._getToken();
+    const token = await this._getValidToken();
     if (!token) return null;
 
     let allFiles: any[] = [];
@@ -245,11 +254,11 @@ class OneDriveFilesService {
 
     do {
       try {
-        const res = await fetch(nextLink, {
+        const res: Response = await fetch(nextLink, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) break;
-        const data = await res.json();
+        const data: any = await res.json();
         allFiles.push(...(data.value || []));
         nextLink = data['@odata.nextLink'] || null;
       } catch {

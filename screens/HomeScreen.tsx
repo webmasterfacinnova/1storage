@@ -230,27 +230,6 @@ const HomeScreen = () => {
           <Text style={styles.configArrow}>›</Text>
         </TouchableOpacity>
 
-        {/* Browse OneDrive Files (only when connected) */}
-        {isOneDriveConnected && (
-          <TouchableOpacity
-            style={styles.configCard}
-            onPress={() => navigation.navigate('FileList', {
-              folderId: 'root',
-              folderName: 'OneDrive',
-              provider: 'onedrive',
-            })}
-          >
-            <View style={[styles.configIcon, { backgroundColor: '#e6f2fb' }]}>
-              <Text style={styles.configIconText}>☁️</Text>
-            </View>
-            <View style={styles.configInfo}>
-              <Text style={styles.configTitle}>Browse OneDrive</Text>
-              <Text style={styles.configDesc}>Explore your OneDrive files and folders</Text>
-            </View>
-            <Text style={styles.configArrow}>›</Text>
-          </TouchableOpacity>
-        )}
-
         <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('CleanTrash')}>
           <View style={styles.configIcon}>
             <Text style={styles.configIconText}>🗑️</Text>

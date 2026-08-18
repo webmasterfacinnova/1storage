@@ -1,16 +1,49 @@
 // utils/secureStorage.ts
 // Secure storage utilities using platform-specific secure storage solutions
 
+import { Platform } from 'react-native';
 import * as Keychain from 'react-native-keychain';
 
 // Service identifier for keychain
 const SERVICE_ID = 'com.unifiedstorage.auth';
+
+// Web fallback: localStorage is not secure, but react-native-keychain does not
+// work in the browser. Use it only for development/web builds.
+const webGet = (key: string): string | null => {
+  try {
+    return localStorage.getItem(`__secure_${key}`);
+  } catch {
+    return null;
+  }
+};
+
+const webSet = (key: string, value: string): void => {
+  try {
+    localStorage.setItem(`__secure_${key}`, value);
+  } catch {
+    // Ignore storage errors (e.g., private mode).
+  }
+};
+
+const webRemove = (key: string): void => {
+  try {
+    localStorage.removeItem(`__secure_${key}`);
+  } catch {
+    // Ignore.
+  }
+};
+
+const isWeb = Platform.OS === 'web';
 
 /**
  * Saves authentication token securely
  * @param token The authentication token to save
  */
 export const saveAuthToken = async (token: string): Promise<void> => {
+  if (isWeb) {
+    webSet('authToken', token);
+    return;
+  }
   try {
     await Keychain.setGenericPassword('authToken', token, {
       service: SERVICE_ID,
@@ -27,6 +60,7 @@ export const saveAuthToken = async (token: string): Promise<void> => {
  * @returns The stored token or null if not found
  */
 export const getAuthToken = async (): Promise<string | null> => {
+  if (isWeb) return webGet('authToken');
   try {
     const credentials = await Keychain.getGenericPassword({
       service: SERVICE_ID,
@@ -42,6 +76,10 @@ export const getAuthToken = async (): Promise<string | null> => {
  * Clears authentication token from secure storage
  */
 export const clearAuthToken = async (): Promise<void> => {
+  if (isWeb) {
+    webRemove('authToken');
+    return;
+  }
   try {
     await Keychain.resetGenericPassword({
       service: SERVICE_ID,
@@ -58,6 +96,10 @@ export const clearAuthToken = async (): Promise<void> => {
  * @param value The value to store
  */
 export const saveSecureData = async (key: string, value: string): Promise<void> => {
+  if (isWeb) {
+    webSet(key, value);
+    return;
+  }
   try {
     await Keychain.setGenericPassword(key, value, {
       service: `${SERVICE_ID}.${key}`,
@@ -75,6 +117,7 @@ export const saveSecureData = async (key: string, value: string): Promise<void> 
  * @returns The stored value or null if not found
  */
 export const getSecureData = async (key: string): Promise<string | null> => {
+  if (isWeb) return webGet(key);
   try {
     const credentials = await Keychain.getGenericPassword({
       service: `${SERVICE_ID}.${key}`,
@@ -91,6 +134,10 @@ export const getSecureData = async (key: string): Promise<string | null> => {
  * @param key The key to clear
  */
 export const clearSecureData = async (key: string): Promise<void> => {
+  if (isWeb) {
+    webRemove(key);
+    return;
+  }
   try {
     await Keychain.resetGenericPassword({
       service: `${SERVICE_ID}.${key}`,
