@@ -18,6 +18,7 @@ const SCOPES = [
   'profile',
   'email',
   'offline_access',
+  'User.Read',
   'Files.Read',
   'Files.Read.All',
   'Files.ReadWrite.All',
@@ -107,11 +108,9 @@ class OneDriveAuthService implements AuthService {
         code_verifier: codeVerifier,
       });
 
-      // For Azure public clients (SPA/mobile), client_secret must NOT be sent
-      // Only send it if explicitly configured for confidential clients
-      // if (this.clientSecret) {
-      //   tokenBody.append('client_secret', this.clientSecret);
-      // }
+      if (this.clientSecret) {
+        tokenBody.append('client_secret', this.clientSecret);
+      }
 
       const tokenResponse = await fetch(TOKEN_URL, {
         method: 'POST',
@@ -130,9 +129,11 @@ class OneDriveAuthService implements AuthService {
       const refreshToken = tokenData.refresh_token ?? '';
       const idToken = tokenData.id_token ?? '';
 
-      if (!accessToken) {
+      if (!accessToken || typeof accessToken !== 'string' || accessToken.trim().length === 0) {
         throw new Error('No access token received from Microsoft');
       }
+
+      console.log('[OneDriveAuth] Access token received');
 
       // Fetch user info from Microsoft Graph (fallback to id_token claims)
       const userInfo = await this.getUserInfo(accessToken, idToken);
@@ -196,79 +197,6 @@ class OneDriveAuthService implements AuthService {
     return getSecureData('onedrive_token');
   }
 
-  /**
-   * Return a valid access token, refreshing it first if the current one
-   * appears to be expired or invalid.
-   */
-  async getValidToken(): Promise<string | null> {
-    const token = await getSecureData('onedrive_token');
-    if (!token) return null;
-
-    // Quick sanity check against Graph; if it works, return as-is.
-    const probe = await fetch('https://graph.microsoft.com/v1.0/me/drive', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (probe.ok) return token;
-
-    // Token is likely expired — try to refresh it.
-    console.warn('[OneDriveAuth] Access token rejected, attempting refresh...');
-    const refreshed = await this.refreshAccessToken();
-    return refreshed ? refreshed.accessToken : null;
-  }
-
-  /**
-   * Exchange the stored refresh_token for a new access_token.
-   */
-  async refreshAccessToken(): Promise<{ accessToken: string; refreshToken?: string } | null> {
-    const refreshToken = await getSecureData('onedrive_refresh_token');
-    if (!refreshToken) {
-      console.warn('[OneDriveAuth] No refresh token available');
-      return null;
-    }
-
-const tokenBody = new URLSearchParams({
-        client_id: this.clientId,
-        refresh_token: refreshToken,
-        grant_type: 'refresh_token',
-      });
-      // For Azure public clients (SPA/mobile), client_secret must NOT be sent
-      // Only send it if explicitly configured for confidential clients
-      // if (this.clientSecret) {
-      //   tokenBody.append('client_secret', this.clientSecret);
-      // }
-
-    try {
-      const response = await fetch(TOKEN_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: tokenBody.toString(),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[OneDriveAuth] Refresh token failed:', response.status, errorText);
-        return null;
-      }
-
-      const data = await response.json();
-      const accessToken = data.access_token;
-      const newRefreshToken = data.refresh_token ?? refreshToken;
-
-      if (!accessToken) {
-        console.error('[OneDriveAuth] No access token in refresh response');
-        return null;
-      }
-
-      await saveSecureData('onedrive_token', accessToken);
-      await saveSecureData('onedrive_refresh_token', newRefreshToken);
-
-      return { accessToken, refreshToken: newRefreshToken };
-    } catch (error) {
-      console.error('[OneDriveAuth] Error refreshing token:', error);
-      return null;
-    }
-  }
-
   // --- Private helpers ---
 
   private generateRandomString(length: number): string {
@@ -319,19 +247,24 @@ const tokenBody = new URLSearchParams({
   }
 
   private async getUserInfo(token: string, idToken?: string): Promise<any> {
-    // Try Microsoft Graph first
-    const response = await fetch('https://graph.microsoft.com/v1.0/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    // Try Microsoft Graph first, but don't fail if the app lacks Graph consent.
+    try {
+      const response = await fetch('https://graph.microsoft.com/v1.0/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    if (response.ok) {
-      return response.json();
+      if (response.ok) {
+        return response.json();
+      }
+
+      const errorText = await response.text();
+      console.warn('[OneDriveAuth] Graph /me failed:', response.status, errorText);
+    } catch (e) {
+      console.warn('[OneDriveAuth] Graph /me network/request error:', e);
     }
 
-    const errorText = await response.text();
-    console.warn('[OneDriveAuth] Graph /me failed:', response.status, errorText);
-
-    // Fallback: decode id_token to get user profile info
+    // Fallback: decode id_token to get user profile info.
+    // The id_token is always available because we request openid/profile/email scopes.
     if (idToken) {
       try {
         const payload = this.parseJwt(idToken);
@@ -348,7 +281,9 @@ const tokenBody = new URLSearchParams({
       }
     }
 
-    throw new Error('Failed to fetch user info from Microsoft Graph');
+    throw new Error(
+      'Could not retrieve your Microsoft profile. Please make sure the app has permission to access your account information, or try again later.'
+    );
   }
 
   private parseJwt(token: string): any {

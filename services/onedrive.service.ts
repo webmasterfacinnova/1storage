@@ -1,7 +1,7 @@
 // services/onedrive.service.ts
 // OneDrive API service — fetches storage quota from Microsoft Graph API
 
-import OneDriveAuthService from './auth/onedrive-auth.service';
+import { getValidOneDriveToken } from './onedrive-token';
 
 export interface OneDriveStorageQuota {
   /** Total storage limit in bytes (null = unlimited) */
@@ -17,10 +17,8 @@ export interface OneDriveStorageQuota {
 const GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0';
 
 class OneDriveService {
-  private async _getValidToken(): Promise<string | null> {
-    const auth = new OneDriveAuthService();
-    await auth.initialize();
-    return auth.getValidToken();
+  private async _getToken(): Promise<string | null> {
+    return getValidOneDriveToken();
   }
 
   /**
@@ -29,11 +27,8 @@ class OneDriveService {
    */
   async getStorageQuota(): Promise<OneDriveStorageQuota | null> {
     try {
-      const token = await this._getValidToken();
-      if (!token) {
-        console.warn('[OneDriveService] No valid token available for quota');
-        return null;
-      }
+      const token = await this._getToken();
+      if (!token) return null;
 
       const response = await fetch(
         `${GRAPH_API_BASE}/me/drive`,
@@ -43,8 +38,7 @@ class OneDriveService {
       );
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[OneDriveService] Quota API error:', response.status, errorText);
+        console.error('OneDrive API error:', response.status, await response.text());
         return null;
       }
 
@@ -58,7 +52,7 @@ class OneDriveService {
         usageInDriveTrash: parseInt(quota?.deleted ?? '0', 10) || 0,
       };
     } catch (error) {
-      console.error('[OneDriveService] Failed to fetch OneDrive storage quota:', error);
+      console.error('Failed to fetch OneDrive storage quota:', error);
       return null;
     }
   }
