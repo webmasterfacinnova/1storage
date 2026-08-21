@@ -70,7 +70,16 @@ const ManagerFilesScreen: React.FC = () => {
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'size'>('name');
   const [activeProvider, setActiveProvider] = useState<string>(PROVIDER_ALL);
   const connectedProviders = useSelector(selectConnectedProviders);
-  const providerKeys = useMemo(() => Object.keys(connectedProviders), [connectedProviders]);
+  const providerKeys = useMemo(() => Object.keys(connectedProviders || {}), [connectedProviders]);
+
+  // Collapse to single provider or restore "all" if extra providers load after re-opening app.
+  useEffect(() => {
+    if (providerKeys.length === 1 && activeProvider === PROVIDER_ALL) {
+      setActiveProvider(providerKeys[0]);
+    } else if (providerKeys.length > 1 && !providerKeys.includes(activeProvider)) {
+      setActiveProvider(PROVIDER_ALL);
+    }
+  }, [providerKeys, activeProvider]);
 
   // Which providers are currently in view: all of them, or just the selected one.
   const scope = useMemo(
@@ -78,27 +87,31 @@ const ManagerFilesScreen: React.FC = () => {
     [activeProvider, providerKeys],
   );
 
-  // Collapse "all" to the single provider when only one is connected.
-  useEffect(() => {
-    if (providerKeys.length === 1 && activeProvider === PROVIDER_ALL) {
-      setActiveProvider(providerKeys[0]);
-    }
-  }, [providerKeys, activeProvider]);
-
   // Fetch one page from a single provider, mapped to UnifiedFile (tagged with its provider).
   const fetchProviderPage = useCallback(async (pid: string, pageToken?: string) => {
-    if (pid === 'onedrive') {
-      const r = await oneDriveFilesService.getPreviews(20, pageToken);
+    try {
+      if (pid === 'onedrive') {
+        const r = await oneDriveFilesService.getPreviews(20, pageToken);
+        if (!r) return null;
+        return { files: r.files.map(odToUnified), next: r.nextPageToken };
+      }
+      const r = await driveFilesService.getPreviews(20, pageToken);
       if (!r) return null;
-      return { files: r.files.map(odToUnified), next: r.nextPageToken };
+      return { files: r.files.map(gdToUnified), next: r.nextPageToken };
+    } catch (err) {
+      console.error(`Error fetching page for ${pid}:`, err);
+      return null;
     }
-    const r = await driveFilesService.getPreviews(20, pageToken);
-    if (!r) return null;
-    return { files: r.files.map(gdToUnified), next: r.nextPageToken };
   }, []);
 
   // Load the first page of every provider in scope and merge the results.
   const loadInitial = useCallback(async (isRefresh = false) => {
+    if (scope.length === 0) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setError(null);
     try {
@@ -126,7 +139,7 @@ const ManagerFilesScreen: React.FC = () => {
     }
   }, [scope, fetchProviderPage]);
 
-  // Reload whenever the selected provider(s) change.
+  // Reload whenever the selected provider(s) or providerKeys change.
   useEffect(() => { loadInitial(); }, [loadInitial]);
 
   const hasMore = useMemo(
@@ -195,10 +208,7 @@ const ManagerFilesScreen: React.FC = () => {
     });
   }, [unified, tab, search, sortBy]);
 
-  // Auto-fill: filtering is client-side but paging is server-side. Keep pulling
-  // pages until the rendered content actually overflows the viewport (so there is
-  // something to scroll). Once it overflows, onScroll takes over. Falls back to a
-  // count check before measurements arrive.
+  // Auto-fill: filtering is client-side but paging is server-side.
   useEffect(() => {
     if (!hasMore || loadingMore || loading) return;
     const notScrollableYet = viewportH > 0 ? contentH <= viewportH + 40 : filtered.length < 15;
@@ -252,13 +262,13 @@ const ManagerFilesScreen: React.FC = () => {
           <View style={s.cell}><Text style={s.val}>{unified.filter(f => f.size != null).length}</Text><Text style={s.lbl}>Details</Text></View>
         </View>
 
-      {/* Provider selector — "All" merges every provider; single-provider shows as active label. */}
+      {/* Provider selector */}
       <View style={s.providerRow}>
         {[PROVIDER_ALL, ...providerKeys].map(pid => {
           const isActive = pid === activeProvider;
           const meta = pid === PROVIDER_ALL
             ? { name: 'All', color: '#1a237e' }
-            : (PROVIDER_META[pid] || { name: connectedProviders[pid]?.name || pid, color: '#1a237e' });
+            : (PROVIDER_META[pid] || { name: connectedProviders?.[pid]?.name || pid, color: '#1a237e' });
           const isSingleProvider = providerKeys.length <= 1;
           return (
             <TouchableOpacity
