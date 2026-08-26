@@ -149,6 +149,10 @@ class GoogleAuthService implements AuthService {
       // Fetch user info from Google
       const userInfo = await this.getUserInfo(accessToken);
 
+      if (!userInfo) {
+        throw new Error('Failed to fetch user info from Google');
+      }
+
       const user: User = {
         id: userInfo.sub ?? userInfo.id,
         email: userInfo.email,
@@ -200,10 +204,16 @@ class GoogleAuthService implements AuthService {
   async getCurrentUser(): Promise<User | null> {
     try {
       const token = await getAuthToken();
+      // Si no existe token guardado, evitamos consultar la API de Google
       if (!token) return null;
 
       const userInfo = await this.getUserInfo(token);
-      if (!userInfo) return null;
+      if (!userInfo) {
+        // Si el token expiró o no devolvió info, limpiamos el almacenamiento
+        await clearAuthToken();
+        await userService.clearCache();
+        return null;
+      }
 
       return {
         id: userInfo.sub ?? userInfo.id,
@@ -212,7 +222,8 @@ class GoogleAuthService implements AuthService {
         photoURL: userInfo.picture,
       };
     } catch (error) {
-      console.error('Get current user error:', error);
+      await clearAuthToken();
+      await userService.clearCache();
       return null;
     }
   }
@@ -223,13 +234,21 @@ class GoogleAuthService implements AuthService {
 
   // Private helpers
   private async getUserInfo(token: string): Promise<any> {
-    const response = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) {
-      throw new Error('Failed to fetch user info from Google');
+    if (!token) return null;
+
+    try {
+      const response = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      return await response.json();
+    } catch (error) {
+      return null;
     }
-    return response.json();
   }
 
   private handleAuthError(error: any): Error {
