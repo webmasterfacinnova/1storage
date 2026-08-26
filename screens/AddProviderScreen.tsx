@@ -16,8 +16,10 @@ import {
   selectConnectedProviders,
 } from '../store/slices/connectedProvidersSlice';
 import { selectCurrentUser } from '../store/slices/authSlice';
-import { saveSecureData, clearSecureData } from '../utils/secureStorage';
+import { saveSecureData, clearSecureData, getAuthToken } from '../utils/secureStorage';
 import OneDriveAuthService from '../services/auth/onedrive-auth.service';
+import GoogleAuthService from '../services/auth/google-auth.service';
+import { ProviderActionButton } from '../components/common/ProviderActionButton';
 
 const AddProviderScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -25,24 +27,70 @@ const AddProviderScreen: React.FC = () => {
   const connectedProviders = useSelector(selectConnectedProviders);
   const currentUser = useSelector(selectCurrentUser);
 
-  // Único estado local: indicador de carga para OneDrive
   const [isOneDriveConnecting, setIsOneDriveConnecting] = useState(false);
+  const [isGoogleConnecting, setIsGoogleConnecting] = useState(false);
 
-  // Auto-vincular Google Drive al entrar
+  // Sincronizar el estado real de Google Drive leyendo el token de sesión
   useEffect(() => {
-    if (currentUser?.email && !connectedProviders['google-drive']) {
-      dispatch(
-        addProvider({
-          id: 'google-drive',
-          name: 'Google Drive',
-          token: '',
-          userPrincipalName: currentUser.email,
-          connectedAt: new Date().toISOString(),
-        })
-      );
-    }
-  }, [currentUser?.email, connectedProviders['google-drive'], dispatch]);
+    const verifyGoogleDriveAccess = async () => {
+      const googleToken = await getAuthToken();
 
+      if (googleToken && currentUser?.email) {
+        dispatch(
+          addProvider({
+            id: 'google-drive',
+            name: 'Google Drive',
+            token: googleToken,
+            userPrincipalName: currentUser.email,
+            connectedAt: new Date().toISOString(),
+          })
+        );
+      } else {
+        dispatch(removeProvider('google-drive'));
+      }
+    };
+
+    verifyGoogleDriveAccess();
+  }, [currentUser?.email, dispatch]);
+
+  // --- GOOGLE DRIVE LOGIC ---
+  const connectGoogleDrive = async () => {
+    setIsGoogleConnecting(true);
+    try {
+      const authService = new GoogleAuthService();
+      await authService.initialize();
+      const result = await authService.signIn();
+
+      if (result?.token) {
+        dispatch(
+          addProvider({
+            id: 'google-drive',
+            name: 'Google Drive',
+            token: result.token,
+            userPrincipalName: result.user?.email || currentUser?.email,
+            connectedAt: new Date().toISOString(),
+          })
+        );
+      }
+    } catch (err) {
+      console.error('Error al autorizar Google Drive:', err);
+    } finally {
+      setIsGoogleConnecting(false);
+    }
+  };
+
+  const disconnectGoogleDrive = async () => {
+    try {
+      const authService = new GoogleAuthService();
+      await authService.signOut();
+      dispatch(removeProvider('google-drive'));
+    } catch (error) {
+      console.error('Error al desconectar Google Drive:', error);
+      dispatch(removeProvider('google-drive'));
+    }
+  };
+
+  // --- ONEDRIVE LOGIC ---
   const connectOneDrive = async () => {
     setIsOneDriveConnecting(true);
     try {
@@ -60,20 +108,19 @@ const AddProviderScreen: React.FC = () => {
         })
       );
 
+      await saveSecureData('onedrive_token', result.token);
       await saveSecureData('onedrive_provider_name', 'Microsoft OneDrive');
       await saveSecureData('onedrive_provider_email', result.user.email);
       await saveSecureData('onedrive_connected_at', new Date().toISOString());
     } catch (err: any) {
-      console.error('Connection failed:', err);
+      console.error('Error al conectar OneDrive:', err);
     } finally {
       setIsOneDriveConnecting(false);
     }
   };
 
   const disconnectOneDrive = async () => {
-    console.log('[AddProviderScreen] Disconnecting OneDrive...');
     try {
-      // Limpiar todos los datos de OneDrive del almacenamiento seguro
       await clearSecureData('onedrive_token');
       await clearSecureData('onedrive_id_token');
       await clearSecureData('onedrive_refresh_token');
@@ -81,25 +128,18 @@ const AddProviderScreen: React.FC = () => {
       await clearSecureData('onedrive_provider_email');
       await clearSecureData('onedrive_connected_at');
 
-      // Remover de Redux
       dispatch(removeProvider('onedrive'));
-
-      console.log('[AddProviderScreen] OneDrive disconnected successfully');
     } catch (error) {
-      console.error('Error during disconnect:', error);
-      // Aunque falle, forzar remoción del provider
+      console.error('Error al desconectar OneDrive:', error);
       dispatch(removeProvider('onedrive'));
-      console.log('[AddProviderScreen] OneDrive removed from Redux despite error');
     }
   };
 
-  // Función que determina el estado visual según Redux + carga
   const getProviderStatus = (storeKey: string, isConnecting: boolean) => {
     if (isConnecting) return 'connecting';
     return connectedProviders[storeKey] ? 'connected' : 'disconnected';
   };
 
-  // Definición de proveedores
   const providers = [
     {
       id: 'google',
@@ -108,8 +148,9 @@ const AddProviderScreen: React.FC = () => {
       description: 'Access your Google Drive files and storage',
       icon: '🔵',
       color: '#4285F4',
-      isConnecting: false,
-      onConnect: async () => {},
+      isConnecting: isGoogleConnecting,
+      onConnect: connectGoogleDrive,
+      onDisconnect: disconnectGoogleDrive,
     },
     {
       id: 'onedrive',
@@ -170,34 +211,13 @@ const AddProviderScreen: React.FC = () => {
               </View>
             </View>
 
-            {isConnected ? (
-              provider.id === 'google' ? (
-                <View style={styles.connectedBadge}>
-                  <Text style={styles.connectedBadgeText}>✓ Connected</Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.disconnectButton}
-                  onPress={provider.onDisconnect}
-                >
-                  <Text style={styles.disconnectButtonText}>Disconnect</Text>
-                </TouchableOpacity>
-              )
-            ) : (
-              <TouchableOpacity
-                style={[
-                  styles.connectButton,
-                  { backgroundColor: provider.color },
-                  isConnecting && styles.connectingButton,
-                ]}
-                onPress={provider.onConnect}
-                disabled={isConnecting}
-              >
-                <Text style={styles.connectButtonText}>
-                  {isConnecting ? 'Connecting...' : 'Connect'}
-                </Text>
-              </TouchableOpacity>
-            )}
+            <ProviderActionButton
+              isConnected={isConnected}
+              isConnecting={isConnecting}
+              color={provider.color}
+              onConnect={provider.onConnect}
+              onDisconnect={provider.onDisconnect}
+            />
           </View>
         );
       })}
@@ -302,45 +322,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#888888',
     marginTop: 4,
-  },
-  connectButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    minWidth: 90,
-    alignItems: 'center',
-  },
-  connectingButton: {
-    opacity: 0.7,
-  },
-  connectButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  connectedBadge: {
-    backgroundColor: '#E8F5E9',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-  },
-  connectedBadgeText: {
-    color: '#34A853',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  disconnectButton: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E53935',
-  },
-  disconnectButtonText: {
-    color: '#E53935',
-    fontSize: 13,
-    fontWeight: '600',
   },
   footer: {
     padding: 24,

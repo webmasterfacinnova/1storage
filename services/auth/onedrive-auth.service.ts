@@ -1,7 +1,4 @@
 // services/auth/onedrive-auth.service.ts
-// Microsoft OneDrive Authentication — Authorization Code + PKCE flow
-// Uses WebBrowser.openAuthSessionAsync + manual token exchange via fetch.
-
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import Constants from 'expo-constants';
@@ -26,7 +23,6 @@ const SCOPES = [
 
 class OneDriveAuthService implements AuthService {
   private clientId: string = '';
-  private clientSecret: string = '';
 
   async initialize(): Promise<void> {
     this.clientId =
@@ -34,17 +30,9 @@ class OneDriveAuthService implements AuthService {
       Constants.expoConfig?.extra?.onedriveClientId ??
       Constants.expoConfig?.extra?.EXPO_PUBLIC_ONEDRIVE_CLIENT_ID ??
       '';
-    this.clientSecret =
-      process.env.EXPO_PUBLIC_ONEDRIVE_CLIENT_SECRET ??
-      Constants.expoConfig?.extra?.onedriveClientSecret ??
-      Constants.expoConfig?.extra?.EXPO_PUBLIC_ONEDRIVE_CLIENT_SECRET ??
-      '';
 
     if (!this.clientId) {
       console.warn('OneDrive Auth: ONEDRIVE_CLIENT_ID not found');
-    }
-    if (!this.clientSecret) {
-      console.warn('OneDrive Auth: ONEDRIVE_CLIENT_SECRET not found');
     }
   }
 
@@ -100,10 +88,6 @@ class OneDriveAuthService implements AuthService {
         code_verifier: codeVerifier,
         scope: SCOPES.join(' '),
       });
-
-      if (this.clientSecret) {
-        tokenBody.append('client_secret', this.clientSecret);
-      }
 
       const tokenResponse = await fetch(TOKEN_URL, {
         method: 'POST',
@@ -164,12 +148,8 @@ class OneDriveAuthService implements AuthService {
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
         redirect_uri: redirectUri,
-        scope: SCOPES.join(' '),
+        scope: 'offline_access',
       });
-
-      if (this.clientSecret) {
-        tokenBody.append('client_secret', this.clientSecret);
-      }
 
       const response = await fetch(TOKEN_URL, {
         method: 'POST',

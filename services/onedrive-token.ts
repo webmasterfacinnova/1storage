@@ -13,7 +13,9 @@ const onedriveAuth = new OneDriveAuthService();
 export async function getValidOneDriveToken(): Promise<string | null> {
   let token = await getSecureData('onedrive_token');
 
-  if (!token || typeof token !== 'string' || token.trim().length === 0 || token.split('.').length !== 3) {
+  // Se eliminó la validación 'token.split('.').length !== 3' 
+  // ya que los tokens de OneDrive para cuentas personales no son JWTs.
+  if (!token || typeof token !== 'string' || token.trim().length === 0) {
     console.log('[OneDriveToken] Token expired or missing. Attempting refresh...');
     
     await onedriveAuth.initialize();
