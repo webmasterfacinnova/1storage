@@ -1,7 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Image, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
 import { authService } from '../../services/auth.service';
 import { setLoading, setCredentials, setError } from '../../store/slices/authSlice';
 import { selectAuthLoading, selectAuthError } from '../../store/slices/authSlice';
@@ -9,7 +8,6 @@ import GoogleSignInButton from './GoogleSignInButton';
 
 const LoginScreen = () => {
   const dispatch = useDispatch();
-  const navigation = useNavigation<any>();
   const loading = useSelector(selectAuthLoading);
   const error = useSelector(selectAuthError);
 
@@ -18,9 +16,15 @@ const LoginScreen = () => {
     dispatch(setError(null));
     try {
       const result = await authService.signIn();
-      dispatch(setCredentials({ user: result.user, token: result.token, provider: result.provider }));
+      dispatch(
+        setCredentials({
+          user: result.user,
+          token: result.token,
+          provider: result.provider,
+        })
+      );
       dispatch(setLoading(false));
-      navigation.replace('Home');
+      // No se requiere navigation.replace('Home') ya que AppNavigator redirige automáticamente al cambiar el estado de Redux.
     } catch (err: any) {
       let message = 'Authentication failed';
       if (err.message) {
@@ -37,7 +41,7 @@ const LoginScreen = () => {
       dispatch(setLoading(false));
       Alert.alert('Login failed', message);
     }
-  }, [dispatch, navigation]);
+  }, [dispatch]);
 
   return (
     <View style={styles.container}>
@@ -53,9 +57,7 @@ const LoginScreen = () => {
 
       <GoogleSignInButton onPress={handleGoogleSignIn} loading={loading} />
 
-      {error && (
-        <Text style={styles.error}>{error}</Text>
-      )}
+      {error && <Text style={styles.error}>{error}</Text>}
 
       <Text style={styles.footer}>
         By continuing, you agree to our Terms of Service and Privacy Policy.
