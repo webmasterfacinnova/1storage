@@ -16,7 +16,7 @@ import {
   selectConnectedProviders,
 } from '../store/slices/connectedProvidersSlice';
 import { selectCurrentUser } from '../store/slices/authSlice';
-import { saveSecureData, clearSecureData } from '../utils/secureStorage';
+import { saveSecureData, clearSecureData, getSecureData } from '../utils/secureStorage';
 import { getValidGoogleToken } from '../services/google-token';
 import OneDriveAuthService from '../services/auth/onedrive-auth.service';
 import GoogleAuthService from '../services/auth/google-auth.service';
@@ -53,6 +53,33 @@ const AddProviderScreen: React.FC = () => {
 
     verifyGoogleDriveAccess();
   }, [currentUser?.email, dispatch]);
+
+  // Sincronizar el estado de OneDrive leyendo datos persistidos en SecureStore
+  useEffect(() => {
+    const verifyOneDriveAccess = async () => {
+      try {
+        const token = await getSecureData('onedrive_token');
+        const email = await getSecureData('onedrive_provider_email');
+        const connectedAt = await getSecureData('onedrive_connected_at');
+
+        if (token) {
+          dispatch(
+            addProvider({
+              id: 'onedrive',
+              name: 'Microsoft OneDrive',
+              token,
+              userPrincipalName: email || '',
+              connectedAt: connectedAt || new Date().toISOString(),
+            })
+          );
+        }
+      } catch (error) {
+        console.error('Error al verificar sesión de OneDrive:', error);
+      }
+    };
+
+    verifyOneDriveAccess();
+  }, [dispatch]);
 
   // --- GOOGLE DRIVE LOGIC ---
   const connectGoogleDrive = async () => {

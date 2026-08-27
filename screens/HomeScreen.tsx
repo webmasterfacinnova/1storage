@@ -74,8 +74,6 @@ const HomeScreen = () => {
       await authService.signOut();
       dispatch(clearAllProviders());
       dispatch(logout());
-      // Al hacer dispatch(logout()), Redux limpia el estado del usuario.
-      // AppNavigator desmontará HomeScreen y mostrará LoginScreen automáticamente.
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -132,103 +130,105 @@ const HomeScreen = () => {
           </View>
         </View>
 
-        {isGoogleDriveConnected && (
-          <View style={styles.storageCard}>
-            <Text style={styles.storageTitle}>Google Drive Storage</Text>
+        {/* Tarjeta de Google Drive visible siempre */}
+        <View style={styles.storageCard}>
+          <Text style={styles.storageTitle}>Google Drive Storage</Text>
 
-            {quotaLoading ? (
-              <Text style={styles.loadingText}>Loading storage info...</Text>
-            ) : quotaError ? (
-              <Text style={styles.errorText}>Could not load storage info</Text>
-            ) : quota ? (
-              <>
-                <View style={styles.quotaRow}>
-                  <View style={styles.quotaItem}>
-                    <Text style={styles.quotaValue}>{driveService.formatBytes(quota.usage)}</Text>
-                    <Text style={styles.quotaLabel}>Used</Text>
-                  </View>
-                  <View style={styles.quotaItem}>
-                    <Text style={styles.quotaValue}>
-                      {quota.limit ? driveService.formatBytes(quota.limit) : 'Unlimited'}
-                    </Text>
-                    <Text style={styles.quotaLabel}>Total</Text>
-                  </View>
-                  <View style={styles.quotaItem}>
-                    <Text style={styles.quotaValue}>{driveService.formatBytes(quota.usageInDriveTrash)}</Text>
-                    <Text style={styles.quotaLabel}>Trash</Text>
-                  </View>
+          {!isGoogleDriveConnected ? (
+            <Text style={styles.loadingText}>Not connected — Tap Add Provider below to link</Text>
+          ) : quotaLoading ? (
+            <Text style={styles.loadingText}>Loading storage info...</Text>
+          ) : quotaError ? (
+            <Text style={styles.errorText}>Could not load storage info</Text>
+          ) : quota ? (
+            <>
+              <View style={styles.quotaRow}>
+                <View style={styles.quotaItem}>
+                  <Text style={styles.quotaValue}>{driveService.formatBytes(quota.usage)}</Text>
+                  <Text style={styles.quotaLabel}>Used</Text>
                 </View>
-
-                {quota.limit && (
-                  <View style={styles.progressBarContainer}>
-                    <View style={styles.progressBarBg}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          { width: `${Math.min(usagePercent, 100)}%`, backgroundColor: barColor },
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.progressText}>
-                      {usagePercent.toFixed(1)}% used
-                    </Text>
-                  </View>
-                )}
-              </>
-            ) : (
-              <Text style={styles.loadingText}>Tap to load storage info</Text>
-            )}
-          </View>
-        )}
-
-        {isOneDriveConnected && (
-          <View style={[styles.storageCard, { borderLeftWidth: 3, borderLeftColor: '#0078d4' }]}>
-            <Text style={styles.storageTitle}>OneDrive Storage</Text>
-
-            {odQuotaLoading ? (
-              <Text style={styles.loadingText}>Loading storage info...</Text>
-            ) : odQuotaError ? (
-              <Text style={styles.errorText}>Could not load storage info</Text>
-            ) : odQuota ? (
-              <>
-                <View style={styles.quotaRow}>
-                  <View style={styles.quotaItem}>
-                    <Text style={styles.quotaValue}>{oneDriveService.formatBytes(odQuota.usage)}</Text>
-                    <Text style={styles.quotaLabel}>Used</Text>
-                  </View>
-                  <View style={styles.quotaItem}>
-                    <Text style={styles.quotaValue}>
-                      {odQuota.limit ? oneDriveService.formatBytes(odQuota.limit) : 'Unlimited'}
-                    </Text>
-                    <Text style={styles.quotaLabel}>Total</Text>
-                  </View>
-                  <View style={styles.quotaItem}>
-                    <Text style={styles.quotaValue}>{oneDriveService.formatBytes(odQuota.usageInDriveTrash)}</Text>
-                    <Text style={styles.quotaLabel}>Trash</Text>
-                  </View>
+                <View style={styles.quotaItem}>
+                  <Text style={styles.quotaValue}>
+                    {quota.limit ? driveService.formatBytes(quota.limit) : 'Unlimited'}
+                  </Text>
+                  <Text style={styles.quotaLabel}>Total</Text>
                 </View>
+                <View style={styles.quotaItem}>
+                  <Text style={styles.quotaValue}>{driveService.formatBytes(quota.usageInDriveTrash)}</Text>
+                  <Text style={styles.quotaLabel}>Trash</Text>
+                </View>
+              </View>
 
-                {odQuota.limit && (
-                  <View style={styles.progressBarContainer}>
-                    <View style={styles.progressBarBg}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          { width: `${Math.min(odUsagePercent, 100)}%`, backgroundColor: odBarColor },
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.progressText}>
-                      {odUsagePercent.toFixed(1)}% used
-                    </Text>
+              {quota.limit && (
+                <View style={styles.progressBarContainer}>
+                  <View style={styles.progressBarBg}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        { width: `${Math.min(usagePercent, 100)}%`, backgroundColor: barColor },
+                      ]}
+                    />
                   </View>
-                )}
-              </>
-            ) : (
-              <Text style={styles.loadingText}>Tap to load storage info</Text>
-            )}
-          </View>
-        )}
+                  <Text style={styles.progressText}>
+                    {usagePercent.toFixed(1)}% used
+                  </Text>
+                </View>
+              )}
+            </>
+          ) : (
+            <Text style={styles.loadingText}>Tap to load storage info</Text>
+          )}
+        </View>
+
+        {/* Tarjeta de OneDrive visible siempre */}
+        <View style={[styles.storageCard, { borderLeftWidth: 3, borderLeftColor: '#0078d4' }]}>
+          <Text style={styles.storageTitle}>OneDrive Storage</Text>
+
+          {!isOneDriveConnected ? (
+            <Text style={styles.loadingText}>Not connected — Tap Add Provider below to link</Text>
+          ) : odQuotaLoading ? (
+            <Text style={styles.loadingText}>Loading storage info...</Text>
+          ) : odQuotaError ? (
+            <Text style={styles.errorText}>Could not load storage info</Text>
+          ) : odQuota ? (
+            <>
+              <View style={styles.quotaRow}>
+                <View style={styles.quotaItem}>
+                  <Text style={styles.quotaValue}>{oneDriveService.formatBytes(odQuota.usage)}</Text>
+                  <Text style={styles.quotaLabel}>Used</Text>
+                </View>
+                <View style={styles.quotaItem}>
+                  <Text style={styles.quotaValue}>
+                    {odQuota.limit ? oneDriveService.formatBytes(odQuota.limit) : 'Unlimited'}
+                  </Text>
+                  <Text style={styles.quotaLabel}>Total</Text>
+                </View>
+                <View style={styles.quotaItem}>
+                  <Text style={styles.quotaValue}>{oneDriveService.formatBytes(odQuota.usageInDriveTrash)}</Text>
+                  <Text style={styles.quotaLabel}>Trash</Text>
+                </View>
+              </View>
+
+              {odQuota.limit && (
+                <View style={styles.progressBarContainer}>
+                  <View style={styles.progressBarBg}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        { width: `${Math.min(odUsagePercent, 100)}%`, backgroundColor: odBarColor },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.progressText}>
+                    {odUsagePercent.toFixed(1)}% used
+                  </Text>
+                </View>
+              )}
+            </>
+          ) : (
+            <Text style={styles.loadingText}>Tap to load storage info</Text>
+          )}
+        </View>
 
         <Text style={styles.sectionTitle}>Configuration</Text>
 
