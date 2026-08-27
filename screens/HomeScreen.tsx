@@ -74,7 +74,8 @@ const HomeScreen = () => {
       await authService.signOut();
       dispatch(clearAllProviders());
       dispatch(logout());
-      navigation.navigate('Login' as never);
+      // Al hacer dispatch(logout()), Redux limpia el estado del usuario.
+      // AppNavigator desmontará HomeScreen y mostrará LoginScreen automáticamente.
     } catch (error) {
       console.error('Logout error:', error);
     }

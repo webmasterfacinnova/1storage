@@ -1,12 +1,12 @@
-// components/auth/LoginScreen.tsx
+// screens/LoginScreen.tsx
 import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Image, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { authService } from '../../services/auth.service';
-import { setLoading, setCredentials, setError } from '../../store/slices/authSlice';
-import { selectAuthLoading, selectAuthError } from '../../store/slices/authSlice';
-import { addProvider } from '../../store/slices/connectedProvidersSlice';
-import GoogleSignInButton from './GoogleSignInButton';
+import { authService } from '../services/auth.service';
+import { setLoading, setCredentials, setError } from '../store/slices/authSlice';
+import { selectAuthLoading, selectAuthError } from '../store/slices/authSlice';
+import { addProvider } from '../store/slices/connectedProvidersSlice';
+import GoogleSignInButton from '../components/auth/GoogleSignInButton';
 
 const LoginScreen = () => {
   const dispatch = useDispatch();
@@ -63,7 +63,7 @@ const LoginScreen = () => {
     <View style={styles.container}>
       <View style={styles.logoContainer}>
         <Image
-          source={require('../../assets/LogoSlogan.png')}
+          source={require('../assets/LogoSlogan.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -73,7 +73,7 @@ const LoginScreen = () => {
 
       <GoogleSignInButton onPress={handleGoogleSignIn} loading={loading} />
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {Boolean(error) && <Text style={styles.error}>{error}</Text>}
 
       <Text style={styles.footer}>
         By continuing, you agree to our Terms of Service and Privacy Policy.
