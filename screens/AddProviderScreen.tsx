@@ -17,7 +17,6 @@ import {
 } from '../store/slices/connectedProvidersSlice';
 import { selectCurrentUser } from '../store/slices/authSlice';
 import { saveSecureData, clearSecureData, getSecureData } from '../utils/secureStorage';
-import { getValidGoogleToken } from '../services/google-token';
 import OneDriveAuthService from '../services/auth/onedrive-auth.service';
 import GoogleAuthService from '../services/auth/google-auth.service';
 import { ProviderActionButton } from '../components/common/ProviderActionButton';
@@ -30,29 +29,6 @@ const AddProviderScreen: React.FC = () => {
 
   const [isOneDriveConnecting, setIsOneDriveConnecting] = useState(false);
   const [isGoogleConnecting, setIsGoogleConnecting] = useState(false);
-
-  // Sincronizar el estado real de Google Drive leyendo el token válido/refrescado
-  useEffect(() => {
-    const verifyGoogleDriveAccess = async () => {
-      const googleToken = await getValidGoogleToken();
-
-      if (googleToken && currentUser?.email) {
-        dispatch(
-          addProvider({
-            id: 'google-drive',
-            name: 'Google Drive',
-            token: googleToken,
-            userPrincipalName: currentUser.email,
-            connectedAt: new Date().toISOString(),
-          })
-        );
-      } else {
-        dispatch(removeProvider('google-drive'));
-      }
-    };
-
-    verifyGoogleDriveAccess();
-  }, [currentUser?.email, dispatch]);
 
   // Sincronizar el estado de OneDrive leyendo datos persistidos en SecureStore
   useEffect(() => {
@@ -111,9 +87,10 @@ const AddProviderScreen: React.FC = () => {
     try {
       const authService = new GoogleAuthService();
       await authService.signOut();
-      dispatch(removeProvider('google-drive'));
+      await clearSecureData('google_refresh_token');
     } catch (error) {
       console.error('Error al desconectar Google Drive:', error);
+    } finally {
       dispatch(removeProvider('google-drive'));
     }
   };
@@ -155,10 +132,9 @@ const AddProviderScreen: React.FC = () => {
       await clearSecureData('onedrive_provider_name');
       await clearSecureData('onedrive_provider_email');
       await clearSecureData('onedrive_connected_at');
-
-      dispatch(removeProvider('onedrive'));
     } catch (error) {
       console.error('Error al desconectar OneDrive:', error);
+    } finally {
       dispatch(removeProvider('onedrive'));
     }
   };

@@ -13,7 +13,7 @@ import {
 } from 'expo-auth-session';
 import Constants from 'expo-constants';
 import { AuthService, AuthResult, User } from '../auth.service';
-import { saveAuthToken, getAuthToken, clearAuthToken, saveSecureData, getSecureData } from '../../utils/secureStorage';
+import { saveAuthToken, getAuthToken, clearAuthToken, saveSecureData, getSecureData, clearSecureData } from '../../utils/secureStorage';
 import { userService } from '../user.service';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -216,6 +216,7 @@ class GoogleAuthService implements AuthService {
         await GoogleSignin.signOut();
       }
       await clearAuthToken();
+      await clearSecureData('google_refresh_token');
       await userService.clearCache();
     } catch (error) {
       console.error('Google sign-out error:', error);
