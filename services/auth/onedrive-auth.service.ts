@@ -148,7 +148,7 @@ class OneDriveAuthService implements AuthService {
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
         redirect_uri: redirectUri,
-        scope: 'offline_access',
+        scope: SCOPES.join(' '), // Corrección: Se incluyen todos los scopes
       });
 
       const response = await fetch(TOKEN_URL, {
