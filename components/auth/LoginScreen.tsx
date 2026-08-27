@@ -1,9 +1,11 @@
+// components/auth/LoginScreen.tsx
 import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Image, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { authService } from '../../services/auth.service';
 import { setLoading, setCredentials, setError } from '../../store/slices/authSlice';
 import { selectAuthLoading, selectAuthError } from '../../store/slices/authSlice';
+import { addProvider } from '../../store/slices/connectedProvidersSlice';
 import GoogleSignInButton from './GoogleSignInButton';
 
 const LoginScreen = () => {
@@ -23,6 +25,20 @@ const LoginScreen = () => {
           provider: result.provider,
         })
       );
+
+      // Registrar Google Drive en connectedProvidersSlice al iniciar sesión correctamente
+      if (result.token) {
+        dispatch(
+          addProvider({
+            id: 'google-drive',
+            name: 'Google Drive',
+            token: result.token,
+            userPrincipalName: result.user?.email,
+            connectedAt: new Date().toISOString(),
+          })
+        );
+      }
+
       dispatch(setLoading(false));
       // No se requiere navigation.replace('Home') ya que AppNavigator redirige automáticamente al cambiar el estado de Redux.
     } catch (err: any) {

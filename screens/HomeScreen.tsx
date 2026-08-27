@@ -1,16 +1,13 @@
 // screens/HomeScreen.tsx
-// Home screen after successful authentication - shows storage info for all connected providers
-
 import React, { useEffect, useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshControl, useWindowDimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
-import { selectCurrentUser } from '../store/slices/authSlice';
-import { logout } from '../store/slices/authSlice';
+import { selectCurrentUser, logout } from '../store/slices/authSlice';
 import { authService } from '../services/auth.service';
-import { driveService, DriveStorageQuota } from '../services/drive.service';
+import { driveService } from '../services/drive.service';
 import { setQuotaLoading, setQuota, setQuotaError, selectDriveQuota, selectDriveLoading, selectDriveError } from '../store/slices/driveSlice';
-import { oneDriveService, OneDriveStorageQuota } from '../services/onedrive.service';
+import { oneDriveService } from '../services/onedrive.service';
 import {
   setQuotaLoading as setODQuotaLoading,
   setQuota as setODQuota,
@@ -19,7 +16,7 @@ import {
   selectOnedriveLoading,
   selectOnedriveError,
 } from '../store/slices/onedriveSlice';
-import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
+import { selectConnectedProviders, clearAllProviders } from '../store/slices/connectedProvidersSlice';
 
 const HomeScreen = () => {
   const user = useSelector(selectCurrentUser);
@@ -30,7 +27,6 @@ const HomeScreen = () => {
   const odQuotaLoading = useSelector(selectOnedriveLoading);
   const odQuotaError = useSelector(selectOnedriveError);
 
-  // Leer estado de los proveedores desde Redux
   const connectedProviders = useSelector(selectConnectedProviders);
   const isGoogleDriveConnected = !!connectedProviders['google-drive'];
   const isOneDriveConnected = !!connectedProviders['onedrive'];
@@ -38,8 +34,8 @@ const HomeScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { height: windowHeight } = useWindowDimensions();
-  const [headerH, setHeaderH] = useState(74);   // measured header height
-  const [footerH, setFooterH] = useState(53);    // measured sign-out footer height
+  const [headerH, setHeaderH] = useState(74);
+  const [footerH, setFooterH] = useState(53);
 
   const fetchStorageQuota = useCallback(async () => {
     dispatch(setQuotaLoading(true));
@@ -76,6 +72,7 @@ const HomeScreen = () => {
   const handleLogout = async () => {
     try {
       await authService.signOut();
+      dispatch(clearAllProviders());
       dispatch(logout());
       navigation.navigate('Login' as never);
     } catch (error) {
@@ -106,16 +103,18 @@ const HomeScreen = () => {
         />
       </View>
 
-      <ScrollView style={[styles.content, { height: Math.max(windowHeight - headerH - footerH, 0) }]} refreshControl={
-        <RefreshControl
-          refreshing={quotaLoading || odQuotaLoading}
-          onRefresh={() => { 
-            if (isGoogleDriveConnected) fetchStorageQuota(); 
-            if (isOneDriveConnected) fetchOneDriveQuota(); 
-          }}
-        />
-      }>
-        {/* Welcome Card */}
+      <ScrollView
+        style={[styles.content, { height: Math.max(windowHeight - headerH - footerH, 0) }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={quotaLoading || odQuotaLoading}
+            onRefresh={() => {
+              if (isGoogleDriveConnected) fetchStorageQuota();
+              if (isOneDriveConnected) fetchOneDriveQuota();
+            }}
+          />
+        }
+      >
         <View style={styles.welcomeCard}>
           {user?.photoURL ? (
             <Image source={{ uri: user.photoURL }} style={styles.userAvatar} />
@@ -132,7 +131,6 @@ const HomeScreen = () => {
           </View>
         </View>
 
-        {/* Google Drive Storage Quota Card (Se muestra si Google Drive está conectado) */}
         {isGoogleDriveConnected && (
           <View style={styles.storageCard}>
             <Text style={styles.storageTitle}>Google Drive Storage</Text>
@@ -160,7 +158,6 @@ const HomeScreen = () => {
                   </View>
                 </View>
 
-                {/* Progress bar */}
                 {quota.limit && (
                   <View style={styles.progressBarContainer}>
                     <View style={styles.progressBarBg}>
@@ -183,7 +180,6 @@ const HomeScreen = () => {
           </View>
         )}
 
-        {/* OneDrive Storage Quota Card (Se muestra si OneDrive está conectado) */}
         {isOneDriveConnected && (
           <View style={[styles.storageCard, { borderLeftWidth: 3, borderLeftColor: '#0078d4' }]}>
             <Text style={styles.storageTitle}>OneDrive Storage</Text>
@@ -211,7 +207,6 @@ const HomeScreen = () => {
                   </View>
                 </View>
 
-                {/* Progress bar */}
                 {odQuota.limit && (
                   <View style={styles.progressBarContainer}>
                     <View style={styles.progressBarBg}>
@@ -234,7 +229,6 @@ const HomeScreen = () => {
           </View>
         )}
 
-        {/* Configuration Options */}
         <Text style={styles.sectionTitle}>Configuration</Text>
 
         <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('ManagerFiles' as never)}>

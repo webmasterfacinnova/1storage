@@ -16,7 +16,8 @@ import {
   selectConnectedProviders,
 } from '../store/slices/connectedProvidersSlice';
 import { selectCurrentUser } from '../store/slices/authSlice';
-import { saveSecureData, clearSecureData, getAuthToken } from '../utils/secureStorage';
+import { saveSecureData, clearSecureData } from '../utils/secureStorage';
+import { getValidGoogleToken } from '../services/google-token';
 import OneDriveAuthService from '../services/auth/onedrive-auth.service';
 import GoogleAuthService from '../services/auth/google-auth.service';
 import { ProviderActionButton } from '../components/common/ProviderActionButton';
@@ -30,10 +31,10 @@ const AddProviderScreen: React.FC = () => {
   const [isOneDriveConnecting, setIsOneDriveConnecting] = useState(false);
   const [isGoogleConnecting, setIsGoogleConnecting] = useState(false);
 
-  // Sincronizar el estado real de Google Drive leyendo el token de sesión
+  // Sincronizar el estado real de Google Drive leyendo el token válido/refrescado
   useEffect(() => {
     const verifyGoogleDriveAccess = async () => {
-      const googleToken = await getAuthToken();
+      const googleToken = await getValidGoogleToken();
 
       if (googleToken && currentUser?.email) {
         dispatch(
