@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Text, Image, StyleSheet } from 'react-native';
 import { ProviderMeta } from '../../types/storage';
 
 interface ProviderSelectorProps {
@@ -27,12 +27,15 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         const isActive = pid === activeProvider;
         const meta =
           pid === providerAllId
-            ? { name: 'All', color: '#1a237e' }
+            ? { name: 'All', color: '#1a237e', icon: undefined }
             : providerMetaMap[pid] || {
                 name: connectedProviders?.[pid]?.name || pid,
                 color: '#1a237e',
+                icon: undefined,
               };
         const isSingleProvider = providerKeys.length <= 1;
+
+        if (isSingleProvider && !isActive) return null;
 
         return (
           <TouchableOpacity
@@ -40,16 +43,21 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
             style={[
               styles.providerBtn,
               isActive && { backgroundColor: meta.color, borderColor: meta.color },
-              isSingleProvider && !isActive && styles.providerBtnHidden,
             ]}
             onPress={() => !isSingleProvider && onSelectProvider(pid)}
             activeOpacity={isSingleProvider ? 1 : 0.7}
           >
+            {meta.icon && (
+              <Image
+                source={meta.icon}
+                style={styles.providerIcon}
+                resizeMode="contain"
+              />
+            )}
             <Text
               style={[
                 styles.providerBtnTxt,
-                isActive && { color: '#fff' },
-                isSingleProvider && !isActive && { color: '#bbb' },
+                isActive && { color: '#ffffff' },
               ]}
             >
               {meta.name}
@@ -72,16 +80,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   providerBtn: {
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#ddd',
+    gap: 6,
   },
-  providerBtnHidden: {
-    backgroundColor: 'transparent',
-    borderColor: 'transparent',
+  providerIcon: {
+    width: 18,
+    height: 18,
   },
   providerBtnTxt: {
     fontSize: 13,

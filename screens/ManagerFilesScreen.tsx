@@ -1,4 +1,3 @@
-// screens/ManagerFilesScreen.tsx
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
   View,
@@ -6,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  TextInput,
   ScrollView,
   RefreshControl,
   useWindowDimensions,
@@ -17,16 +15,33 @@ import FileCard, { mimeTypeToCategory } from '../components/storage/FileCard';
 import FileTypeTabs, { FILE_TYPE_TABS } from '../components/storage/FileTypeTabs';
 import StorageSummaryBar from '../components/storage/StorageSummaryBar';
 import ProviderSelector from '../components/storage/ProviderSelector';
+import TypeSummaryScroll from '../components/storage/TypeSummaryScroll';
+import SortBar, { SortOption } from '../components/storage/SortBar';
 import { fetchProviderFilesPage } from '../services/storage-registry.service';
 import { UnifiedFile, ProviderMeta } from '../types/storage';
 import { useSelector } from 'react-redux';
 import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
 
+const googleDriveIcon = require('../assets/googledrive.png');
+const oneDriveIcon = require('../assets/onedrive.png');
+
 const PROVIDER_ALL = 'all';
 
 const PROVIDER_META: Record<string, ProviderMeta> = {
-  'google-drive': { id: 'google-drive', short: 'GD', name: 'Google Drive', color: '#34a853' },
-  'onedrive': { id: 'onedrive', short: 'OD', name: 'OneDrive', color: '#0078d4' },
+  'google-drive': {
+    id: 'google-drive',
+    short: 'GD',
+    name: 'Google Drive',
+    color: '#34a853',
+    icon: googleDriveIcon,
+  },
+  'onedrive': {
+    id: 'onedrive',
+    short: 'OD',
+    name: 'OneDrive',
+    color: '#0078d4',
+    icon: oneDriveIcon,
+  },
 };
 
 const fileKey = (f: UnifiedFile) => `${f.provider}:${f.id}`;
@@ -46,7 +61,7 @@ const ManagerFilesScreen: React.FC = () => {
   const [tab, setTab] = useState('all');
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
-  const [sortBy, setSortBy] = useState<'name' | 'date' | 'size'>('name');
+  const [sortBy, setSortBy] = useState<SortOption>('name');
   const [activeProvider, setActiveProvider] = useState<string>(PROVIDER_ALL);
 
   const connectedProviders = useSelector(selectConnectedProviders);
@@ -215,7 +230,7 @@ const ManagerFilesScreen: React.FC = () => {
         onLayout={e => setViewportH(e.nativeEvent.layout.height)}
         onContentSizeChange={(_, h) => setContentH(h)}
       >
-        {/* Summary Bar Reutilizable (Sin "Details") */}
+        {/* Barra de Resumen */}
         <StorageSummaryBar
           fileCount={previews.length}
           providersCount={
@@ -230,7 +245,7 @@ const ManagerFilesScreen: React.FC = () => {
           }
         />
 
-        {/* Provider Selector Reutilizable */}
+        {/* Selector de Proveedores con Logos */}
         <ProviderSelector
           activeProvider={activeProvider}
           providerKeys={providerKeys}
@@ -239,56 +254,29 @@ const ManagerFilesScreen: React.FC = () => {
           onSelectProvider={setActiveProvider}
         />
 
-        {/* Type mini-cards */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.typeScroll} nestedScrollEnabled>
-          {summary.slice(0, 7).map(i => (
-            <TouchableOpacity key={i.label} style={s.typeCard} onPress={() => {
-              const t = FILE_TYPE_TABS.find(x => x.label === i.label || x.key === i.label.toLowerCase());
-              setTab(t?.key || 'other');
-            }}>
-              <Text style={s.typeIcon}>{i.icon}</Text>
-              <Text style={s.typeLabel}>{i.label}</Text>
-              <Text style={s.typeCount}>{i.count}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {/* Carrusel de Conteo por Tipo */}
+        <TypeSummaryScroll
+          summaryItems={summary}
+          onSelectType={label => {
+            const t = FILE_TYPE_TABS.find(x => x.label === label || x.key === label.toLowerCase());
+            setTab(t?.key || 'other');
+          }}
+        />
 
-        {/* Tabs */}
+        {/* Tabs de Filtro de Archivo */}
         <FileTypeTabs activeTab={tab} onTabChange={setTab} />
 
-        {/* Search + Sort */}
-        <View style={s.actions}>
-          <TouchableOpacity onPress={() => setShowSearch(!showSearch)}>
-            <Text>{showSearch ? '✕' : '🔍'}</Text>
-          </TouchableOpacity>
-          {showSearch ? (
-            <TextInput
-              style={s.si}
-              placeholder="Search files…"
-              placeholderTextColor="#999"
-              value={search}
-              onChangeText={setSearch}
-              autoFocus
-            />
-          ) : (
-            <View style={s.sortGroup}>
-              <Text style={s.sortLbl}>Sort:</Text>
-              {(['name', 'date', 'size'] as const).map(k => (
-                <TouchableOpacity
-                  key={k}
-                  style={[s.sb, sortBy === k && s.sbActive]}
-                  onPress={() => setSortBy(k)}
-                >
-                  <Text style={[s.sbt, sortBy === k && s.sbtActive]}>
-                    {k[0].toUpperCase() + k.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
+        {/* Barra de Búsqueda y Filtros de Ordenamiento */}
+        <SortBar
+          sortBy={sortBy}
+          onSelectSort={setSortBy}
+          searchQuery={search}
+          onSearchChange={setSearch}
+          showSearch={showSearch}
+          onToggleSearch={() => setShowSearch(!showSearch)}
+        />
 
-        {/* Section Header */}
+        {/* Header de Sección */}
         <View style={s.sec}>
           <Text style={s.secTitle}>
             {tab === 'all' ? 'All Files' : FILE_TYPE_TABS.find(t => t.key === tab)?.label || 'Files'}
@@ -296,7 +284,7 @@ const ManagerFilesScreen: React.FC = () => {
           <Text style={s.secCount}>{filtered.length} file{filtered.length !== 1 ? 's' : ''}</Text>
         </View>
 
-        {/* Files List */}
+        {/* Lista de Archivos */}
         {filtered.length === 0 && !loading && !loadingMore && !hasMore && (
           <View style={s.empty}>
             <Text style={s.emptyIcon}>📂</Text>
@@ -306,7 +294,7 @@ const ManagerFilesScreen: React.FC = () => {
         )}
         {filtered.map(f => <FileCard key={fileKey(f)} file={f} onPress={handleFilePress} />)}
 
-        {/* Auto-load indicator */}
+        {/* Indicador de Carga */}
         {hasMore && (
           <View style={s.lmBtn}>
             <ActivityIndicator size="small" color="#1a237e" />
@@ -314,7 +302,7 @@ const ManagerFilesScreen: React.FC = () => {
           </View>
         )}
 
-        {/* End of list */}
+        {/* Fin de Lista */}
         {!hasMore && filtered.length > 0 && (
           <View style={s.endRow}>
             <Text style={s.endText}>· End of list ·</Text>
@@ -334,21 +322,6 @@ const s = StyleSheet.create({
   back: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
   backTxt: { fontSize: 28, color: '#1a237e', fontWeight: '300', lineHeight: 30 },
   title: { fontSize: 20, fontWeight: 'bold', color: '#1a237e' },
-
-  typeScroll: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e9ecef', paddingHorizontal: 16, paddingVertical: 12 },
-  typeCard: { width: 80, alignItems: 'center', paddingVertical: 8, backgroundColor: '#f8f9fa', borderRadius: 8, marginRight: 10 },
-  typeIcon: { fontSize: 20, marginBottom: 4 },
-  typeLabel: { fontSize: 11, fontWeight: '600', color: '#555' },
-  typeCount: { fontSize: 10, color: '#999', marginTop: 2 },
-
-  actions: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e9ecef', gap: 8 },
-  si: { flex: 1, height: 36, backgroundColor: '#f0f4ff', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#333' },
-  sortGroup: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
-  sortLbl: { fontSize: 12, color: '#888', marginRight: 2 },
-  sb: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#f0f4ff', borderRadius: 6 },
-  sbActive: { backgroundColor: '#1a237e' },
-  sbt: { fontSize: 12, color: '#1a237e', fontWeight: '600' },
-  sbtActive: { color: '#fff' },
 
   sec: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   secTitle: { fontSize: 16, fontWeight: '700', color: '#333' },

@@ -1,3 +1,5 @@
+import { ImageSourcePropType } from 'react-native';
+
 export type ProviderId = 'google-drive' | 'onedrive' | 'dropbox' | 'box' | string;
 
 export interface UnifiedFile {
@@ -23,4 +25,5 @@ export interface ProviderMeta {
   short: string;
   name: string;
   color: string;
+  icon?: ImageSourcePropType;
 }
