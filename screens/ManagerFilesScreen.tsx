@@ -259,7 +259,6 @@ const ManagerFilesScreen: React.FC = () => {
             <Text style={s.val}>{activeProvider === PROVIDER_ALL ? String(scope.length) : (PROVIDER_META[activeProvider]?.short || 'P')}</Text>
             <Text style={s.lbl}>{activeProvider === PROVIDER_ALL ? 'Providers' : (PROVIDER_META[activeProvider]?.name || 'Provider')}</Text>
           </View>
-          <View style={s.cell}><Text style={s.val}>{unified.filter(f => f.size != null).length}</Text><Text style={s.lbl}>Details</Text></View>
         </View>
 
       {/* Provider selector */}
