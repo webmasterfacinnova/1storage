@@ -1,5 +1,5 @@
 // screens/AddProviderScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -9,175 +9,21 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useDispatch, useSelector } from 'react-redux';
-import {
-  addProvider,
-  removeProvider,
-  selectConnectedProviders,
-} from '../store/slices/connectedProvidersSlice';
-import { selectCurrentUser } from '../store/slices/authSlice';
-import { saveSecureData, clearSecureData, getSecureData } from '../utils/secureStorage';
-import OneDriveAuthService from '../services/auth/onedrive-auth.service';
-import GoogleAuthService from '../services/auth/google-auth.service';
+import { useStorageProviders } from '../hooks/useStorageProviders';
 import { ProviderActionButton } from '../components/common/ProviderActionButton';
 
 const AddProviderScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const dispatch = useDispatch();
-  const connectedProviders = useSelector(selectConnectedProviders);
-  const currentUser = useSelector(selectCurrentUser);
+  const { providers } = useStorageProviders();
 
-  const [isOneDriveConnecting, setIsOneDriveConnecting] = useState(false);
-  const [isGoogleConnecting, setIsGoogleConnecting] = useState(false);
-
-  // Sincronizar el estado de OneDrive leyendo datos persistidos en SecureStore
-  useEffect(() => {
-    const verifyOneDriveAccess = async () => {
-      try {
-        const token = await getSecureData('onedrive_token');
-        const email = await getSecureData('onedrive_provider_email');
-        const connectedAt = await getSecureData('onedrive_connected_at');
-
-        if (token) {
-          dispatch(
-            addProvider({
-              id: 'onedrive',
-              name: 'Microsoft OneDrive',
-              token,
-              userPrincipalName: email || '',
-              connectedAt: connectedAt || new Date().toISOString(),
-            })
-          );
-        }
-      } catch (error) {
-        console.error('Error al verificar sesión de OneDrive:', error);
-      }
-    };
-
-    verifyOneDriveAccess();
-  }, [dispatch]);
-
-  // --- GOOGLE DRIVE LOGIC ---
-  const connectGoogleDrive = async () => {
-    setIsGoogleConnecting(true);
-    try {
-      const authService = new GoogleAuthService();
-      await authService.initialize();
-      const result = await authService.signIn();
-
-      if (result?.token) {
-        dispatch(
-          addProvider({
-            id: 'google-drive',
-            name: 'Google Drive',
-            token: result.token,
-            userPrincipalName: result.user?.email || currentUser?.email,
-            connectedAt: new Date().toISOString(),
-          })
-        );
-      }
-    } catch (err) {
-      console.error('Error al autorizar Google Drive:', err);
-    } finally {
-      setIsGoogleConnecting(false);
+  const getStatusBadge = (isConnecting: boolean, isConnected: boolean) => {
+    if (isConnecting) {
+      return <ActivityIndicator size="small" color="#0078D4" />;
     }
-  };
-
-  const disconnectGoogleDrive = async () => {
-    try {
-      const authService = new GoogleAuthService();
-      await authService.signOut();
-      await clearSecureData('google_refresh_token');
-    } catch (error) {
-      console.error('Error al desconectar Google Drive:', error);
-    } finally {
-      dispatch(removeProvider('google-drive'));
+    if (isConnected) {
+      return <Text style={styles.statusConnected}>Connected</Text>;
     }
-  };
-
-  // --- ONEDRIVE LOGIC ---
-  const connectOneDrive = async () => {
-    setIsOneDriveConnecting(true);
-    try {
-      const authService = new OneDriveAuthService();
-      await authService.initialize();
-      const result = await authService.signIn();
-
-      dispatch(
-        addProvider({
-          id: 'onedrive',
-          name: 'Microsoft OneDrive',
-          token: result.token,
-          userPrincipalName: result.user.email,
-          connectedAt: new Date().toISOString(),
-        })
-      );
-
-      await saveSecureData('onedrive_token', result.token);
-      await saveSecureData('onedrive_provider_name', 'Microsoft OneDrive');
-      await saveSecureData('onedrive_provider_email', result.user.email);
-      await saveSecureData('onedrive_connected_at', new Date().toISOString());
-    } catch (err: any) {
-      console.error('Error al conectar OneDrive:', err);
-    } finally {
-      setIsOneDriveConnecting(false);
-    }
-  };
-
-  const disconnectOneDrive = async () => {
-    try {
-      await clearSecureData('onedrive_token');
-      await clearSecureData('onedrive_id_token');
-      await clearSecureData('onedrive_refresh_token');
-      await clearSecureData('onedrive_provider_name');
-      await clearSecureData('onedrive_provider_email');
-      await clearSecureData('onedrive_connected_at');
-    } catch (error) {
-      console.error('Error al desconectar OneDrive:', error);
-    } finally {
-      dispatch(removeProvider('onedrive'));
-    }
-  };
-
-  const getProviderStatus = (storeKey: string, isConnecting: boolean) => {
-    if (isConnecting) return 'connecting';
-    return connectedProviders[storeKey] ? 'connected' : 'disconnected';
-  };
-
-  const providers = [
-    {
-      id: 'google',
-      storeKey: 'google-drive',
-      name: 'Google Drive',
-      description: 'Access your Google Drive files and storage',
-      icon: '🔵',
-      color: '#4285F4',
-      isConnecting: isGoogleConnecting,
-      onConnect: connectGoogleDrive,
-      onDisconnect: disconnectGoogleDrive,
-    },
-    {
-      id: 'onedrive',
-      storeKey: 'onedrive',
-      name: 'Microsoft OneDrive',
-      description: 'Access your OneDrive files and storage',
-      icon: '☁️',
-      color: '#0078D4',
-      isConnecting: isOneDriveConnecting,
-      onConnect: connectOneDrive,
-      onDisconnect: disconnectOneDrive,
-    },
-  ];
-
-  const getStatusBadge = (status: 'connected' | 'disconnected' | 'connecting') => {
-    switch (status) {
-      case 'connected':
-        return <Text style={styles.statusConnected}>Connected</Text>;
-      case 'connecting':
-        return <ActivityIndicator size="small" color="#0078D4" />;
-      default:
-        return <Text style={styles.statusAvailable}>Available</Text>;
-    }
+    return <Text style={styles.statusAvailable}>Available</Text>;
   };
 
   return (
@@ -192,39 +38,31 @@ const AddProviderScreen: React.FC = () => {
         </Text>
       </View>
 
-      {providers.map(provider => {
-        const status = getProviderStatus(provider.storeKey, provider.isConnecting);
-        const isConnected = status === 'connected';
-        const isConnecting = status === 'connecting';
-
-        return (
-          <View key={provider.id} style={styles.providerCard}>
-            <View style={styles.providerInfo}>
-              <View style={[styles.iconContainer, { backgroundColor: provider.color + '20' }]}>
-                <Text style={styles.providerIcon}>{provider.icon}</Text>
-              </View>
-              <View style={styles.providerText}>
-                <Text style={styles.providerName}>{provider.name}</Text>
-                <Text style={styles.providerDescription}>{provider.description}</Text>
-                {isConnected && connectedProviders[provider.storeKey]?.userPrincipalName && (
-                  <Text style={styles.providerAccount}>
-                    {connectedProviders[provider.storeKey]?.userPrincipalName}
-                  </Text>
-                )}
-                {getStatusBadge(status)}
-              </View>
+      {providers.map(provider => (
+        <View key={provider.id} style={styles.providerCard}>
+          <View style={styles.providerInfo}>
+            <View style={[styles.iconContainer, { backgroundColor: provider.color + '20' }]}>
+              <Text style={styles.providerIcon}>{provider.icon}</Text>
             </View>
-
-            <ProviderActionButton
-              isConnected={isConnected}
-              isConnecting={isConnecting}
-              color={provider.color}
-              onConnect={provider.onConnect}
-              onDisconnect={provider.onDisconnect}
-            />
+            <View style={styles.providerText}>
+              <Text style={styles.providerName}>{provider.name}</Text>
+              <Text style={styles.providerDescription}>{provider.description}</Text>
+              {provider.isConnected && provider.accountEmail && (
+                <Text style={styles.providerAccount}>{provider.accountEmail}</Text>
+              )}
+              {getStatusBadge(provider.isConnecting, provider.isConnected)}
+            </View>
           </View>
-        );
-      })}
+
+          <ProviderActionButton
+            isConnected={provider.isConnected}
+            isConnecting={provider.isConnecting}
+            color={provider.color}
+            onConnect={provider.onConnect}
+            onDisconnect={provider.onDisconnect}
+          />
+        </View>
+      ))}
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
