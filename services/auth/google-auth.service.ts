@@ -226,11 +226,26 @@ class GoogleAuthService implements AuthService {
 
   async getCurrentUser(): Promise<User | null> {
     try {
-      const token = await getAuthToken();
+      let token = await getAuthToken();
       if (!token) return null;
 
-      const userInfo = await this.getUserInfo(token);
+      // Intentar obtener los datos del usuario con el token guardado
+      let userInfo = await this.getUserInfo(token);
+
+      // Si falla (token expirado / 401), intentamos refrescarlo automáticamente
       if (!userInfo) {
+        console.log('[GoogleAuth] Token expirado o inválido. Intentando refrescar...');
+        await this.initialize();
+        token = await this.refreshAccessToken();
+
+        if (token) {
+          userInfo = await this.getUserInfo(token);
+        }
+      }
+
+      // Si aún no se pudo obtener información del usuario, se limpia la sesión
+      if (!userInfo) {
+        console.warn('[GoogleAuth] No se pudo renovar la sesión del usuario');
         await clearAuthToken();
         await userService.clearCache();
         return null;
@@ -243,6 +258,7 @@ class GoogleAuthService implements AuthService {
         photoURL: userInfo.picture,
       };
     } catch (error) {
+      console.error('[GoogleAuth] Error obteniendo usuario actual:', error);
       await clearAuthToken();
       await userService.clearCache();
       return null;

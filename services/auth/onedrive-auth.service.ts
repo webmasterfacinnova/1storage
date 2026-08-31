@@ -1,4 +1,3 @@
-// services/auth/onedrive-auth.service.ts
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import Constants from 'expo-constants';
@@ -139,16 +138,16 @@ class OneDriveAuthService implements AuthService {
   async refreshAccessToken(): Promise<string | null> {
     try {
       const refreshToken = await getSecureData('onedrive_refresh_token');
-      if (!refreshToken) return null;
+      if (!refreshToken) {
+        console.warn('[OneDriveAuth] No refresh token available');
+        return null;
+      }
 
-      const redirectUri = makeRedirectUri({ preferLocalhost: true });
-
+      // Estructura corregida para la renovación de token
       const tokenBody = new URLSearchParams({
         client_id: this.clientId,
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
-        redirect_uri: redirectUri,
-        scope: SCOPES.join(' '), // Corrección: Se incluyen todos los scopes
       });
 
       const response = await fetch(TOKEN_URL, {
@@ -158,7 +157,8 @@ class OneDriveAuthService implements AuthService {
       });
 
       if (!response.ok) {
-        console.warn('[OneDriveAuth] Failed to refresh token:', response.status);
+        const errorText = await response.text();
+        console.warn('[OneDriveAuth] Failed to refresh token:', response.status, errorText);
         return null;
       }
 
@@ -173,6 +173,7 @@ class OneDriveAuthService implements AuthService {
         await saveSecureData('onedrive_refresh_token', newRefreshToken);
       }
 
+      console.log('[OneDriveAuth] Access token refreshed successfully');
       return newAccessToken;
     } catch (error) {
       console.error('[OneDriveAuth] Error refreshing token:', error);
