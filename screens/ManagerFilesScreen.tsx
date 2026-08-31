@@ -26,7 +26,7 @@ const googleDriveIcon = require('../assets/googledrive.png');
 const oneDriveIcon = require('../assets/onedrive.png');
 
 const PROVIDER_ALL = 'all';
-a
+
 const PROVIDER_META: Record<string, ProviderMeta> = {
   'google-drive': {
     id: 'google-drive',
