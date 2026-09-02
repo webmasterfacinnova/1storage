@@ -7,6 +7,8 @@ import {
   selectConnectedProviders,
 } from '../store/slices/connectedProvidersSlice';
 import { selectCurrentUser } from '../store/slices/authSlice';
+import { clearQuota as clearDriveQuota } from '../store/slices/driveSlice';
+import { clearQuota as clearOneDriveQuota } from '../store/slices/onedriveSlice';
 import { saveSecureData, clearSecureData, getSecureData } from '../utils/secureStorage';
 import OneDriveAuthService from '../services/auth/onedrive-auth.service';
 import GoogleAuthService from '../services/auth/google-auth.service';
@@ -90,11 +92,19 @@ export const useStorageProviders = () => {
     try {
       const authService = new GoogleAuthService();
       await authService.signOut();
-      await clearSecureData('google_refresh_token');
     } catch (error) {
-      console.error('Error al desconectar Google Drive:', error);
+      console.error('Error al cerrar sesión en Google AuthService:', error);
     } finally {
+      try {
+        await clearSecureData('google_token');
+        await clearSecureData('google_refresh_token');
+        await clearSecureData('google_provider_email');
+      } catch (storageErr) {
+        console.error('Error al limpiar almacenamiento local de Google:', storageErr);
+      }
+      
       dispatch(removeProvider('google-drive'));
+      dispatch(clearDriveQuota());
     }
   };
 
@@ -136,9 +146,10 @@ export const useStorageProviders = () => {
       await clearSecureData('onedrive_provider_email');
       await clearSecureData('onedrive_connected_at');
     } catch (error) {
-      console.error('Error al desconectar OneDrive:', error);
+      console.error('Error al limpiar almacenamiento de OneDrive:', error);
     } finally {
       dispatch(removeProvider('onedrive'));
+      dispatch(clearOneDriveQuota());
     }
   };
 

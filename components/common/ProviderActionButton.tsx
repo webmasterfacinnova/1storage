@@ -1,5 +1,5 @@
 // components/common/ProviderActionButton.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import {
   TouchableOpacity,
   Text,
@@ -23,7 +23,19 @@ export const ProviderActionButton: React.FC<ProviderActionButtonProps> = ({
   onConnect,
   onDisconnect,
 }) => {
-  if (isConnecting) {
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  const handleDisconnect = async () => {
+    if (!onDisconnect || isDisconnecting) return;
+    setIsDisconnecting(true);
+    try {
+      await onDisconnect();
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
+  if (isConnecting || isDisconnecting) {
     return (
       <View style={[styles.button, styles.disabledButton]}>
         <ActivityIndicator size="small" color="#FFFFFF" />
@@ -35,7 +47,7 @@ export const ProviderActionButton: React.FC<ProviderActionButtonProps> = ({
     return (
       <TouchableOpacity
         style={styles.disconnectButton}
-        onPress={onDisconnect}
+        onPress={handleDisconnect}
       >
         <Text style={styles.disconnectButtonText}>Disconnect</Text>
       </TouchableOpacity>
