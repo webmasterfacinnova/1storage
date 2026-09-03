@@ -1,15 +1,15 @@
+// screens/LoginScreen.tsx
 import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Image, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
-import { authService } from '../../services/auth.service';
-import { setLoading, setCredentials, setError } from '../../store/slices/authSlice';
-import { selectAuthLoading, selectAuthError } from '../../store/slices/authSlice';
-import GoogleSignInButton from './GoogleSignInButton';
+import { authService } from '../services/auth.service';
+import { setLoading, setCredentials, setError } from '../store/slices/authSlice';
+import { selectAuthLoading, selectAuthError } from '../store/slices/authSlice';
+import { addProvider } from '../store/slices/connectedProvidersSlice';
+import GoogleSignInButton from '../components/auth/GoogleSignInButton';
 
 const LoginScreen = () => {
   const dispatch = useDispatch();
-  const navigation = useNavigation<any>();
   const loading = useSelector(selectAuthLoading);
   const error = useSelector(selectAuthError);
 
@@ -18,9 +18,29 @@ const LoginScreen = () => {
     dispatch(setError(null));
     try {
       const result = await authService.signIn();
-      dispatch(setCredentials({ user: result.user, token: result.token, provider: result.provider }));
+      dispatch(
+        setCredentials({
+          user: result.user,
+          token: result.token,
+          provider: result.provider,
+        })
+      );
+
+      // Registrar Google Drive en connectedProvidersSlice al iniciar sesión correctamente
+      if (result.token) {
+        dispatch(
+          addProvider({
+            id: 'google-drive',
+            name: 'Google Drive',
+            token: result.token,
+            userPrincipalName: result.user?.email,
+            connectedAt: new Date().toISOString(),
+          })
+        );
+      }
+
       dispatch(setLoading(false));
-      navigation.replace('Home');
+      // No se requiere navigation.replace('Home') ya que AppNavigator redirige automáticamente al cambiar el estado de Redux.
     } catch (err: any) {
       let message = 'Authentication failed';
       if (err.message) {
@@ -37,13 +57,13 @@ const LoginScreen = () => {
       dispatch(setLoading(false));
       Alert.alert('Login failed', message);
     }
-  }, [dispatch, navigation]);
+  }, [dispatch]);
 
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
         <Image
-          source={require('../../assets/LogoSlogan.png')}
+          source={require('../assets/LogoSlogan.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -53,9 +73,7 @@ const LoginScreen = () => {
 
       <GoogleSignInButton onPress={handleGoogleSignIn} loading={loading} />
 
-      {error && (
-        <Text style={styles.error}>{error}</Text>
-      )}
+      {Boolean(error) && <Text style={styles.error}>{error}</Text>}
 
       <Text style={styles.footer}>
         By continuing, you agree to our Terms of Service and Privacy Policy.

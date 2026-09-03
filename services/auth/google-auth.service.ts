@@ -13,32 +13,26 @@ import {
 } from 'expo-auth-session';
 import Constants from 'expo-constants';
 import { AuthService, AuthResult, User } from '../auth.service';
-import { saveAuthToken, getAuthToken, clearAuthToken } from '../../utils/secureStorage';
+import { saveAuthToken, getAuthToken, clearAuthToken, saveSecureData, getSecureData, clearSecureData } from '../../utils/secureStorage';
 import { userService } from '../user.service';
 
-// Required for any auth session to work (closes the popup/redirect on web)
 WebBrowser.maybeCompleteAuthSession();
 
-// Google's OpenID Connect endpoints (Authorization Code + PKCE flow)
 const DISCOVERY = {
   authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
   tokenEndpoint: 'https://oauth2.googleapis.com/token',
   revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
 };
 
-// @react-native-google-signin/google-signin is a native-only module and is
-// not available on web. Load it lazily so the web bundle stays clean.
 const getGoogleSignin = (): any | null => {
   if (Platform.OS === 'web') return null;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     return require('@react-native-google-signin/google-signin').GoogleSignin;
   } catch {
     return null;
   }
 };
 
-// OAuth scopes we request
 const SCOPES = [
   'openid',
   'profile',
@@ -51,8 +45,6 @@ class GoogleAuthService implements AuthService {
   private clientSecret: string = '';
 
   async initialize(): Promise<void> {
-    // Credentials are read from environment variables (.env) first, with an
-    // optional override via Expo's app.json extra config.
     this.clientId =
       process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
       Constants.expoConfig?.extra?.googleWebClientId ??
@@ -73,8 +65,6 @@ class GoogleAuthService implements AuthService {
 
     const GoogleSignin = getGoogleSignin();
     if (!GoogleSignin) {
-      // Web (or module unavailable): OAuth runs through expo-auth-session,
-      // so no native configuration is required.
       return;
     }
 
@@ -92,15 +82,9 @@ class GoogleAuthService implements AuthService {
 
   async signIn(): Promise<AuthResult> {
     try {
-      // Exact redirect URI must be registered in the Google Cloud Console
-      // (APIs & Services → Credentials → OAuth Web Client → Authorized redirect URIs).
       const redirectUri = makeRedirectUri({ preferLocalhost: true });
       console.log('[GoogleAuth] redirectUri =', redirectUri);
 
-      // Authorization Code + PKCE flow (replaces the deprecated implicit flow).
-      // NOTE: client_secret must NOT be sent in the authorization request —
-      // Google rejects it ("Parameter not allowed... client_secret"). It is
-      // only used later in the token exchange (exchangeCodeAsync).
       const request = new AuthRequest({
         clientId: this.clientId,
         scopes: SCOPES,
@@ -109,11 +93,10 @@ class GoogleAuthService implements AuthService {
         usePKCE: true,
         extraParams: {
           access_type: 'offline',
-          prompt: 'select_account',
+          prompt: 'consent',
         },
       });
 
-      // Opens the OAuth screen (popup on web, in-app browser on native)
       const result = await request.promptAsync(DISCOVERY);
 
       if (result.type !== 'success' || !result.params?.code) {
@@ -124,8 +107,6 @@ class GoogleAuthService implements AuthService {
         throw new Error(errDesc || 'Google sign-in failed');
       }
 
-      // Exchange the authorization code for tokens (PKCE code_verifier proves
-      // this is the same client that started the flow).
       const tokenResponse = await exchangeCodeAsync(
         {
           clientId: this.clientId,
@@ -140,14 +121,18 @@ class GoogleAuthService implements AuthService {
       );
 
       const accessToken = tokenResponse.accessToken;
+      const refreshToken = tokenResponse.refreshToken ?? '';
       const idToken = tokenResponse.idToken ?? '';
 
       if (!accessToken) {
         throw new Error('No access token received from Google');
       }
 
-      // Fetch user info from Google
       const userInfo = await this.getUserInfo(accessToken);
+
+      if (!userInfo) {
+        throw new Error('Failed to fetch user info from Google');
+      }
 
       const user: User = {
         id: userInfo.sub ?? userInfo.id,
@@ -156,10 +141,12 @@ class GoogleAuthService implements AuthService {
         photoURL: userInfo.picture,
       };
 
-      // Save tokens locally
+      // Guardar access_token y refresh_token
       await saveAuthToken(accessToken);
+      if (refreshToken) {
+        await saveSecureData('google_refresh_token', refreshToken);
+      }
 
-      // Sync user to MongoDB (create/update profile) — non-critical
       try {
         if (userInfo.sub) {
           await userService.upsertUser({
@@ -172,7 +159,6 @@ class GoogleAuthService implements AuthService {
           });
         }
       } catch (dbError) {
-        // Non-critical: user can still use the app with local session
         console.error('Failed to sync user to database:', dbError);
       }
 
@@ -183,6 +169,46 @@ class GoogleAuthService implements AuthService {
     }
   }
 
+  async refreshAccessToken(): Promise<string | null> {
+    try {
+      const refreshToken = await getSecureData('google_refresh_token');
+      if (!refreshToken) return null;
+
+      const tokenBody = new URLSearchParams({
+        client_id: this.clientId,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      });
+
+      if (this.clientSecret) {
+        tokenBody.append('client_secret', this.clientSecret);
+      }
+
+      const response = await fetch(DISCOVERY.tokenEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: tokenBody.toString(),
+      });
+
+      if (!response.ok) {
+        console.warn('[GoogleAuth] Failed to refresh token:', response.status);
+        return null;
+      }
+
+      const tokenData = await response.json();
+      const newAccessToken = tokenData.access_token;
+
+      if (newAccessToken) {
+        await saveAuthToken(newAccessToken);
+      }
+
+      return newAccessToken;
+    } catch (error) {
+      console.error('[GoogleAuth] Error refreshing token:', error);
+      return null;
+    }
+  }
+
   async signOut(): Promise<void> {
     try {
       const GoogleSignin = getGoogleSignin();
@@ -190,6 +216,7 @@ class GoogleAuthService implements AuthService {
         await GoogleSignin.signOut();
       }
       await clearAuthToken();
+      await clearSecureData('google_refresh_token');
       await userService.clearCache();
     } catch (error) {
       console.error('Google sign-out error:', error);
@@ -199,11 +226,30 @@ class GoogleAuthService implements AuthService {
 
   async getCurrentUser(): Promise<User | null> {
     try {
-      const token = await getAuthToken();
+      let token = await getAuthToken();
       if (!token) return null;
 
-      const userInfo = await this.getUserInfo(token);
-      if (!userInfo) return null;
+      // Intentar obtener los datos del usuario con el token guardado
+      let userInfo = await this.getUserInfo(token);
+
+      // Si falla (token expirado / 401), intentamos refrescarlo automáticamente
+      if (!userInfo) {
+        console.log('[GoogleAuth] Token expirado o inválido. Intentando refrescar...');
+        await this.initialize();
+        token = await this.refreshAccessToken();
+
+        if (token) {
+          userInfo = await this.getUserInfo(token);
+        }
+      }
+
+      // Si aún no se pudo obtener información del usuario, se limpia la sesión
+      if (!userInfo) {
+        console.warn('[GoogleAuth] No se pudo renovar la sesión del usuario');
+        await clearAuthToken();
+        await userService.clearCache();
+        return null;
+      }
 
       return {
         id: userInfo.sub ?? userInfo.id,
@@ -212,7 +258,9 @@ class GoogleAuthService implements AuthService {
         photoURL: userInfo.picture,
       };
     } catch (error) {
-      console.error('Get current user error:', error);
+      console.error('[GoogleAuth] Error obteniendo usuario actual:', error);
+      await clearAuthToken();
+      await userService.clearCache();
       return null;
     }
   }
@@ -221,15 +269,22 @@ class GoogleAuthService implements AuthService {
     return getAuthToken();
   }
 
-  // Private helpers
   private async getUserInfo(token: string): Promise<any> {
-    const response = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) {
-      throw new Error('Failed to fetch user info from Google');
+    if (!token) return null;
+
+    try {
+      const response = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      return await response.json();
+    } catch (error) {
+      return null;
     }
-    return response.json();
   }
 
   private handleAuthError(error: any): Error {

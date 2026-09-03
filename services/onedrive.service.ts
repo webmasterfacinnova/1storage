@@ -1,7 +1,10 @@
 // services/onedrive.service.ts
 // OneDrive API service — fetches storage quota from Microsoft Graph API
 
-import { getSecureData } from '../utils/secureStorage';
+import { getValidOneDriveToken } from './onedrive-token';
+import OneDriveAuthService from './auth/onedrive-auth.service';
+
+const onedriveAuth = new OneDriveAuthService();
 
 export interface OneDriveStorageQuota {
   /** Total storage limit in bytes (null = unlimited) */
@@ -18,7 +21,7 @@ const GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0';
 
 class OneDriveService {
   private async _getToken(): Promise<string | null> {
-    return getSecureData('onedrive_token');
+    return getValidOneDriveToken();
   }
 
   /**
@@ -27,15 +30,31 @@ class OneDriveService {
    */
   async getStorageQuota(): Promise<OneDriveStorageQuota | null> {
     try {
-      const token = await this._getToken();
+      let token = await this._getToken();
       if (!token) return null;
 
-      const response = await fetch(
+      let response = await fetch(
         `${GRAPH_API_BASE}/me/drive`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
+
+      // Reintento automático si el token caducó
+      if (response.status === 401) {
+        console.log('[OneDriveService] Received 401 Unauthorized. Attempting token refresh...');
+        await onedriveAuth.initialize();
+        token = await onedriveAuth.refreshAccessToken();
+
+        if (token) {
+          response = await fetch(
+            `${GRAPH_API_BASE}/me/drive`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+        }
+      }
 
       if (!response.ok) {
         console.error('OneDrive API error:', response.status, await response.text());

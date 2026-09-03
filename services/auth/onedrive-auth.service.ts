@@ -1,7 +1,3 @@
-// services/auth/onedrive-auth.service.ts
-// Microsoft OneDrive Authentication — Authorization Code + PKCE flow
-// Uses WebBrowser.openAuthSessionAsync + manual token exchange via fetch.
-
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import Constants from 'expo-constants';
@@ -18,6 +14,7 @@ const SCOPES = [
   'profile',
   'email',
   'offline_access',
+  'User.Read',
   'Files.Read',
   'Files.Read.All',
   'Files.ReadWrite.All',
@@ -25,27 +22,16 @@ const SCOPES = [
 
 class OneDriveAuthService implements AuthService {
   private clientId: string = '';
-  private clientSecret: string = '';
 
   async initialize(): Promise<void> {
-    // Credentials are read from environment variables (.env) first, with an
-    // optional override via Expo's app.json extra config.
     this.clientId =
       process.env.EXPO_PUBLIC_ONEDRIVE_CLIENT_ID ??
       Constants.expoConfig?.extra?.onedriveClientId ??
       Constants.expoConfig?.extra?.EXPO_PUBLIC_ONEDRIVE_CLIENT_ID ??
       '';
-    this.clientSecret =
-      process.env.EXPO_PUBLIC_ONEDRIVE_CLIENT_SECRET ??
-      Constants.expoConfig?.extra?.onedriveClientSecret ??
-      Constants.expoConfig?.extra?.EXPO_PUBLIC_ONEDRIVE_CLIENT_SECRET ??
-      '';
 
     if (!this.clientId) {
       console.warn('OneDrive Auth: ONEDRIVE_CLIENT_ID not found');
-    }
-    if (!this.clientSecret) {
-      console.warn('OneDrive Auth: ONEDRIVE_CLIENT_SECRET not found');
     }
   }
 
@@ -54,16 +40,13 @@ class OneDriveAuthService implements AuthService {
       const redirectUri = makeRedirectUri({ preferLocalhost: true });
       console.log('[OneDriveAuth] redirectUri:', redirectUri);
 
-      // Generate code_verifier: 43-128 chars, alphanumeric
       const codeVerifier = this.generateRandomString(64);
-
-      // code_challenge = BASE64URL( SHA256( code_verifier ) )
       const codeChallenge = await this.sha256Base64URL(codeVerifier);
 
-      // Build authorize URL with all required params
       const params = new URLSearchParams({
         client_id: this.clientId,
         response_type: 'code',
+        response_mode: 'query',
         redirect_uri: redirectUri,
         scope: SCOPES.join(' '),
         code_challenge: codeChallenge,
@@ -83,7 +66,6 @@ class OneDriveAuthService implements AuthService {
         throw new Error('Microsoft sign-in was interrupted');
       }
 
-      // Extract code from redirect URL
       const url = result.url;
       const parsedUrl = new URL(url);
       const code = parsedUrl.searchParams.get('code');
@@ -97,19 +79,14 @@ class OneDriveAuthService implements AuthService {
         throw new Error('No authorization code received from Microsoft');
       }
 
-      // Exchange code for token via POST with URLSearchParams.
-      // NOTE: Azure public clients (SPA/mobile) must NOT send client_secret.
       const tokenBody = new URLSearchParams({
         client_id: this.clientId,
         code: code,
         redirect_uri: redirectUri,
         grant_type: 'authorization_code',
         code_verifier: codeVerifier,
+        scope: SCOPES.join(' '),
       });
-
-      if (this.clientSecret) {
-        tokenBody.append('client_secret', this.clientSecret);
-      }
 
       const tokenResponse = await fetch(TOKEN_URL, {
         method: 'POST',
@@ -128,11 +105,12 @@ class OneDriveAuthService implements AuthService {
       const refreshToken = tokenData.refresh_token ?? '';
       const idToken = tokenData.id_token ?? '';
 
-      if (!accessToken) {
+      if (!accessToken || typeof accessToken !== 'string' || accessToken.trim().length === 0) {
         throw new Error('No access token received from Microsoft');
       }
 
-      // Fetch user info from Microsoft Graph (fallback to id_token claims)
+      console.log('[OneDriveAuth] Access token received');
+
       const userInfo = await this.getUserInfo(accessToken, idToken);
 
       const user: User = {
@@ -142,7 +120,6 @@ class OneDriveAuthService implements AuthService {
         photoURL: '',
       };
 
-      // Save tokens
       await saveSecureData('onedrive_token', accessToken);
       if (idToken) {
         await saveSecureData('onedrive_id_token', idToken);
@@ -155,6 +132,52 @@ class OneDriveAuthService implements AuthService {
     } catch (error) {
       console.error('OneDrive sign-in error:', error);
       throw this.handleAuthError(error);
+    }
+  }
+
+  async refreshAccessToken(): Promise<string | null> {
+    try {
+      const refreshToken = await getSecureData('onedrive_refresh_token');
+      if (!refreshToken) {
+        console.warn('[OneDriveAuth] No refresh token available');
+        return null;
+      }
+
+      // Estructura corregida para la renovación de token
+      const tokenBody = new URLSearchParams({
+        client_id: this.clientId,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      });
+
+      const response = await fetch(TOKEN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: tokenBody.toString(),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn('[OneDriveAuth] Failed to refresh token:', response.status, errorText);
+        return null;
+      }
+
+      const tokenData = await response.json();
+      const newAccessToken = tokenData.access_token;
+      const newRefreshToken = tokenData.refresh_token;
+
+      if (newAccessToken) {
+        await saveSecureData('onedrive_token', newAccessToken);
+      }
+      if (newRefreshToken) {
+        await saveSecureData('onedrive_refresh_token', newRefreshToken);
+      }
+
+      console.log('[OneDriveAuth] Access token refreshed successfully');
+      return newAccessToken;
+    } catch (error) {
+      console.error('[OneDriveAuth] Error refreshing token:', error);
+      return null;
     }
   }
 
@@ -194,13 +217,9 @@ class OneDriveAuthService implements AuthService {
     return getSecureData('onedrive_token');
   }
 
-  // --- Private helpers ---
-
   private generateRandomString(length: number): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
     let result = '';
-    const array = new Uint8Array(length);
-    // Use Math.random as fallback (secure enough for PKCE)
     for (let i = 0; i < length; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
@@ -208,11 +227,9 @@ class OneDriveAuthService implements AuthService {
   }
 
   private async sha256Base64URL(input: string): Promise<string> {
-    // Encode string to UTF-8 bytes
     const encoder = new TextEncoder();
     const data = encoder.encode(input);
 
-    // Use SubtleCrypto if available (browsers, Hermes)
     if (typeof crypto !== 'undefined' && crypto.subtle) {
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -220,15 +237,12 @@ class OneDriveAuthService implements AuthService {
       return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     }
 
-    // Fallback for React Native: use a simpler approach
-    // For Hermes engine, polyfill via expo-crypto approach
     try {
       const ExpoCrypto = require('expo-crypto');
       const digest = await ExpoCrypto.digestStringAsync(
         ExpoCrypto.CryptoDigestAlgorithm.SHA256,
-        input,
+        input
       );
-      // digest is hex, convert to bytes then base64url
       const bytes: number[] = [];
       for (let i = 0; i < digest.length; i += 2) {
         bytes.push(parseInt(digest.substring(i, i + 2), 16));
@@ -236,27 +250,27 @@ class OneDriveAuthService implements AuthService {
       const base64 = btoa(String.fromCharCode(...bytes));
       return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     } catch {
-      // Last resort: use plain code_challenge = code_verifier (S256 not available)
-      // Microsoft supports 'plain' method as well
       console.warn('[OneDriveAuth] SHA-256 not available, using plain challenge method');
-      return input; // plain mode
+      return input;
     }
   }
 
   private async getUserInfo(token: string, idToken?: string): Promise<any> {
-    // Try Microsoft Graph first
-    const response = await fetch('https://graph.microsoft.com/v1.0/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    try {
+      const response = await fetch('https://graph.microsoft.com/v1.0/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    if (response.ok) {
-      return response.json();
+      if (response.ok) {
+        return response.json();
+      }
+
+      const errorText = await response.text();
+      console.warn('[OneDriveAuth] Graph /me failed:', response.status, errorText);
+    } catch (e) {
+      console.warn('[OneDriveAuth] Graph /me network/request error:', e);
     }
 
-    const errorText = await response.text();
-    console.warn('[OneDriveAuth] Graph /me failed:', response.status, errorText);
-
-    // Fallback: decode id_token to get user profile info
     if (idToken) {
       try {
         const payload = this.parseJwt(idToken);
@@ -273,7 +287,9 @@ class OneDriveAuthService implements AuthService {
       }
     }
 
-    throw new Error('Failed to fetch user info from Microsoft Graph');
+    throw new Error(
+      'Could not retrieve your Microsoft profile. Please make sure the app has permission to access your account information, or try again later.'
+    );
   }
 
   private parseJwt(token: string): any {
@@ -284,7 +300,7 @@ class OneDriveAuthService implements AuthService {
       atob(base64)
         .split('')
         .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join(''),
+        .join('')
     );
     return JSON.parse(jsonPayload);
   }

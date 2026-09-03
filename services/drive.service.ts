@@ -1,7 +1,7 @@
 // services/drive.service.ts
 // Google Drive API service — fetches storage quota and file listings
 
-import { getAuthToken } from '../utils/secureStorage';
+import { getValidGoogleToken } from './google-token';
 
 export interface DriveStorageQuota {
   /** Total storage limit in bytes (null = unlimited) */
@@ -28,7 +28,7 @@ const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
 
 class DriveService {
   private async getToken(): Promise<string | null> {
-    return getAuthToken();
+    return getValidGoogleToken();
   }
 
   /**
@@ -37,15 +37,29 @@ class DriveService {
    */
   async getStorageQuota(): Promise<DriveStorageQuota | null> {
     try {
-      const token = await this.getToken();
+      let token = await this.getToken();
       if (!token) return null;
 
-      const response = await fetch(
+      let response = await fetch(
         `${DRIVE_API_BASE}/about?fields=storageQuota`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
+
+      // Si da un 401 Unauthorized, forzar el intento de renovación de token
+      if (response.status === 401) {
+        console.warn('Google Drive token returned 401. Refreshing token...');
+        token = await getValidGoogleToken();
+        if (token) {
+          response = await fetch(
+            `${DRIVE_API_BASE}/about?fields=storageQuota`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+        }
+      }
 
       if (!response.ok) {
         console.error('Drive API error:', response.status, await response.text());

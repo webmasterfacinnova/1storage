@@ -1,16 +1,13 @@
 // screens/HomeScreen.tsx
-// Home screen after successful authentication - shows storage info for all connected providers
-
-import React, { useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshControl } from 'react-native';
+import React, { useEffect, useCallback, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshControl, useWindowDimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
-import { selectCurrentUser } from '../store/slices/authSlice';
-import { logout } from '../store/slices/authSlice';
+import { selectCurrentUser, logout } from '../store/slices/authSlice';
 import { authService } from '../services/auth.service';
-import { driveService, DriveStorageQuota } from '../services/drive.service';
+import { driveService } from '../services/drive.service';
 import { setQuotaLoading, setQuota, setQuotaError, selectDriveQuota, selectDriveLoading, selectDriveError } from '../store/slices/driveSlice';
-import { oneDriveService, OneDriveStorageQuota } from '../services/onedrive.service';
+import { oneDriveService } from '../services/onedrive.service';
 import {
   setQuotaLoading as setODQuotaLoading,
   setQuota as setODQuota,
@@ -19,7 +16,7 @@ import {
   selectOnedriveLoading,
   selectOnedriveError,
 } from '../store/slices/onedriveSlice';
-import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
+import { selectConnectedProviders, clearAllProviders } from '../store/slices/connectedProvidersSlice';
 
 const HomeScreen = () => {
   const user = useSelector(selectCurrentUser);
@@ -29,10 +26,16 @@ const HomeScreen = () => {
   const odQuota = useSelector(selectOnedriveQuota);
   const odQuotaLoading = useSelector(selectOnedriveLoading);
   const odQuotaError = useSelector(selectOnedriveError);
+
   const connectedProviders = useSelector(selectConnectedProviders);
+  const isGoogleDriveConnected = !!connectedProviders['google-drive'];
   const isOneDriveConnected = !!connectedProviders['onedrive'];
+
   const navigation = useNavigation();
   const dispatch = useDispatch();
+  const { height: windowHeight } = useWindowDimensions();
+  const [headerH, setHeaderH] = useState(74);
+  const [footerH, setFooterH] = useState(53);
 
   const fetchStorageQuota = useCallback(async () => {
     dispatch(setQuotaLoading(true));
@@ -55,8 +58,10 @@ const HomeScreen = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    fetchStorageQuota();
-  }, [fetchStorageQuota]);
+    if (isGoogleDriveConnected) {
+      fetchStorageQuota();
+    }
+  }, [isGoogleDriveConnected, fetchStorageQuota]);
 
   useEffect(() => {
     if (isOneDriveConnected) {
@@ -67,8 +72,8 @@ const HomeScreen = () => {
   const handleLogout = async () => {
     try {
       await authService.signOut();
+      dispatch(clearAllProviders());
       dispatch(logout());
-      navigation.navigate('Login' as never);
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -80,9 +85,16 @@ const HomeScreen = () => {
   const odUsagePercent = odQuota ? oneDriveService.usagePercentage(odQuota) : 0;
   const odBarColor = odUsagePercent > 90 ? '#e53935' : odUsagePercent > 70 ? '#fb8c00' : '#0078d4';
 
+  const getConnectedSubtext = () => {
+    if (isGoogleDriveConnected && isOneDriveConnected) return 'Google Drive + OneDrive connected';
+    if (isGoogleDriveConnected) return 'Google Drive connected';
+    if (isOneDriveConnected) return 'OneDrive connected';
+    return 'No storage providers connected';
+  };
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, { height: windowHeight }]}>
+      <View style={styles.header} onLayout={e => setHeaderH(e.nativeEvent.layout.height)}>
         <Image
           source={require('../assets/LogoSlogan.png')}
           style={styles.logo}
@@ -90,13 +102,18 @@ const HomeScreen = () => {
         />
       </View>
 
-      <ScrollView style={styles.content} refreshControl={
-        <RefreshControl
-          refreshing={quotaLoading || odQuotaLoading}
-          onRefresh={() => { fetchStorageQuota(); if (isOneDriveConnected) fetchOneDriveQuota(); }}
-        />
-      }>
-        {/* Welcome Card */}
+      <ScrollView
+        style={[styles.content, { height: Math.max(windowHeight - headerH - footerH, 0) }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={quotaLoading || odQuotaLoading}
+            onRefresh={() => {
+              if (isGoogleDriveConnected) fetchStorageQuota();
+              if (isOneDriveConnected) fetchOneDriveQuota();
+            }}
+          />
+        }
+      >
         <View style={styles.welcomeCard}>
           {user?.photoURL ? (
             <Image source={{ uri: user.photoURL }} style={styles.userAvatar} />
@@ -107,17 +124,19 @@ const HomeScreen = () => {
           )}
           <View style={styles.welcomeInfo}>
             <Text style={styles.welcomeText}>Welcome, {user?.name || user?.email}</Text>
-            <Text style={styles.welcomeSubtext}>
-              {isOneDriveConnected ? 'Google Drive + OneDrive connected' : 'Google Drive connected'}
+            <Text style={[styles.welcomeSubtext, !isGoogleDriveConnected && !isOneDriveConnected && { color: '#888888' }]}>
+              {getConnectedSubtext()}
             </Text>
           </View>
         </View>
 
-        {/* Google Drive Storage Quota Card */}
+        {/* Tarjeta de Google Drive visible siempre */}
         <View style={styles.storageCard}>
           <Text style={styles.storageTitle}>Google Drive Storage</Text>
 
-          {quotaLoading ? (
+          {!isGoogleDriveConnected ? (
+            <Text style={styles.loadingText}>Not connected — Tap Add Provider below to link</Text>
+          ) : quotaLoading ? (
             <Text style={styles.loadingText}>Loading storage info...</Text>
           ) : quotaError ? (
             <Text style={styles.errorText}>Could not load storage info</Text>
@@ -140,7 +159,6 @@ const HomeScreen = () => {
                 </View>
               </View>
 
-              {/* Progress bar */}
               {quota.limit && (
                 <View style={styles.progressBarContainer}>
                   <View style={styles.progressBarBg}>
@@ -162,61 +180,59 @@ const HomeScreen = () => {
           )}
         </View>
 
-        {/* OneDrive Storage Quota Card (only when connected) */}
-        {isOneDriveConnected && (
-          <View style={[styles.storageCard, { borderLeftWidth: 3, borderLeftColor: '#0078d4' }]}>
-            <Text style={styles.storageTitle}>OneDrive Storage</Text>
+        {/* Tarjeta de OneDrive visible siempre */}
+        <View style={[styles.storageCard, { borderLeftWidth: 3, borderLeftColor: '#0078d4' }]}>
+          <Text style={styles.storageTitle}>OneDrive Storage</Text>
 
-            {odQuotaLoading ? (
-              <Text style={styles.loadingText}>Loading storage info...</Text>
-            ) : odQuotaError ? (
-              <Text style={styles.errorText}>Could not load storage info</Text>
-            ) : odQuota ? (
-              <>
-                <View style={styles.quotaRow}>
-                  <View style={styles.quotaItem}>
-                    <Text style={styles.quotaValue}>{oneDriveService.formatBytes(odQuota.usage)}</Text>
-                    <Text style={styles.quotaLabel}>Used</Text>
-                  </View>
-                  <View style={styles.quotaItem}>
-                    <Text style={styles.quotaValue}>
-                      {odQuota.limit ? oneDriveService.formatBytes(odQuota.limit) : 'Unlimited'}
-                    </Text>
-                    <Text style={styles.quotaLabel}>Total</Text>
-                  </View>
-                  <View style={styles.quotaItem}>
-                    <Text style={styles.quotaValue}>{oneDriveService.formatBytes(odQuota.usageInDriveTrash)}</Text>
-                    <Text style={styles.quotaLabel}>Trash</Text>
-                  </View>
+          {!isOneDriveConnected ? (
+            <Text style={styles.loadingText}>Not connected — Tap Add Provider below to link</Text>
+          ) : odQuotaLoading ? (
+            <Text style={styles.loadingText}>Loading storage info...</Text>
+          ) : odQuotaError ? (
+            <Text style={styles.errorText}>Could not load storage info</Text>
+          ) : odQuota ? (
+            <>
+              <View style={styles.quotaRow}>
+                <View style={styles.quotaItem}>
+                  <Text style={styles.quotaValue}>{oneDriveService.formatBytes(odQuota.usage)}</Text>
+                  <Text style={styles.quotaLabel}>Used</Text>
                 </View>
+                <View style={styles.quotaItem}>
+                  <Text style={styles.quotaValue}>
+                    {odQuota.limit ? oneDriveService.formatBytes(odQuota.limit) : 'Unlimited'}
+                  </Text>
+                  <Text style={styles.quotaLabel}>Total</Text>
+                </View>
+                <View style={styles.quotaItem}>
+                  <Text style={styles.quotaValue}>{oneDriveService.formatBytes(odQuota.usageInDriveTrash)}</Text>
+                  <Text style={styles.quotaLabel}>Trash</Text>
+                </View>
+              </View>
 
-                {/* Progress bar */}
-                {odQuota.limit && (
-                  <View style={styles.progressBarContainer}>
-                    <View style={styles.progressBarBg}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          { width: `${Math.min(odUsagePercent, 100)}%`, backgroundColor: odBarColor },
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.progressText}>
-                      {odUsagePercent.toFixed(1)}% used
-                    </Text>
+              {odQuota.limit && (
+                <View style={styles.progressBarContainer}>
+                  <View style={styles.progressBarBg}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        { width: `${Math.min(odUsagePercent, 100)}%`, backgroundColor: odBarColor },
+                      ]}
+                    />
                   </View>
-                )}
-              </>
-            ) : (
-              <Text style={styles.loadingText}>Tap to load storage info</Text>
-            )}
-          </View>
-        )}
+                  <Text style={styles.progressText}>
+                    {odUsagePercent.toFixed(1)}% used
+                  </Text>
+                </View>
+              )}
+            </>
+          ) : (
+            <Text style={styles.loadingText}>Tap to load storage info</Text>
+          )}
+        </View>
 
-        {/* Configuration Options */}
         <Text style={styles.sectionTitle}>Configuration</Text>
 
-        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('ManagerFiles')}>
+        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('ManagerFiles' as never)}>
           <View style={styles.configIcon}>
             <Text style={styles.configIconText}>📁</Text>
           </View>
@@ -227,28 +243,7 @@ const HomeScreen = () => {
           <Text style={styles.configArrow}>›</Text>
         </TouchableOpacity>
 
-        {/* Browse OneDrive Files (only when connected) */}
-        {isOneDriveConnected && (
-          <TouchableOpacity
-            style={styles.configCard}
-            onPress={() => navigation.navigate('FileList', {
-              folderId: 'root',
-              folderName: 'OneDrive',
-              provider: 'onedrive',
-            })}
-          >
-            <View style={[styles.configIcon, { backgroundColor: '#e6f2fb' }]}>
-              <Text style={styles.configIconText}>☁️</Text>
-            </View>
-            <View style={styles.configInfo}>
-              <Text style={styles.configTitle}>Browse OneDrive</Text>
-              <Text style={styles.configDesc}>Explore your OneDrive files and folders</Text>
-            </View>
-            <Text style={styles.configArrow}>›</Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('CleanTrash')}>
+        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('CleanTrash' as never)}>
           <View style={styles.configIcon}>
             <Text style={styles.configIconText}>🗑️</Text>
           </View>
@@ -261,7 +256,7 @@ const HomeScreen = () => {
           <Text style={styles.configArrow}>›</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('AddProvider')}>
+        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('AddProvider' as never)}>
           <View style={styles.configIcon}>
             <Text style={styles.configIconText}>🔗</Text>
           </View>
@@ -284,7 +279,7 @@ const HomeScreen = () => {
         </TouchableOpacity>
       </ScrollView>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} onLayout={e => setFooterH(e.nativeEvent.layout.height)}>
         <Text style={styles.logoutText}>Sign Out</Text>
       </TouchableOpacity>
     </View>
@@ -309,7 +304,6 @@ const styles = StyleSheet.create({
     height: 50,
   },
   content: {
-    flex: 1,
     padding: 16,
   },
   welcomeCard: {
