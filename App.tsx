@@ -9,7 +9,8 @@ import AppNavigator from './navigation/AppNavigator';
 import { authService } from './services/auth.service';
 import { setCredentials, setLoading } from './store/slices/authSlice';
 import { addProvider } from './store/slices/connectedProvidersSlice';
-import { getSecureData } from './utils/secureStorage';
+import { getSecureData, saveSecureData, clearSecureData } from './utils/secureStorage';
+import OneDriveAuthService from './services/auth/onedrive-auth.service';
 
 const App = () => {
   useEffect(() => {
@@ -37,11 +38,27 @@ const App = () => {
 
         // 3️⃣ Restore OneDrive session from saved token
         const odToken = await getSecureData('onedrive_token');
-        if (odToken) {
+        if (odToken && typeof odToken === 'string' && odToken.trim().length > 0) {
           // Restore saved provider metadata if available
           const odName = await getSecureData('onedrive_provider_name');
-          const odEmail = await getSecureData('onedrive_provider_email');
+          let odEmail = await getSecureData('onedrive_provider_email');
           const odConnectedAt = await getSecureData('onedrive_connected_at');
+
+          // Older sessions may not have persisted the email — recover it from Graph.
+          if (!odEmail) {
+            try {
+              const odAuth = new OneDriveAuthService();
+              await odAuth.initialize();
+              const odUser = await odAuth.getCurrentUser();
+              if (odUser?.email) {
+                odEmail = odUser.email;
+                await saveSecureData('onedrive_provider_email', odEmail);
+              }
+            } catch (e) {
+              console.warn('Could not recover OneDrive email:', e);
+            }
+          }
+
           store.dispatch(addProvider({
             id: 'onedrive',
             name: odName || 'Microsoft OneDrive',
@@ -49,6 +66,14 @@ const App = () => {
             userPrincipalName: odEmail || '',
             connectedAt: odConnectedAt || new Date().toISOString(),
           }));
+        } else if (odToken) {
+          console.warn('[App] Empty OneDrive token found in storage, clearing session');
+          await clearSecureData('onedrive_token');
+          await clearSecureData('onedrive_id_token');
+          await clearSecureData('onedrive_refresh_token');
+          await clearSecureData('onedrive_provider_name');
+          await clearSecureData('onedrive_provider_email');
+          await clearSecureData('onedrive_connected_at');
         }
       } catch (error) {
         console.error('Auth init error:', error);

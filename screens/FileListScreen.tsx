@@ -51,11 +51,11 @@ const FileListScreen = () => {
   const isOneDrive = provider === 'onedrive';
 
   // Select from the correct Redux slice
-  const files = useSelector(isOneDrive ? selectOnedriveCurrentFolderFiles : selectCurrentFolderFiles);
-  const folderId = useSelector(isOneDrive ? selectOnedriveCurrentFolderId : selectCurrentFolderId);
-  const folderName = useSelector(isOneDrive ? selectOnedriveCurrentFolderName : selectCurrentFolderName);
-  const loading = useSelector(isOneDrive ? selectOnedriveFolderFilesLoading : selectFolderFilesLoading);
-  const nextPageToken = useSelector(isOneDrive ? selectOnedriveFolderFilesNextPage : selectFolderFilesNextPage);
+  const files = useSelector((state: any) => isOneDrive ? selectOnedriveCurrentFolderFiles(state) : selectCurrentFolderFiles(state));
+  const folderId = useSelector((state: any) => isOneDrive ? selectOnedriveCurrentFolderId(state) : selectCurrentFolderId(state));
+  const folderName = useSelector((state: any) => isOneDrive ? selectOnedriveCurrentFolderName(state) : selectCurrentFolderName(state));
+  const loading = useSelector((state: any) => isOneDrive ? selectOnedriveFolderFilesLoading(state) : selectFolderFilesLoading(state));
+  const nextPageToken = useSelector((state: any) => isOneDrive ? selectOnedriveFolderFilesNextPage(state) : selectFolderFilesNextPage(state));
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'size' | 'name' | 'date'>('size');

@@ -94,6 +94,7 @@ export const clearSecureData = async (key: string): Promise<void> => {
   try {
     await Keychain.resetGenericPassword({
       service: `${SERVICE_ID}.${key}`,
+      account: key,
     });
   } catch (error) {
     console.error(`Failed to clear secure data for key ${key}:`, error);

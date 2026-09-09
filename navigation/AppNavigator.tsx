@@ -6,7 +6,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { selectCurrentUser } from '../store/slices/authSlice';
-import LoginScreen from '../components/auth/LoginScreen';
+import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
 import StorageBreakdownScreen from '../screens/StorageBreakdownScreen';
 import FileListScreen from '../screens/FileListScreen';

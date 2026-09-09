@@ -70,7 +70,7 @@ class DriveFilesService {
       pageSize: String(Math.min(pageSize, 1000)),
       fields: DriveFilesService.FIELDS_PREVIEW,
       orderBy: 'name',
-      q: "trashed = false",
+      q: "'me' in owners and trashed = false",
     });
     if (pageToken) params.set('pageToken', pageToken);
 
@@ -142,7 +142,7 @@ class DriveFilesService {
       pageToken,
       fields: DriveFilesService.FIELDS_FULL,
       orderBy: 'quotaBytesUsed desc',
-      query: 'trashed = false',
+      query: "'me' in owners and trashed = false",
     });
   }
 
@@ -205,7 +205,7 @@ class DriveFilesService {
       const params = new URLSearchParams({
         pageSize: '1000',
         fields: 'files(id,name,mimeType,size),nextPageToken',
-        q: 'trashed = false and size > 0',
+        q: "'me' in owners and trashed = false and size > 0",
       });
       if (pt) params.set('pageToken', pt);
       try {

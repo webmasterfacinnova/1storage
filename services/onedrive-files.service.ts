@@ -2,7 +2,7 @@
 // OneDrive file listing service — fetches file previews, largest files, trash,
 // and storage breakdown from Microsoft Graph API.
 
-import { getSecureData } from '../utils/secureStorage';
+import { getValidOneDriveToken } from './onedrive-token';
 
 /** Lightweight preview entry — shown in the Manager Files list. */
 export interface OneDriveFilePreview {
@@ -39,7 +39,7 @@ class OneDriveFilesService {
   private static readonly PAGE_SIZE = 20;
 
   private async _getToken(): Promise<string | null> {
-    return getSecureData('onedrive_token');
+    return getValidOneDriveToken();
   }
 
   /**
