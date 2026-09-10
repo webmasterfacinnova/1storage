@@ -61,9 +61,8 @@ export function formatFileSize(bytes: number | null): string {
 const FileCard: React.FC<FileCardProps> = ({ file, onPress }) => {
   const typeInfo = categorizeMimeType(file.mimeType);
   const isMedia = file.mimeType.startsWith('image/') || file.mimeType.startsWith('video/');
-  const showThumb = !!file.thumbnailLink && isMedia;
+  const showThumb = Boolean(file.thumbnailLink && isMedia);
 
-  // Inline date formatting (no helper function to avoid any crash)
   let dateLabel = '—';
   if (file.modifiedTime) {
     try {
@@ -96,7 +95,7 @@ const FileCard: React.FC<FileCardProps> = ({ file, onPress }) => {
         <Text style={s.name} numberOfLines={1}>{file.name}</Text>
         <View style={s.metaRow}>
           <Text style={s.meta}>{dateLabel}</Text>
-          {sizeLabel && <Text style={s.meta}>{' • '}{sizeLabel}</Text>}
+          {Boolean(sizeLabel) && <Text style={s.meta}>{` • ${sizeLabel}`}</Text>}
         </View>
       </View>
 

@@ -1,3 +1,4 @@
+// screens/ManagerFilesScreen.tsx
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
   View,
@@ -9,6 +10,7 @@ import {
   RefreshControl,
   useWindowDimensions,
   Linking,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import FileCard, { mimeTypeToCategory } from '../components/storage/FileCard';
@@ -164,7 +166,11 @@ const ManagerFilesScreen: React.FC = () => {
         provider: file.provider,
       });
     } else if (file.webViewLink) {
-      Linking.openURL(file.webViewLink).catch(() => {});
+      if (Platform.OS === 'web') {
+        window.open(file.webViewLink, '_blank', 'noopener,noreferrer');
+      } else {
+        Linking.openURL(file.webViewLink).catch(() => {});
+      }
     }
   }, [nav]);
 

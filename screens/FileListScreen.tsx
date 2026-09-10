@@ -222,7 +222,7 @@ const FileListScreen = () => {
                 onPress={() => isFolder(file) ? handleFolderPress(file) : null}
               >
                 <View style={styles.fileIcon}>
-                  {isFolder(file) ? '📁' : '📄'}
+                  <Text style={styles.fileIconText}>{isFolder(file) ? '📁' : '📄'}</Text>
                 </View>
                 <View style={styles.fileInfo}>
                   <Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>
@@ -327,6 +327,8 @@ const styles = StyleSheet.create({
   },
   fileIcon: {
     marginRight: 12,
+  },
+  fileIconText: {
     fontSize: 20,
   },
   fileInfo: {
