@@ -25,29 +25,33 @@ interface FileCardProps {
   onPress: (file: UnifiedFile) => void;
 }
 
-export function categorizeMimeType(mimeType: string): { label: string; icon: string } {
-  if (mimeType === 'application/vnd.google-apps.folder') return { label: 'Folder', icon: '📁' };
-  if (mimeType.startsWith('image/')) return { label: 'Image', icon: '🖼️' };
-  if (mimeType.startsWith('video/')) return { label: 'Video', icon: '🎬' };
-  if (mimeType.startsWith('audio/')) return { label: 'Audio', icon: '🎵' };
-  if (mimeType.includes('pdf')) return { label: 'PDF', icon: '📄' };
-  if (mimeType.includes('document') || mimeType.includes('spreadsheet') || mimeType.includes('presentation'))
+export function categorizeMimeType(mimeType?: string): { label: string; icon: string } {
+  const safeMime = mimeType || '';
+
+  if (safeMime === 'application/vnd.google-apps.folder') return { label: 'Folder', icon: '📁' };
+  if (safeMime.startsWith('image/')) return { label: 'Image', icon: '🖼️' };
+  if (safeMime.startsWith('video/')) return { label: 'Video', icon: '🎬' };
+  if (safeMime.startsWith('audio/')) return { label: 'Audio', icon: '🎵' };
+  if (safeMime.includes('pdf')) return { label: 'PDF', icon: '📄' };
+  if (safeMime.includes('document') || safeMime.includes('spreadsheet') || safeMime.includes('presentation'))
     return { label: 'Doc', icon: '📝' };
-  if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || mimeType.includes('gz'))
+  if (safeMime.includes('zip') || safeMime.includes('rar') || safeMime.includes('tar') || safeMime.includes('gz'))
     return { label: 'Archive', icon: '🗜️' };
-  if (mimeType.includes('text/')) return { label: 'Text', icon: '📄' };
+  if (safeMime.includes('text/')) return { label: 'Text', icon: '📄' };
   return { label: 'File', icon: '📦' };
 }
 
-export function mimeTypeToCategory(mimeType: string): string {
-  if (mimeType === 'application/vnd.google-apps.folder') return 'folders';
-  if (mimeType.startsWith('image/')) return 'images';
-  if (mimeType.startsWith('video/')) return 'videos';
-  if (mimeType.startsWith('audio/')) return 'audio';
-  if (mimeType.includes('pdf')) return 'pdfs';
-  if (mimeType.includes('document') || mimeType.includes('spreadsheet') || mimeType.includes('presentation')) return 'docs';
-  if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || mimeType.includes('gz')) return 'archives';
-  if (mimeType.includes('text/')) return 'docs';
+export function mimeTypeToCategory(mimeType?: string): string {
+  const safeMime = mimeType || '';
+
+  if (safeMime === 'application/vnd.google-apps.folder') return 'folders';
+  if (safeMime.startsWith('image/')) return 'images';
+  if (safeMime.startsWith('video/')) return 'videos';
+  if (safeMime.startsWith('audio/')) return 'audio';
+  if (safeMime.includes('pdf')) return 'pdfs';
+  if (safeMime.includes('document') || safeMime.includes('spreadsheet') || safeMime.includes('presentation')) return 'docs';
+  if (safeMime.includes('zip') || safeMime.includes('rar') || safeMime.includes('tar') || safeMime.includes('gz')) return 'archives';
+  if (safeMime.includes('text/')) return 'docs';
   return 'other';
 }
 
@@ -59,8 +63,9 @@ export function formatFileSize(bytes: number | null): string {
 }
 
 const FileCard: React.FC<FileCardProps> = ({ file, onPress }) => {
-  const typeInfo = categorizeMimeType(file.mimeType);
-  const isMedia = file.mimeType.startsWith('image/') || file.mimeType.startsWith('video/');
+  const safeMime = file?.mimeType || '';
+  const typeInfo = categorizeMimeType(safeMime);
+  const isMedia = safeMime.startsWith('image/') || safeMime.startsWith('video/');
   const showThumb = !!file.thumbnailLink && isMedia;
 
   // Inline date formatting (no helper function to avoid any crash)

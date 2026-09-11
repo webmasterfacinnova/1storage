@@ -90,6 +90,7 @@ const FileListScreen = () => {
           append,
         }));
       } else {
+        lastLoadedFolderRef.current = null; // Permite reintentar si falló
         dispatch(setODFolderFilesError('Could not fetch files'));
       }
     } else {
@@ -108,12 +109,14 @@ const FileListScreen = () => {
           append,
         }));
       } else {
+        lastLoadedFolderRef.current = null; // Permite reintentar si falló
         dispatch(setFolderFilesError('Could not fetch files'));
       }
     }
-  }, [dispatch, isOneDrive]);
+  }, [dispatch, isOneDrive, route.params?.folderId, route.params?.folderName]);
 
   const onRefresh = useCallback(() => {
+    lastLoadedFolderRef.current = null;
     fetchFiles(false);
   }, [fetchFiles]);
 
