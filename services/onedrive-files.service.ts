@@ -1,100 +1,134 @@
 // services/onedrive-files.service.ts
-// OneDrive file listing service — fetches file previews, largest files, trash,
-// and storage breakdown from Microsoft Graph API.
-
 import { getValidOneDriveToken } from './onedrive-token';
+import OneDriveAuthService from './auth/onedrive-auth.service';
 
-/** Lightweight preview entry — shown in the Manager Files list. */
-export interface OneDriveFilePreview {
-  id: string;
-  name: string;
-  mimeType: string;
-  size: number | null;
-  modifiedTime: string;
-  webViewLink: string;
-}
+const onedriveAuth = new OneDriveAuthService();
+const GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0';
 
-/** Full OneDrive file type. */
 export interface OneDriveFile {
   id: string;
   name: string;
+  size: number;
   mimeType: string;
-  size: number | null;
   modifiedTime: string;
-  webViewLink: string;
+  webViewLink?: string;
+  folder?: { childCount: number };
+  provider?: string;
 }
 
 export interface StorageByType {
   type: string;
-  label: string;
-  size: number;
+  bytes: number;
   count: number;
-  percentage: number;
-  icon: string;
 }
 
-const GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0';
-
 class OneDriveFilesService {
-  private static readonly PAGE_SIZE = 20;
-
   private async _getToken(): Promise<string | null> {
     return getValidOneDriveToken();
   }
 
   /**
-   * Fetch lightweight previews from OneDrive root.
-   * Returns null if token is missing.
+   * Helper privado para ejecutar peticiones a Microsoft Graph
+   * con soporte automático de renovación de token ante respuestas HTTP 401.
    */
-  async getPreviews(
-    pageSize: number = OneDriveFilesService.PAGE_SIZE,
-    pageToken?: string,
-  ): Promise<{ files: OneDriveFilePreview[]; nextPageToken: string | null } | null> {
-    const token = await this._getToken();
-    if (!token) return null;
-
-    const params = new URLSearchParams({
-      $top: String(Math.min(pageSize, 200)),
-      $select: 'id,name,file,folder,package,specialFolder,mimeType,size,lastModifiedDateTime,webUrl',
-    });
-    if (pageToken) params.set('$skiptoken', pageToken);
-
+  private async _fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response | null> {
     try {
-      const res: Response = await fetch(`${GRAPH_API_BASE}/me/drive/root/children?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return null;
+      let token = await this._getToken();
 
-      const data: any = await res.json();
-      return {
-        files: (data.value || []).map((f: any) => {
-          const isDirectory = Boolean(f.folder || f.package || f.specialFolder);
-          return {
-            id: f.id,
-            name: f.name,
-            mimeType: f.file?.mimeType ?? (isDirectory ? 'application/vnd.google-apps.folder' : 'unknown'),
-            size: f.size !== undefined ? f.size : null,
-            modifiedTime: f.lastModifiedDateTime || '',
-            webViewLink: f.webUrl || '',
-          };
-        }),
-        nextPageToken: data['@odata.nextLink'] || null,
-      };
-    } catch (err) {
-      console.error('OneDrive getPreviews error:', err);
+      if (!token) {
+        token = await onedriveAuth.refreshAccessToken();
+        if (!token) return null;
+      }
+
+      let response = await fetch(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // Si el token caducó (401), renovarlo y reintentar la llamada
+      if (response.status === 401) {
+        console.log('[OneDriveFilesService] 401 recibido. Renovando token...');
+        token = await onedriveAuth.refreshAccessToken();
+
+        if (token) {
+          response = await fetch(url, {
+            ...options,
+            headers: {
+              ...options.headers,
+              Authorization: `Bearer ${token}`,
+            },
+          });
+        } else {
+          return null;
+        }
+      }
+
+      return response;
+    } catch (error) {
+      console.error('[OneDriveFilesService] Error de red o ejecución:', error);
       return null;
     }
   }
 
   /**
-   * Fetch files and folders inside a specific OneDrive folder.
-   * Calls GET /me/drive/items/{folderId}/children
-   * Returns null if token is missing.
+   * Helper para normalizar la respuesta de Microsoft Graph a objetos compatibles con la app.
+   * Garantiza que `mimeType` sea siempre un string para evitar crashes con .startsWith().
+   */
+  private _mapOneDriveItem(item: any): OneDriveFile {
+    let mimeType = item.file && item.file.mimeType ? item.file.mimeType : '';
+
+    // Asignar MimeType estándar para carpetas
+    if (item.folder) {
+      mimeType = 'application/vnd.google-apps.folder';
+    }
+
+    return {
+      id: item.id,
+      name: item.name,
+      size: item.size || 0,
+      mimeType,
+      modifiedTime: item.lastModifiedDateTime || new Date().toISOString(),
+      webViewLink: item.webUrl || null,
+      folder: item.folder,
+      provider: 'onedrive',
+    };
+  }
+
+  /**
+   * Método requerido por `storage-registry.service.ts` para ManagerFilesScreen.
+   * Trae los archivos paginados con sus enlaces e información de tipo.
+   */
+  async getPreviews(
+    pageSize: number = 20,
+    pageToken?: string
+  ): Promise<{ files: OneDriveFile[]; nextPageToken: string | null } | null> {
+    const endpoint = `${GRAPH_API_BASE}/me/drive/root/children?$top=${pageSize}&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
+    const url = pageToken || endpoint;
+
+    const response = await this._fetchWithAuth(url);
+
+    if (!response || !response.ok) {
+      if (response) console.error('OneDrive getPreviews API error:', response.status, await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    const files: OneDriveFile[] = (data.value || []).map((item: any) => this._mapOneDriveItem(item));
+    const nextPageToken = data['@odata.nextLink'] || null;
+
+    return { files, nextPageToken };
+  }
+
+  /**
+   * Obtiene la lista de archivos de una carpeta específica o de la raíz.
    */
   async getFilesInFolder(
     folderId: string = 'root',
-    pageSize: number = OneDriveFilesService.PAGE_SIZE,
-    pageToken?: string,
+    pageSize: number = 50,
+    pageToken?: string
   ): Promise<{ files: OneDriveFile[]; nextPageToken: string | null } | null> {
     const token = await this._getToken();
     if (!token) return null;
@@ -107,124 +141,77 @@ class OneDriveFilesService {
 
     const endpoint =
       folderId === 'root'
-        ? `${GRAPH_API_BASE}/me/drive/root/children`
-        : `${GRAPH_API_BASE}/me/drive/items/${folderId}/children`;
+        ? `${GRAPH_API_BASE}/me/drive/root/children?$top=${pageSize}&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`
+        : `${GRAPH_API_BASE}/me/drive/items/${folderId}/children?$top=${pageSize}&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
 
-    try {
-      const res: Response = await fetch(`${endpoint}?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return null;
+    const url = pageToken || endpoint;
+    const response = await this._fetchWithAuth(url);
 
-      const data: any = await res.json();
-      return {
-        files: (data.value || []).map((f: any) => {
-          const isDirectory = Boolean(f.folder || f.package || f.specialFolder);
-          return {
-            id: f.id,
-            name: f.name,
-            mimeType: f.file?.mimeType ?? (isDirectory ? 'application/vnd.google-apps.folder' : 'unknown'),
-            size: f.size !== undefined ? f.size : null,
-            modifiedTime: f.lastModifiedDateTime || '',
-            webViewLink: f.webUrl || '',
-          };
-        }),
-        nextPageToken: data['@odata.nextLink'] || null,
-      };
-    } catch (err) {
-      console.error('OneDrive getFilesInFolder error:', err);
+    if (!response || !response.ok) {
+      if (response) console.error('OneDrive Files API error:', response.status, await response.text());
       return null;
     }
+
+    const data = await response.json();
+    const files: OneDriveFile[] = (data.value || []).map((item: any) => this._mapOneDriveItem(item));
+    const nextPageToken = data['@odata.nextLink'] || null;
+
+    return { files, nextPageToken };
   }
 
   /**
-   * Fetch the largest files in OneDrive root.
+   * Obtiene los archivos más grandes del almacenamiento.
    */
   async getLargestFiles(
-    pageSize: number = 50,
-    pageToken?: string,
+    pageSize: number = 20,
+    pageToken?: string
   ): Promise<{ files: OneDriveFile[]; nextPageToken: string | null } | null> {
-    const token = await this._getToken();
-    if (!token) return null;
+    const endpoint = `${GRAPH_API_BASE}/me/drive/root/search(q='')?$orderby=size desc&$top=${pageSize}&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
+    const url = pageToken || endpoint;
 
-    const params = new URLSearchParams({
-      $top: String(Math.min(pageSize, 200)),
-      $orderby: 'size desc',
-      $select: 'id,name,size,file,folder,package,specialFolder,mimeType,lastModifiedDateTime,webUrl',
-    });
-    if (pageToken) params.set('$skiptoken', pageToken);
+    const response = await this._fetchWithAuth(url);
 
-    try {
-      const res: Response = await fetch(`${GRAPH_API_BASE}/me/drive/root/children?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return null;
-
-      const data: any = await res.json();
-      return {
-        files: (data.value || []).map((f: any) => {
-          const isDirectory = Boolean(f.folder || f.package || f.specialFolder);
-          return {
-            id: f.id,
-            name: f.name,
-            mimeType: f.file?.mimeType ?? (isDirectory ? 'application/vnd.google-apps.folder' : 'unknown'),
-            size: f.size !== undefined ? f.size : null,
-            modifiedTime: f.lastModifiedDateTime || '',
-            webViewLink: f.webUrl || '',
-          };
-        }),
-        nextPageToken: data['@odata.nextLink'] || null,
-      };
-    } catch (err) {
-      console.error('OneDrive getLargestFiles error:', err);
+    if (!response || !response.ok) {
+      if (response) console.error('OneDrive Largest Files API error:', response.status, await response.text());
       return null;
     }
+
+    const data = await response.json();
+    const files: OneDriveFile[] = (data.value || [])
+      .filter((item: any) => !item.folder)
+      .map((item: any) => this._mapOneDriveItem(item));
+
+    const nextPageToken = data['@odata.nextLink'] || null;
+
+    return { files, nextPageToken };
   }
 
   /**
-   * Fetch trashed files from OneDrive.
-   * Graph API: deleted items are in /me/drive/items/{id}/children filtered by deleted.
+   * Obtiene los archivos de la papelera de reciclaje.
    */
   async getTrashedFiles(
-    pageSize: number = 100,
-    pageToken?: string,
+    pageSize: number = 50,
+    pageToken?: string
   ): Promise<{ files: OneDriveFile[]; nextPageToken: string | null } | null> {
-    const token = await this._getToken();
-    if (!token) return null;
+    const endpoint = `${GRAPH_API_BASE}/me/drive/special/trash/children?$top=${pageSize}&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
+    const url = pageToken || endpoint;
 
-    const params = new URLSearchParams({
-      $top: String(Math.min(pageSize, 200)),
-      $filter: 'deleted ne null',
-      $select: 'id,name,size,file,mimeType,lastModifiedDateTime,webUrl,deleted',
-    });
-    if (pageToken) params.set('$skiptoken', pageToken);
+    const response = await this._fetchWithAuth(url);
 
-    try {
-      const res: Response = await fetch(`${GRAPH_API_BASE}/me/drive/root/children?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return null;
-
-      const data: any = await res.json();
-      return {
-        files: (data.value || []).map((f: any) => ({
-          id: f.id,
-          name: f.name,
-          mimeType: f.file?.mimeType ?? 'unknown',
-          size: f.size !== undefined ? f.size : null,
-          modifiedTime: f.lastModifiedDateTime || '',
-          webViewLink: f.webUrl || '',
-        })),
-        nextPageToken: data['@odata.nextLink'] || null,
-      };
-    } catch (err) {
-      console.error('OneDrive getTrashedFiles error:', err);
+    if (!response || !response.ok) {
+      if (response) console.error('OneDrive Trash API error:', response.status, await response.text());
       return null;
     }
+
+    const data = await response.json();
+    const files: OneDriveFile[] = (data.value || []).map((item: any) => this._mapOneDriveItem(item));
+    const nextPageToken = data['@odata.nextLink'] || null;
+
+    return { files, nextPageToken };
   }
 
   /**
-   * Permanently delete a file from OneDrive.
+   * Elimina un archivo permanentemente.
    */
   async deleteFilePermanently(fileId: string): Promise<boolean> {
     const token = await this._getToken();
