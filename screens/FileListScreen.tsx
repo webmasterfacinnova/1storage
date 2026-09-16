@@ -6,11 +6,10 @@ import React, { useEffect, useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, TextInput } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '../types/navigation';
 import { driveFilesService } from '../services/drive-files.service';
-import { driveService } from '../services/drive.service';
 import { oneDriveFilesService } from '../services/onedrive-files.service';
-import { oneDriveService } from '../services/onedrive.service';
+import FileCard from '../components/storage/FileCard';
+import { UnifiedFile } from '../types/storage';
 import {
   setFolderFilesLoading,
   setFolderFiles,
@@ -148,12 +147,6 @@ const FileListScreen = () => {
     }
   };
 
-  const formatFileSize = (bytes: number | null): string => {
-    if (bytes == null) return '—';
-    if (isOneDrive) return oneDriveService.formatBytes(bytes);
-    return driveService.formatBytes(bytes);
-  };
-
   const providerColor = isOneDrive ? '#0078d4' : '#1a73e8';
   const providerLabel = isOneDrive ? 'OneDrive' : 'Google Drive';
 
@@ -218,24 +211,24 @@ const FileListScreen = () => {
                 return new Date(b.modifiedTime).getTime() - new Date(a.modifiedTime).getTime();
               }
             })
-            .map((file: any) => (
-              <TouchableOpacity
-                key={file.id}
-                style={styles.fileCard}
-                onPress={() => isFolder(file) ? handleFolderPress(file) : null}
-              >
-                <View style={styles.fileIcon}>
-                  <Text style={styles.fileIconText}>{isFolder(file) ? '📁' : '📄'}</Text>
-                </View>
-                <View style={styles.fileInfo}>
-                  <Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>
-                  <Text style={styles.fileDetails}>
-                    {formatFileSize(file.size)} • {file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString() : '—'}
-                  </Text>
-                </View>
-                {isFolder(file) && <Text style={styles.fileArrow}>›</Text>}
-              </TouchableOpacity>
-            ))
+            .map((file: any) => {
+              const unifiedFile: UnifiedFile = {
+                ...file,
+                provider: file.provider || provider,
+              };
+
+              return (
+                <FileCard
+                  key={file.id}
+                  file={unifiedFile}
+                  onPress={(f) => {
+                    if (isFolder(f)) {
+                      handleFolderPress(f);
+                    }
+                  }}
+                />
+              );
+            })
         ) : (
           <Text style={styles.loadingText}>No files found</Text>
         )}
@@ -314,42 +307,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
-  },
-  fileCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  fileIcon: {
-    marginRight: 12,
-  },
-  fileIconText: {
-    fontSize: 20,
-  },
-  fileInfo: {
-    flex: 1,
-  },
-  fileName: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#333',
-  },
-  fileDetails: {
-    fontSize: 13,
-    color: '#5f6368',
-    marginTop: 2,
-  },
-  fileArrow: {
-    fontSize: 20,
-    color: '#ccc',
   },
   loadingText: {
     color: '#999999',

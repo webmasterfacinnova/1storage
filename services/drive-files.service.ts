@@ -1,29 +1,24 @@
 // services/drive-files.service.ts
-// Optimised Google Drive file listing — lightweight previews first, full details on demand.
-
 import { getAuthToken } from '../utils/secureStorage';
 
-/** Full detail set (fetched on demand when user interacts with a file). */
 export interface FileDetails {
   size: number | null;
   modifiedTime: string;
   webViewLink: string;
-  thumbnailLink?: string;
+  thumbnailUrl?: string;
 }
 
-/** Lightweight preview entry — shown in the Manager Files list. */
 export interface DriveFilePreview {
   id: string;
   name: string;
   mimeType: string;
   iconLink: string;
+  thumbnailUrl?: string;
   parents?: string[];
   trashed?: boolean;
-  /** Populated lazily when user taps/focuses this file. */
   details?: FileDetails | null;
 }
 
-/** Full legacy DriveFile type (kept for backward compat with other screens). */
 export interface DriveFile {
   id: string;
   name: string;
@@ -31,6 +26,7 @@ export interface DriveFile {
   size: number | null;
   modifiedTime: string;
   iconLink: string;
+  thumbnailUrl?: string;
   webViewLink: string;
   parents?: string[];
   trashed?: boolean;
@@ -48,17 +44,10 @@ export interface StorageByType {
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
 
 class DriveFilesService {
-  // Preview list fields — include size & modifiedTime so cards can show them (returned in the same list call, no extra requests)
-  private static readonly FIELDS_PREVIEW = 'files(id,name,mimeType,iconLink,parents,size,modifiedTime),nextPageToken';
-  // Full fields when details are needed
+  private static readonly FIELDS_PREVIEW = 'files(id,name,mimeType,iconLink,thumbnailLink,parents,size,modifiedTime),nextPageToken';
   private static readonly FIELDS_FULL = 'files(id,name,mimeType,size,modifiedTime,iconLink,webViewLink,thumbnailLink,parents,trashed),nextPageToken';
   private static readonly PAGE_SIZE = 20;
 
-  /**
-   * Fetch lightweight previews from Google Drive.
-   * Only returns id, name, mimeType, iconLink — tiny payload, very fast.
-   * Ordered by name for a clean, browsable list.
-   */
   async getPreviews(
     pageSize: number = DriveFilesService.PAGE_SIZE,
     pageToken?: string,
@@ -87,12 +76,14 @@ class DriveFilesService {
           name: f.name,
           mimeType: f.mimeType,
           iconLink: f.iconLink,
+          thumbnailUrl: f.thumbnailLink,
           parents: f.parents,
           trashed: f.trashed,
           details: {
             size: f.size ? parseInt(f.size, 10) : null,
             modifiedTime: f.modifiedTime || '',
             webViewLink: '',
+            thumbnailUrl: f.thumbnailLink,
           },
         })),
         nextPageToken: data.nextPageToken || null,
@@ -103,10 +94,6 @@ class DriveFilesService {
     }
   }
 
-  /**
-   * Fetch full details (size, date, links, thumbnail) for a specific file.
-   * Called only when the user selects/interacts with a file.
-   */
   async getDetail(fileId: string): Promise<FileDetails | null> {
     const token = await getAuthToken();
     if (!token) return null;
@@ -123,15 +110,13 @@ class DriveFilesService {
         size: f.size ? parseInt(f.size, 10) : null,
         modifiedTime: f.modifiedTime,
         webViewLink: f.webViewLink,
-        thumbnailLink: f.thumbnailLink,
+        thumbnailUrl: f.thumbnailLink,
       };
     } catch (err) {
       console.error('getDetail error:', err);
       return null;
     }
   }
-
-  // --- Legacy / backward compat methods (used by other screens) ---
 
   async getLargestFiles(
     pageSize: number = 50,
@@ -265,6 +250,7 @@ class DriveFilesService {
           size: f.size ? parseInt(f.size, 10) : null,
           modifiedTime: f.modifiedTime,
           iconLink: f.iconLink,
+          thumbnailUrl: f.thumbnailLink,
           webViewLink: f.webViewLink,
           parents: f.parents,
           trashed: f.trashed,

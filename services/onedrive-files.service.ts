@@ -12,14 +12,18 @@ export interface OneDriveFile {
   mimeType: string;
   modifiedTime: string;
   webViewLink?: string;
+  thumbnailUrl?: string;
   folder?: { childCount: number };
   provider?: string;
 }
 
 export interface StorageByType {
   type: string;
-  bytes: number;
+  label: string;
+  size: number;
   count: number;
+  percentage: number;
+  icon: string;
 }
 
 class OneDriveFilesService {
@@ -27,10 +31,6 @@ class OneDriveFilesService {
     return getValidOneDriveToken();
   }
 
-  /**
-   * Helper privado para ejecutar peticiones a Microsoft Graph
-   * con soporte automático de renovación de token ante respuestas HTTP 401.
-   */
   private async _fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response | null> {
     try {
       let token = await this._getToken();
@@ -48,7 +48,6 @@ class OneDriveFilesService {
         },
       });
 
-      // Si el token caducó (401), renovarlo y reintentar la llamada
       if (response.status === 401) {
         console.log('[OneDriveFilesService] 401 recibido. Renovando token...');
         token = await onedriveAuth.refreshAccessToken();
@@ -73,16 +72,43 @@ class OneDriveFilesService {
     }
   }
 
-  /**
-   * Helper para normalizar la respuesta de Microsoft Graph a objetos compatibles con la app.
-   * Garantiza que `mimeType` sea siempre un string para evitar crashes con .startsWith().
-   */
+  private _getMimeTypeFromName(fileName: string): string {
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    const mimeMap: Record<string, string> = {
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      webp: 'image/webp',
+      bmp: 'image/bmp',
+      svg: 'image/svg+xml',
+      mp4: 'video/mp4',
+      mov: 'video/quicktime',
+      avi: 'video/x-msvideo',
+      mkv: 'video/x-matroska',
+      webm: 'video/webm',
+      pdf: 'application/pdf',
+      txt: 'text/plain',
+    };
+    return mimeMap[ext] || '';
+  }
+
   private _mapOneDriveItem(item: any): OneDriveFile {
     let mimeType = item.file && item.file.mimeType ? item.file.mimeType : '';
 
-    // Asignar MimeType estándar para carpetas
+    if (!mimeType && item.name) {
+      mimeType = this._getMimeTypeFromName(item.name);
+    }
+
     if (item.folder) {
       mimeType = 'application/vnd.google-apps.folder';
+    }
+
+    let thumbnailUrl: string | undefined;
+    if (item.thumbnails && item.thumbnails.length > 0) {
+      thumbnailUrl = item.thumbnails[0].medium?.url || item.thumbnails[0].small?.url || item.thumbnails[0].large?.url;
+    } else if (item['@microsoft.graph.downloadUrl'] && mimeType.startsWith('image/')) {
+      thumbnailUrl = item['@microsoft.graph.downloadUrl'];
     }
 
     return {
@@ -92,20 +118,17 @@ class OneDriveFilesService {
       mimeType,
       modifiedTime: item.lastModifiedDateTime || new Date().toISOString(),
       webViewLink: item.webUrl || null,
+      thumbnailUrl,
       folder: item.folder,
       provider: 'onedrive',
     };
   }
 
-  /**
-   * Método requerido por `storage-registry.service.ts` para ManagerFilesScreen.
-   * Trae los archivos paginados con sus enlaces e información de tipo.
-   */
   async getPreviews(
     pageSize: number = 20,
     pageToken?: string
   ): Promise<{ files: OneDriveFile[]; nextPageToken: string | null } | null> {
-    const endpoint = `${GRAPH_API_BASE}/me/drive/root/children?$top=${pageSize}&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
+    const endpoint = `${GRAPH_API_BASE}/me/drive/root/children?$top=${pageSize}&$expand=thumbnails&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
     const url = pageToken || endpoint;
 
     const response = await this._fetchWithAuth(url);
@@ -122,27 +145,15 @@ class OneDriveFilesService {
     return { files, nextPageToken };
   }
 
-  /**
-   * Obtiene la lista de archivos de una carpeta específica o de la raíz.
-   */
   async getFilesInFolder(
     folderId: string = 'root',
     pageSize: number = 50,
     pageToken?: string
   ): Promise<{ files: OneDriveFile[]; nextPageToken: string | null } | null> {
-    const token = await this._getToken();
-    if (!token) return null;
-
-    const params = new URLSearchParams({
-      $top: String(Math.min(pageSize, 200)),
-      $select: 'id,name,file,folder,package,specialFolder,mimeType,size,lastModifiedDateTime,webUrl',
-    });
-    if (pageToken) params.set('$skiptoken', pageToken);
-
     const endpoint =
       folderId === 'root'
-        ? `${GRAPH_API_BASE}/me/drive/root/children?$top=${pageSize}&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`
-        : `${GRAPH_API_BASE}/me/drive/items/${folderId}/children?$top=${pageSize}&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
+        ? `${GRAPH_API_BASE}/me/drive/root/children?$top=${pageSize}&$expand=thumbnails&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`
+        : `${GRAPH_API_BASE}/me/drive/items/${folderId}/children?$top=${pageSize}&$expand=thumbnails&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
 
     const url = pageToken || endpoint;
     const response = await this._fetchWithAuth(url);
@@ -159,14 +170,11 @@ class OneDriveFilesService {
     return { files, nextPageToken };
   }
 
-  /**
-   * Obtiene los archivos más grandes del almacenamiento.
-   */
   async getLargestFiles(
     pageSize: number = 20,
     pageToken?: string
   ): Promise<{ files: OneDriveFile[]; nextPageToken: string | null } | null> {
-    const endpoint = `${GRAPH_API_BASE}/me/drive/root/search(q='')?$orderby=size desc&$top=${pageSize}&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
+    const endpoint = `${GRAPH_API_BASE}/me/drive/root/search(q='')?$orderby=size desc&$top=${pageSize}&$expand=thumbnails&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
     const url = pageToken || endpoint;
 
     const response = await this._fetchWithAuth(url);
@@ -186,14 +194,11 @@ class OneDriveFilesService {
     return { files, nextPageToken };
   }
 
-  /**
-   * Obtiene los archivos de la papelera de reciclaje.
-   */
   async getTrashedFiles(
     pageSize: number = 50,
     pageToken?: string
   ): Promise<{ files: OneDriveFile[]; nextPageToken: string | null } | null> {
-    const endpoint = `${GRAPH_API_BASE}/me/drive/special/trash/children?$top=${pageSize}&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
+    const endpoint = `${GRAPH_API_BASE}/me/drive/special/trash/children?$top=${pageSize}&$expand=thumbnails&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
     const url = pageToken || endpoint;
 
     const response = await this._fetchWithAuth(url);
@@ -210,9 +215,6 @@ class OneDriveFilesService {
     return { files, nextPageToken };
   }
 
-  /**
-   * Elimina un archivo permanentemente.
-   */
   async deleteFilePermanently(fileId: string): Promise<boolean> {
     const token = await this._getToken();
     if (!token) return false;
@@ -228,10 +230,6 @@ class OneDriveFilesService {
     }
   }
 
-  /**
-   * Get storage usage breakdown by file type.
-   * Iterates all non-trash files with pagination (up to 5000 files).
-   */
   async getStorageByType(): Promise<StorageByType[] | null> {
     const token = await this._getToken();
     if (!token) return null;
@@ -280,11 +278,7 @@ class OneDriveFilesService {
       .sort((a, b) => b.size - a.size);
   }
 
-  /**
-   * Categorise a file by its MIME type and name (extension fallback).
-   */
   private _categorize(name: string, mimeType: string): { label: string; icon: string } {
-    // If there's a proper MIME type from the file object, use it
     if (mimeType && mimeType !== 'unknown') {
       if (mimeType.startsWith('image/')) return { label: 'Images', icon: '🖼️' };
       if (mimeType.startsWith('video/')) return { label: 'Videos', icon: '🎬' };
@@ -299,7 +293,6 @@ class OneDriveFilesService {
         return { label: 'Folders', icon: '📁' };
     }
 
-    // Fallback: use file extension
     const ext = name.split('.').pop()?.toLowerCase() ?? '';
     const extMap: Record<string, { label: string; icon: string }> = {
       jpg: { label: 'Images', icon: '🖼️' }, jpeg: { label: 'Images', icon: '🖼️' },
