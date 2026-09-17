@@ -9,9 +9,10 @@ import {
   RefreshControl,
   useWindowDimensions,
   Linking,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import FileCard, { mimeTypeToCategory } from '../components/storage/FileCard';
+import FileCard, { categorizeMimeType } from '../components/storage/FileCard';
 import FileTypeTabs, { FILE_TYPE_TABS } from '../components/storage/FileTypeTabs';
 import StorageSummaryBar from '../components/storage/StorageSummaryBar';
 import ProviderSelector from '../components/storage/ProviderSelector';
@@ -45,6 +46,21 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
 };
 
 const fileKey = (f: UnifiedFile) => `${f.provider}:${f.id}`;
+
+const getCategoryKey = (mimeType?: string, fileName?: string): string => {
+  const { label } = categorizeMimeType(mimeType, fileName);
+  switch (label) {
+    case 'Image': return 'images';
+    case 'Video': return 'videos';
+    case 'Audio': return 'audio';
+    case 'PDF': return 'pdfs';
+    case 'Doc': return 'docs';
+    case 'Archive': return 'archives';
+    case 'Text': return 'text';
+    case 'Folder': return 'folders';
+    default: return 'other';
+  }
+};
 
 const ManagerFilesScreen: React.FC = () => {
   const nav = useNavigation();
@@ -164,7 +180,11 @@ const ManagerFilesScreen: React.FC = () => {
         provider: file.provider,
       });
     } else if (file.webViewLink) {
-      Linking.openURL(file.webViewLink).catch(() => {});
+      if (Platform.OS === 'web') {
+        window.open(file.webViewLink, '_blank', 'noopener,noreferrer');
+      } else {
+        Linking.openURL(file.webViewLink).catch(() => {});
+      }
     }
   }, [nav]);
 
@@ -176,7 +196,7 @@ const ManagerFilesScreen: React.FC = () => {
 
   const filtered = useMemo(() => {
     let r = previews;
-    if (tab !== 'all') r = r.filter(f => mimeTypeToCategory(f.mimeType) === tab);
+    if (tab !== 'all') r = r.filter(f => getCategoryKey(f.mimeType, f.name) === tab);
     if (search.trim()) { const q = search.toLowerCase(); r = r.filter(f => f.name.toLowerCase().includes(q)); }
     return [...r].sort((a, b) => {
       if (sortBy === 'name') return a.name.localeCompare(b.name);
@@ -194,7 +214,7 @@ const ManagerFilesScreen: React.FC = () => {
   const summary = useMemo(() => {
     const map = new Map<string, { label: string; count: number; icon: string }>();
     for (const f of previews) {
-      const k = mimeTypeToCategory(f.mimeType);
+      const k = getCategoryKey(f.mimeType, f.name);
       const t = FILE_TYPE_TABS.find(x => x.key === k);
       const e = map.get(k) || { label: t?.label || k, count: 0, icon: t?.icon || '📦' };
       e.count += 1; map.set(k, e);

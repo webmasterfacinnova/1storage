@@ -1,3 +1,4 @@
+// services/auth/onedrive-auth.service.ts
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import Constants from 'expo-constants';
@@ -37,6 +38,8 @@ class OneDriveAuthService implements AuthService {
 
   async signIn(): Promise<AuthResult> {
     try {
+      if (!this.clientId) await this.initialize();
+
       const redirectUri = makeRedirectUri({ preferLocalhost: true });
       console.log('[OneDriveAuth] redirectUri:', redirectUri);
 
@@ -137,17 +140,20 @@ class OneDriveAuthService implements AuthService {
 
   async refreshAccessToken(): Promise<string | null> {
     try {
+      if (!this.clientId) await this.initialize();
+
       const refreshToken = await getSecureData('onedrive_refresh_token');
       if (!refreshToken) {
-        console.warn('[OneDriveAuth] No refresh token available');
+        console.warn('[OneDriveAuth] No refresh token available in storage');
         return null;
       }
 
-      // Estructura corregida para la renovación de token
+      // Estructura corregida: Incluye scope para mantener la renovación persistente
       const tokenBody = new URLSearchParams({
         client_id: this.clientId,
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
+        scope: SCOPES.join(' '),
       });
 
       const response = await fetch(TOKEN_URL, {
@@ -159,6 +165,10 @@ class OneDriveAuthService implements AuthService {
       if (!response.ok) {
         const errorText = await response.text();
         console.warn('[OneDriveAuth] Failed to refresh token:', response.status, errorText);
+        // Si el token expiro (invalid_grant), se borran los tokens locales
+        if (response.status === 400 || errorText.includes('invalid_grant')) {
+          await this.signOut();
+        }
         return null;
       }
 
@@ -186,9 +196,11 @@ class OneDriveAuthService implements AuthService {
       await clearSecureData('onedrive_token');
       await clearSecureData('onedrive_id_token');
       await clearSecureData('onedrive_refresh_token');
+      await clearSecureData('onedrive_provider_name');
+      await clearSecureData('onedrive_provider_email');
+      await clearSecureData('onedrive_connected_at');
     } catch (error) {
       console.error('OneDrive sign-out error:', error);
-      throw this.handleAuthError(error);
     }
   }
 

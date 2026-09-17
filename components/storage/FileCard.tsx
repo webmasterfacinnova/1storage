@@ -1,127 +1,200 @@
-// components/storage/FileCard.tsx
-// Individual file card — simple, stable, no fancy logic.
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { UnifiedFile } from '../../types/storage';
+import { getAuthToken } from '../../utils/secureStorage';
+import OneDriveAuthService from '../../services/auth/onedrive-auth.service';
 
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import ProviderBadge from './ProviderBadge';
+const onedriveAuth = new OneDriveAuthService();
 
-export interface UnifiedFile {
-  id: string;
-  name: string;
-  mimeType: string;
-  size: number | null;
-  modifiedTime: string;
-  provider: string;
-  providerName: string;
-  webViewLink?: string;
-  iconLink?: string;
-  thumbnailLink?: string;
-  parents?: string[];
-  trashed?: boolean;
-}
+export const categorizeMimeType = (
+  mimeType?: string,
+  fileName?: string
+): { label: string } => {
+  if (mimeType === 'application/vnd.google-apps.folder') {
+    return { label: 'Folder' };
+  }
+  if (mimeType?.startsWith('image/')) return { label: 'Image' };
+  if (mimeType?.startsWith('video/')) return { label: 'Video' };
+  if (mimeType?.startsWith('audio/')) return { label: 'Audio' };
+  if (mimeType?.includes('pdf')) return { label: 'PDF' };
+
+  const ext = fileName?.split('.').pop()?.toLowerCase();
+  if (['doc', 'docx', 'txt', 'rtf'].includes(ext || '')) return { label: 'Doc' };
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext || '')) return { label: 'Archive' };
+
+  return { label: 'Other' };
+};
 
 interface FileCardProps {
   file: UnifiedFile;
-  onPress: (file: UnifiedFile) => void;
+  onPress?: (file: UnifiedFile) => void;
+  onDelete?: (file: UnifiedFile) => void;
 }
 
-export function categorizeMimeType(mimeType: string): { label: string; icon: string } {
-  if (mimeType === 'application/vnd.google-apps.folder') return { label: 'Folder', icon: '📁' };
-  if (mimeType.startsWith('image/')) return { label: 'Image', icon: '🖼️' };
-  if (mimeType.startsWith('video/')) return { label: 'Video', icon: '🎬' };
-  if (mimeType.startsWith('audio/')) return { label: 'Audio', icon: '🎵' };
-  if (mimeType.includes('pdf')) return { label: 'PDF', icon: '📄' };
-  if (mimeType.includes('document') || mimeType.includes('spreadsheet') || mimeType.includes('presentation'))
-    return { label: 'Doc', icon: '📝' };
-  if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || mimeType.includes('gz'))
-    return { label: 'Archive', icon: '🗜️' };
-  if (mimeType.includes('text/')) return { label: 'Text', icon: '📄' };
-  return { label: 'File', icon: '📦' };
-}
+const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete }) => {
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [imgError, setImgError] = useState(false);
 
-export function mimeTypeToCategory(mimeType: string): string {
-  if (mimeType === 'application/vnd.google-apps.folder') return 'folders';
-  if (mimeType.startsWith('image/')) return 'images';
-  if (mimeType.startsWith('video/')) return 'videos';
-  if (mimeType.startsWith('audio/')) return 'audio';
-  if (mimeType.includes('pdf')) return 'pdfs';
-  if (mimeType.includes('document') || mimeType.includes('spreadsheet') || mimeType.includes('presentation')) return 'docs';
-  if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || mimeType.includes('gz')) return 'archives';
-  if (mimeType.includes('text/')) return 'docs';
-  return 'other';
-}
+  const isFolder =
+    file.mimeType === 'application/vnd.google-apps.folder' ||
+    (file as any).folder !== undefined;
 
-export function formatFileSize(bytes: number | null): string {
-  if (bytes == null || bytes <= 0) return '';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
-}
+  const isMedia =
+    file.mimeType?.startsWith('image/') ||
+    file.mimeType?.startsWith('video/') ||
+    Boolean(file.thumbnailUrl);
 
-const FileCard: React.FC<FileCardProps> = ({ file, onPress }) => {
-  const typeInfo = categorizeMimeType(file.mimeType);
-  const isMedia = file.mimeType.startsWith('image/') || file.mimeType.startsWith('video/');
-  const showThumb = !!file.thumbnailLink && isMedia;
+  useEffect(() => {
+    let isMounted = true;
+    async function loadToken() {
+      if (file.provider === 'google-drive') {
+        const token = await getAuthToken();
+        if (isMounted) setAuthToken(token);
+      } else if (file.provider === 'onedrive') {
+        const token = await onedriveAuth.getAuthToken();
+        if (isMounted) setAuthToken(token);
+      }
+    }
 
-  // Inline date formatting (no helper function to avoid any crash)
-  let dateLabel = '—';
-  if (file.modifiedTime) {
-    try {
-      const d = new Date(file.modifiedTime);
-      const now = new Date();
-      const diff = Math.floor((now.getTime() - d.getTime()) / 86400000);
-      if (diff === 0) dateLabel = 'Today';
-      else if (diff === 1) dateLabel = 'Yesterday';
-      else if (diff < 7) dateLabel = `${diff}d ago`;
-      else if (diff < 30) dateLabel = `${Math.floor(diff / 7)}w ago`;
-      else dateLabel = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    } catch { dateLabel = file.modifiedTime; }
-  }
+    if (isMedia) {
+      loadToken();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [file.provider, isMedia]);
 
-  const sizeLabel = file.size != null && file.size > 0 ? formatFileSize(file.size) : null;
+  const formatFileSize = (bytes: number | null | undefined): string => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const getFileIcon = () => {
+    if (isFolder) return '📁';
+    if (file.mimeType?.startsWith('image/')) return '🖼️';
+    if (file.mimeType?.startsWith('video/')) return '🎬';
+    if (file.mimeType?.startsWith('audio/')) return '🎵';
+    if (file.mimeType?.includes('pdf')) return '📄';
+    return '📄';
+  };
+
+  const renderThumbnail = () => {
+    if (file.thumbnailUrl && !imgError) {
+      const headers =
+        file.provider === 'google-drive' && authToken
+          ? { Authorization: `Bearer ${authToken}` }
+          : undefined;
+
+      return (
+        <Image
+          source={{
+            uri: file.thumbnailUrl,
+            headers,
+          }}
+          style={styles.thumbnail}
+          onError={() => setImgError(true)}
+        />
+      );
+    }
+
+    return <Text style={styles.iconText}>{getFileIcon()}</Text>;
+  };
 
   return (
-    <TouchableOpacity style={s.card} onPress={() => onPress(file)} activeOpacity={0.7}>
-      <View style={[s.iconBox, showThumb && { padding: 0, overflow: 'hidden' }]}>
-        {showThumb ? (
-          <Image source={{ uri: file.thumbnailLink }} style={s.thumb} resizeMode="cover" />
-        ) : file.iconLink ? (
-          <Image source={{ uri: file.iconLink }} style={s.drIcon} resizeMode="contain" />
-        ) : (
-          <Text style={s.emoji}>{typeInfo.icon}</Text>
-        )}
+    <TouchableOpacity
+      style={styles.container}
+      onPress={() => onPress && onPress(file)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.thumbnailContainer}>{renderThumbnail()}</View>
+
+      <View style={styles.infoContainer}>
+        <Text style={styles.fileName} numberOfLines={1}>
+          {file.name}
+        </Text>
+        <Text style={styles.fileDetails}>
+          {isFolder ? 'Folder' : formatFileSize(file.size)} •{' '}
+          {file.modifiedTime
+            ? new Date(file.modifiedTime).toLocaleDateString()
+            : '—'}
+        </Text>
       </View>
 
-      <View style={s.info}>
-        <Text style={s.name} numberOfLines={1}>{file.name}</Text>
-        <View style={s.metaRow}>
-          <Text style={s.meta}>{dateLabel}</Text>
-          {sizeLabel && <Text style={s.meta}>{' • '}{sizeLabel}</Text>}
-        </View>
-      </View>
-
-      <ProviderBadge providerId={file.provider} />
+      {isFolder ? (
+        <Text style={styles.arrow}>›</Text>
+      ) : (
+        onDelete && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => onDelete(file)}
+          >
+            <Text style={styles.deleteText}>🗑️</Text>
+          </TouchableOpacity>
+        )
+      )}
     </TouchableOpacity>
   );
 };
 
-const s = StyleSheet.create({
-  card: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#e0ecf5',
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  iconBox: {
-    width: 40, height: 40, borderRadius: 10, backgroundColor: '#e0f7ff',
-    justifyContent: 'center', alignItems: 'center', marginRight: 12,
+  thumbnailContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#f0f4f8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    overflow: 'hidden',
   },
-  emoji: { fontSize: 20 },
-  drIcon: { width: 32, height: 32 },
-  thumb: { width: 40, height: 40, borderRadius: 10 },
-  info: { flex: 1, marginRight: 8 },
-  name: { fontSize: 15, fontWeight: '500', color: '#333', marginBottom: 3 },
-  metaRow: { flexDirection: 'row', alignItems: 'center' },
-  meta: { fontSize: 12, color: '#999999' },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  iconText: {
+    fontSize: 22,
+  },
+  infoContainer: {
+    flex: 1,
+  },
+  fileName: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#333333',
+  },
+  fileDetails: {
+    fontSize: 13,
+    color: '#666666',
+    marginTop: 2,
+  },
+  arrow: {
+    fontSize: 20,
+    color: '#ccc',
+    paddingLeft: 8,
+  },
+  deleteButton: {
+    padding: 8,
+  },
+  deleteText: {
+    fontSize: 16,
+  },
 });
 
 export default FileCard;

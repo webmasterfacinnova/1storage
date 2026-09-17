@@ -1,3 +1,4 @@
+// types/storage.ts
 import { ImageSourcePropType } from 'react-native';
 
 export type ProviderId = 'google-drive' | 'onedrive' | 'dropbox' | 'box' | string;
@@ -11,7 +12,7 @@ export interface UnifiedFile {
   provider: ProviderId;
   providerName: string;
   iconLink?: string;
-  thumbnailLink?: string;
+  thumbnailUrl?: string; // URL unificada para la miniatura
   webViewLink?: string;
 }
 

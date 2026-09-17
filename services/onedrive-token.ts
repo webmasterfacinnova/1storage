@@ -12,10 +12,11 @@ const onedriveAuth = new OneDriveAuthService();
 export async function getValidOneDriveToken(): Promise<string | null> {
   let token = await getSecureData('onedrive_token');
 
+  // Asegurar que el servicio esté listo antes de operar
+  await onedriveAuth.initialize();
+
   if (!token || typeof token !== 'string' || token.trim().length === 0) {
     console.log('[OneDriveToken] Access token missing/empty. Attempting refresh...');
-    
-    await onedriveAuth.initialize();
     token = await onedriveAuth.refreshAccessToken();
   }
 
