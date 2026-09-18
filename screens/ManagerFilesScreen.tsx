@@ -1,4 +1,3 @@
-// screens/ManagerFilesScreen.tsx
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
   View,
@@ -11,6 +10,7 @@ import {
   useWindowDimensions,
   Linking,
   Platform,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import FileCard, { categorizeMimeType } from '../components/storage/FileCard';
@@ -20,9 +20,15 @@ import ProviderSelector from '../components/storage/ProviderSelector';
 import TypeSummaryScroll from '../components/storage/TypeSummaryScroll';
 import SortBar, { SortOption } from '../components/storage/SortBar';
 import { fetchProviderFilesPage } from '../services/storage-registry.service';
+import { transferService } from '../services/transfer.service';
 import { UnifiedFile, ProviderMeta } from '../types/storage';
-import { useSelector } from 'react-redux';
+
+// 1. Usar las exportaciones de tu nuevo archivo de hooks
+import { useAppDispatch, useAppSelector } from '../hooks/store';
+
 import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
+import { removeDriveFile } from '../store/slices/driveFilesSlice';
+import { removeOnedriveFile } from '../store/slices/onedriveFilesSlice';
 
 const googleDriveIcon = require('../assets/googledrive.png');
 const oneDriveIcon = require('../assets/onedrive.png');
@@ -65,6 +71,7 @@ const getCategoryKey = (mimeType?: string, fileName?: string): string => {
 
 const ManagerFilesScreen: React.FC = () => {
   const nav = useNavigation();
+  const dispatch = useAppDispatch();
   const { height: windowHeight } = useWindowDimensions();
   const [headerH, setHeaderH] = useState(56);
   const [viewportH, setViewportH] = useState(0);
@@ -81,7 +88,8 @@ const ManagerFilesScreen: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('name');
   const [activeProvider, setActiveProvider] = useState<string>(PROVIDER_ALL);
 
-  const connectedProviders = useSelector(selectConnectedProviders);
+  // 2. Usar useAppSelector en lugar de useSelector genérico
+  const connectedProviders = useAppSelector(selectConnectedProviders);
   const providerKeys = useMemo(() => Object.keys(connectedProviders || {}), [connectedProviders]);
 
   useEffect(() => {
@@ -188,6 +196,61 @@ const ManagerFilesScreen: React.FC = () => {
       }
     }
   }, [nav]);
+
+  const handleTransferFile = async (file: UnifiedFile) => {
+    const targetProvider = file.provider === 'google-drive' ? 'onedrive' : 'google-drive';
+    const targetName = targetProvider === 'google-drive' ? 'Google Drive' : 'OneDrive';
+
+    try {
+      setLoading(true);
+
+      const isTransferred = await transferService.transferToDestination({
+        fileId: file.id,
+        fileName: file.name,
+        mimeType: file.mimeType,
+        fromProvider: file.provider as any,
+        toProvider: targetProvider,
+      });
+
+      if (isTransferred) {
+        Alert.alert(
+          '¡Copia exitosa!',
+          `El archivo "${file.name}" se copió correctamente a ${targetName}.\n\nPor favor verifica que la copia sea correcta antes de eliminar el original.`,
+          [
+            {
+              text: 'Conservar original',
+              style: 'cancel',
+            },
+            {
+              text: 'Eliminar original',
+              style: 'destructive',
+              onPress: async () => {
+                const deleted = await transferService.deleteFromSource(file.id, file.provider as any);
+                if (deleted) {
+                  setPreviews(prev => prev.filter(f => f.id !== file.id));
+                  
+                  if (file.provider === 'google-drive') {
+                    dispatch(removeDriveFile(file.id));
+                  } else {
+                    dispatch(removeOnedriveFile(file.id));
+                  }
+                  Alert.alert('Éxito', 'El archivo original fue borrado y el espacio liberado.');
+                } else {
+                  Alert.alert('Aviso', 'El archivo se transfirió, pero no se pudo eliminar el original.');
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Error', 'No se pudo completar la transferencia.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Error al procesar la transferencia.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onScroll = useCallback((e: any) => {
     const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
@@ -326,7 +389,14 @@ const ManagerFilesScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         )}
-        {filtered.map(f => <FileCard key={fileKey(f)} file={f} onPress={handleFilePress} />)}
+        {filtered.map(f => (
+          <FileCard 
+            key={fileKey(f)} 
+            file={f} 
+            onPress={handleFilePress}
+            onTransfer={handleTransferFile}
+          />
+        ))}
 
         {/* Indicador de Carga */}
         {hasMore && (
