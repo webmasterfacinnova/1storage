@@ -1,8 +1,3 @@
-// services/auth/google-auth.service.ts
-// Google Authentication service — direct OAuth, no Firebase
-// Uses expo-auth-session's promptAsync (non-hook-based approach) for
-// environments where hooks cannot be used (service class context).
-
 import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import {
@@ -37,7 +32,7 @@ const SCOPES = [
   'openid',
   'profile',
   'email',
-  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/drive',
 ];
 
 class GoogleAuthService implements AuthService {

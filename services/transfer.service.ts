@@ -27,6 +27,11 @@ class TransferService {
 
     if (!blob) throw new Error('No se pudo descargar el archivo del servicio de origen.');
 
+    // Forzar el mimeType si el Blob resultante no tiene tipo asignado
+    if ((!blob.type || blob.type === 'application/octet-stream') && mimeType) {
+      blob = new Blob([blob], { type: mimeType });
+    }
+
     let uploadSuccess = false;
     if (toProvider === 'google-drive') {
       const res = await driveFilesService.uploadFile(blob, fileName, mimeType);
