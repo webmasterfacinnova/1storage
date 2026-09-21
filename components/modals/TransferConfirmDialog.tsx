@@ -4,9 +4,9 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   TouchableWithoutFeedback,
 } from 'react-native';
+import { Button } from '../common/Button';
 
 interface TransferConfirmDialogProps {
   visible: boolean;
@@ -51,23 +51,21 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
               <Text style={styles.message}>{message}</Text>
 
               <View style={styles.buttonContainer}>
-                {/* Botón Acción: Conservar / Permitir */}
-                <TouchableOpacity
-                  style={[styles.button, styles.keepButton]}
+                <Button
+                  title="Conservar"
                   onPress={onKeep}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.keepButtonText}>Permitir (Conservar)</Text>
-                </TouchableOpacity>
+                  color="#E8EAF6"
+                  textColor="#1A237E"
+                  style={styles.fullWidthButton}
+                />
 
-                {/* Botón Acción: Destruir / Eliminar */}
-                <TouchableOpacity
-                  style={[styles.button, styles.destroyButton]}
+                <Button
+                  title="Eliminar"
                   onPress={onDestroy}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.destroyButtonText}>Destruir (Eliminar)</Text>
-                </TouchableOpacity>
+                  color="#D32F2F"
+                  textColor="#FFFFFF"
+                  style={styles.fullWidthButton}
+                />
               </View>
             </View>
           </TouchableWithoutFeedback>
@@ -119,33 +117,11 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
+    flexDirection: 'column',
+    gap: 10,
     marginTop: 20,
   },
-  button: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 110,
-  },
-  keepButton: {
-    backgroundColor: '#E8EAF6',
-  },
-  keepButtonText: {
-    color: '#1A237E',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  destroyButton: {
-    backgroundColor: '#D32F2F',
-  },
-  destroyButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 13,
+  fullWidthButton: {
+    width: '100%',
   },
 });

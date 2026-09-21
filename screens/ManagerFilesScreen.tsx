@@ -23,10 +23,11 @@ import { fetchProviderFilesPage } from '../services/storage-registry.service';
 import { transferService } from '../services/transfer.service';
 import { UnifiedFile, ProviderMeta } from '../types/storage';
 
-// 1. Agregar el import del nuevo componente modal
+// Modales
 import { TransferConfirmDialog } from '../components/modals/TransferConfirmDialog';
+import { TransferLoadingModal } from '../components/modals/TransferLoadingModal';
 
-// Usar las exportaciones de tu nuevo archivo de hooks
+// Redux hooks
 import { useAppDispatch, useAppSelector } from '../hooks/store';
 
 import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
@@ -91,7 +92,10 @@ const ManagerFilesScreen: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('name');
   const [activeProvider, setActiveProvider] = useState<string>(PROVIDER_ALL);
 
-  // 2. Nuevo estado para manejar el flujo del Modal Dialog
+  // Estado para el modal de carga durante la transferencia
+  const [transferringFile, setTransferringFile] = useState<UnifiedFile | null>(null);
+
+  // Estado para el modal de confirmación final (éxito)
   const [modalConfig, setModalConfig] = useState<{
     visible: boolean;
     file: UnifiedFile | null;
@@ -210,13 +214,14 @@ const ManagerFilesScreen: React.FC = () => {
     }
   }, [nav]);
 
-  // 3. Modificación de handleTransferFile
+  // Manejo de la transferencia con Modal de Carga Comercial
   const handleTransferFile = async (file: UnifiedFile) => {
     const targetProvider = file.provider === 'google-drive' ? 'onedrive' : 'google-drive';
     const targetName = targetProvider === 'google-drive' ? 'Google Drive' : 'OneDrive';
 
     try {
-      setLoading(true);
+      // Activa el modal de carga mostrando el nombre del archivo
+      setTransferringFile(file);
 
       const isTransferred = await transferService.transferToDestination({
         fileId: file.id,
@@ -226,8 +231,10 @@ const ManagerFilesScreen: React.FC = () => {
         toProvider: targetProvider,
       });
 
+      // Oculta el modal de carga antes de mostrar el de éxito
+      setTransferringFile(null);
+
       if (isTransferred) {
-        // Abrir el Dialog de confirmación
         setModalConfig({
           visible: true,
           file,
@@ -237,13 +244,11 @@ const ManagerFilesScreen: React.FC = () => {
         Alert.alert('Error', 'No se pudo completar la transferencia.');
       }
     } catch (err: any) {
+      setTransferringFile(null);
       Alert.alert('Error', err.message || 'Error al procesar la transferencia.');
-    } finally {
-      setLoading(false);
     }
   };
 
-  // 4. Funciones de acción del Dialog Modal (Permitir/Conservar vs Destruir/Eliminar)
   const handleKeepOriginal = () => {
     setModalConfig({ visible: false, file: null, targetName: '' });
   };
@@ -391,7 +396,7 @@ const ManagerFilesScreen: React.FC = () => {
           <Text style={s.secCount}>{filtered.length} file{filtered.length !== 1 ? 's' : ''}</Text>
         </View>
 
-        {/* Lista de Archivos / Estado Vacío con Botón */}
+        {/* Lista de Archivos / Estado Vacío */}
         {filtered.length === 0 && !loading && !loadingMore && !hasMore && (
           <View style={s.empty}>
             <Text style={s.emptyIcon}>📂</Text>
@@ -437,7 +442,13 @@ const ManagerFilesScreen: React.FC = () => {
         )}
       </ScrollView>
 
-      {/* 5. Renderizado del Modal Dialog al final del componente */}
+      {/* Modal Carga de Transferencia */}
+      <TransferLoadingModal
+        visible={!!transferringFile}
+        fileName={transferringFile?.name}
+      />
+
+      {/* Modal Dialog de Confirmación (Post-Transferencia) */}
       <TransferConfirmDialog
         visible={modalConfig.visible}
         title="Transferencia realizada con éxito"
