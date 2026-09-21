@@ -124,6 +124,37 @@ class OneDriveFilesService {
     };
   }
 
+  async downloadFile(fileId: string): Promise<Blob | null> {
+    const url = `${GRAPH_API_BASE}/me/drive/items/${fileId}/content`;
+    const res = await this._fetchWithAuth(url);
+    if (!res || !res.ok) return null;
+    return await res.blob();
+  }
+
+  async uploadFile(blob: Blob, fileName: string): Promise<OneDriveFile | null> {
+    const url = `${GRAPH_API_BASE}/me/drive/root:/${encodeURIComponent(fileName)}:/content`;
+    const token = await this._getToken();
+    if (!token) return null;
+
+    try {
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': blob.type || 'application/octet-stream',
+        },
+        body: blob,
+      });
+
+      if (!res.ok) return null;
+      const item = await res.json();
+      return this._mapOneDriveItem(item);
+    } catch (err) {
+      console.error('uploadFile OneDrive error:', err);
+      return null;
+    }
+  }
+
   async getPreviews(
     pageSize: number = 20,
     pageToken?: string

@@ -118,6 +118,45 @@ class DriveFilesService {
     }
   }
 
+  async downloadFile(fileId: string): Promise<Blob | null> {
+    const token = await getAuthToken();
+    if (!token) return null;
+    try {
+      const res = await fetch(`${DRIVE_API_BASE}/files/${fileId}?alt=media`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      return await res.blob();
+    } catch (err) {
+      console.error('downloadFile Drive error:', err);
+      return null;
+    }
+  }
+
+  async uploadFile(blob: Blob, name: string, mimeType: string): Promise<DriveFile | null> {
+    const token = await getAuthToken();
+    if (!token) return null;
+
+    const metadata = { name, mimeType };
+    const formData = new FormData();
+
+    formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    formData.append('file', blob);
+
+    try {
+      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (err) {
+      console.error('uploadFile Drive error:', err);
+      return null;
+    }
+  }
+
   async getLargestFiles(
     pageSize: number = 50,
     pageToken?: string,

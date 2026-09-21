@@ -23,7 +23,10 @@ import { fetchProviderFilesPage } from '../services/storage-registry.service';
 import { transferService } from '../services/transfer.service';
 import { UnifiedFile, ProviderMeta } from '../types/storage';
 
-// 1. Usar las exportaciones de tu nuevo archivo de hooks
+// 1. Agregar el import del nuevo componente modal
+import { TransferConfirmDialog } from '../components/modals/TransferConfirmDialog';
+
+// Usar las exportaciones de tu nuevo archivo de hooks
 import { useAppDispatch, useAppSelector } from '../hooks/store';
 
 import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
@@ -88,7 +91,17 @@ const ManagerFilesScreen: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('name');
   const [activeProvider, setActiveProvider] = useState<string>(PROVIDER_ALL);
 
-  // 2. Usar useAppSelector en lugar de useSelector genérico
+  // 2. Nuevo estado para manejar el flujo del Modal Dialog
+  const [modalConfig, setModalConfig] = useState<{
+    visible: boolean;
+    file: UnifiedFile | null;
+    targetName: string;
+  }>({
+    visible: false,
+    file: null,
+    targetName: '',
+  });
+
   const connectedProviders = useAppSelector(selectConnectedProviders);
   const providerKeys = useMemo(() => Object.keys(connectedProviders || {}), [connectedProviders]);
 
@@ -197,6 +210,7 @@ const ManagerFilesScreen: React.FC = () => {
     }
   }, [nav]);
 
+  // 3. Modificación de handleTransferFile
   const handleTransferFile = async (file: UnifiedFile) => {
     const targetProvider = file.provider === 'google-drive' ? 'onedrive' : 'google-drive';
     const targetName = targetProvider === 'google-drive' ? 'Google Drive' : 'OneDrive';
@@ -213,40 +227,49 @@ const ManagerFilesScreen: React.FC = () => {
       });
 
       if (isTransferred) {
-        Alert.alert(
-          '¡Copia exitosa!',
-          `El archivo "${file.name}" se copió correctamente a ${targetName}.\n\nPor favor verifica que la copia sea correcta antes de eliminar el original.`,
-          [
-            {
-              text: 'Conservar original',
-              style: 'cancel',
-            },
-            {
-              text: 'Eliminar original',
-              style: 'destructive',
-              onPress: async () => {
-                const deleted = await transferService.deleteFromSource(file.id, file.provider as any);
-                if (deleted) {
-                  setPreviews(prev => prev.filter(f => f.id !== file.id));
-                  
-                  if (file.provider === 'google-drive') {
-                    dispatch(removeDriveFile(file.id));
-                  } else {
-                    dispatch(removeOnedriveFile(file.id));
-                  }
-                  Alert.alert('Éxito', 'El archivo original fue borrado y el espacio liberado.');
-                } else {
-                  Alert.alert('Aviso', 'El archivo se transfirió, pero no se pudo eliminar el original.');
-                }
-              },
-            },
-          ]
-        );
+        // Abrir el Dialog de confirmación
+        setModalConfig({
+          visible: true,
+          file,
+          targetName,
+        });
       } else {
         Alert.alert('Error', 'No se pudo completar la transferencia.');
       }
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Error al procesar la transferencia.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 4. Funciones de acción del Dialog Modal (Permitir/Conservar vs Destruir/Eliminar)
+  const handleKeepOriginal = () => {
+    setModalConfig({ visible: false, file: null, targetName: '' });
+  };
+
+  const handleDestroyOriginal = async () => {
+    const file = modalConfig.file;
+    setModalConfig({ visible: false, file: null, targetName: '' });
+
+    if (!file) return;
+
+    try {
+      setLoading(true);
+      const deleted = await transferService.deleteFromSource(file.id, file.provider as any);
+      if (deleted) {
+        setPreviews(prev => prev.filter(f => f.id !== file.id));
+
+        if (file.provider === 'google-drive') {
+          dispatch(removeDriveFile(file.id));
+        } else {
+          dispatch(removeOnedriveFile(file.id));
+        }
+      } else {
+        Alert.alert('Aviso', 'El archivo se transfirió, pero no se pudo eliminar el original.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', 'Ocurrió un problema al intentar eliminar el archivo original.');
     } finally {
       setLoading(false);
     }
@@ -413,6 +436,17 @@ const ManagerFilesScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
+
+      {/* 5. Renderizado del Modal Dialog al final del componente */}
+      <TransferConfirmDialog
+        visible={modalConfig.visible}
+        title="Transferencia realizada con éxito"
+        fileName={modalConfig.file?.name}
+        message={`El archivo fue enviado exitosamente a ${modalConfig.targetName}. ¿Qué deseas hacer con el archivo original fuente?`}
+        onKeep={handleKeepOriginal}
+        onDestroy={handleDestroyOriginal}
+        onClose={handleKeepOriginal}
+      />
     </View>
   );
 };
