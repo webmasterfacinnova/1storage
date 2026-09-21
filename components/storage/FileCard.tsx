@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { UnifiedFile } from '../../types/storage';
 import { getAuthToken } from '../../utils/secureStorage';
 import OneDriveAuthService from '../../services/auth/onedrive-auth.service';
@@ -130,10 +131,24 @@ const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete, onTransfer
         <View style={styles.actionsContainer}>
           {onTransfer && (
             <TouchableOpacity
-              style={styles.actionButton}
+              style={styles.transferButton}
               onPress={() => onTransfer(file)}
+              activeOpacity={0.6}
             >
-              <Text style={styles.actionText}>⇄</Text>
+              <Svg
+                width={18}
+                height={18}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#0066CC"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <Path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
+                <Path d="M12 12v9" />
+                <Path d="m16 16-4-4-4 4" />
+              </Svg>
             </TouchableOpacity>
           )}
 
@@ -207,6 +222,15 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     padding: 8,
+    marginLeft: 4,
+  },
+  transferButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EBF3FE',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginLeft: 4,
   },
   actionText: {
