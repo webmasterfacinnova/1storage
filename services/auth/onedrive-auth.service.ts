@@ -4,6 +4,8 @@ import { makeRedirectUri } from 'expo-auth-session';
 import Constants from 'expo-constants';
 import { AuthService, AuthResult, User } from '../auth.service';
 import { saveSecureData, getSecureData, clearSecureData } from '../../utils/secureStorage';
+import { store } from '../../store/store';
+import { removeProvider } from '../../store/slices/connectedProvidersSlice';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -145,10 +147,10 @@ class OneDriveAuthService implements AuthService {
       const refreshToken = await getSecureData('onedrive_refresh_token');
       if (!refreshToken) {
         console.warn('[OneDriveAuth] No refresh token available in storage');
+        store.dispatch(removeProvider('onedrive'));
         return null;
       }
 
-      // Estructura corregida: Incluye scope para mantener la renovación persistente
       const tokenBody = new URLSearchParams({
         client_id: this.clientId,
         grant_type: 'refresh_token',
@@ -165,10 +167,7 @@ class OneDriveAuthService implements AuthService {
       if (!response.ok) {
         const errorText = await response.text();
         console.warn('[OneDriveAuth] Failed to refresh token:', response.status, errorText);
-        // Si el token expiro (invalid_grant), se borran los tokens locales
-        if (response.status === 400 || errorText.includes('invalid_grant')) {
-          await this.signOut();
-        }
+        await this.signOut();
         return null;
       }
 
@@ -187,6 +186,7 @@ class OneDriveAuthService implements AuthService {
       return newAccessToken;
     } catch (error) {
       console.error('[OneDriveAuth] Error refreshing token:', error);
+      store.dispatch(removeProvider('onedrive'));
       return null;
     }
   }
@@ -201,6 +201,8 @@ class OneDriveAuthService implements AuthService {
       await clearSecureData('onedrive_connected_at');
     } catch (error) {
       console.error('OneDrive sign-out error:', error);
+    } finally {
+      store.dispatch(removeProvider('onedrive'));
     }
   }
 

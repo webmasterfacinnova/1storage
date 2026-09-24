@@ -1,3 +1,4 @@
+// screens/ManagerFilesScreen.tsx
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
   View,
@@ -304,12 +305,25 @@ const ManagerFilesScreen: React.FC = () => {
           <Text style={s.secCount}>{filtered.length} file{filtered.length !== 1 ? 's' : ''}</Text>
         </View>
 
-        {/* Lista de Archivos */}
+        {/* Lista de Archivos / Estado Vacío con Botón */}
         {filtered.length === 0 && !loading && !loadingMore && !hasMore && (
           <View style={s.empty}>
             <Text style={s.emptyIcon}>📂</Text>
             <Text style={s.emptyTitle}>No files</Text>
-            <Text style={s.emptyDesc}>{search ? 'Try a different search' : 'Connect a provider'}</Text>
+            <Text style={s.emptyDesc}>
+              {search 
+                ? 'Try a different search' 
+                : !connectedProviders[activeProvider] && activeProvider !== PROVIDER_ALL
+                ? 'Authentication failed or account disconnected'
+                : 'Connect a provider'}
+            </Text>
+
+            <TouchableOpacity 
+              style={s.connectBtn} 
+              onPress={() => (nav as any).navigate('AddProvider')}
+            >
+              <Text style={s.connectBtnText}>Connect Provider</Text>
+            </TouchableOpacity>
           </View>
         )}
         {filtered.map(f => <FileCard key={fileKey(f)} file={f} onPress={handleFilePress} />)}
@@ -350,7 +364,20 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: '#555', marginBottom: 8 },
-  emptyDesc: { fontSize: 14, color: '#999' },
+  emptyDesc: { fontSize: 14, color: '#999', textAlign: 'center', paddingHorizontal: 24 },
+
+  connectBtn: {
+    marginTop: 16,
+    backgroundColor: '#0078d4',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  connectBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 
   lmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
   lmText: { fontSize: 14, color: '#1a237e', fontWeight: '600' },
