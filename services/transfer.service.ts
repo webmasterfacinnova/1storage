@@ -30,14 +30,22 @@ class TransferService {
   /**
    * Genera un nombre de archivo modificado tipo "archivo (1).txt"
    */
-  getModifiedFileName(fileName: string): string {
+  getModifiedFileName(fileName: string, existingNames: string[] = []): string {
     const lastDotIndex = fileName.lastIndexOf('.');
-    if (lastDotIndex === -1) {
-      return `${fileName} (1)`;
+    const name = lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
+    const ext = lastDotIndex !== -1 ? fileName.substring(lastDotIndex) : '';
+
+    let counter = 1;
+    let newName = `${name} (${counter})${ext}`;
+
+    if (existingNames.length > 0) {
+      while (existingNames.includes(newName)) {
+        counter++;
+        newName = `${name} (${counter})${ext}`;
+      }
     }
-    const name = fileName.substring(0, lastDotIndex);
-    const ext = fileName.substring(lastDotIndex);
-    return `${name} (1)${ext}`;
+
+    return newName;
   }
 
   /**

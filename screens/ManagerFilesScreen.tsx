@@ -1,3 +1,4 @@
+// screens/ManagerFilesScreen.tsx
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
   View,
@@ -20,7 +21,7 @@ import ProviderSelector from '../components/storage/ProviderSelector';
 import TypeSummaryScroll from '../components/storage/TypeSummaryScroll';
 import SortBar, { SortOption } from '../components/storage/SortBar';
 import { fetchProviderFilesPage } from '../services/storage-registry.service';
-import { transferService } from '../services/transfer.service';
+import { transferService, ProviderType } from '../services/transfer.service';
 import { UnifiedFile, ProviderMeta } from '../types/storage';
 
 // Modales
@@ -97,7 +98,7 @@ const ManagerFilesScreen: React.FC = () => {
 
   // Estados para el Modal de Transferencia / Confirmación
   const [dialogVisible, setDialogVisible] = useState(false);
-  const [dialogStep, setDialogStep] = useState<DialogStep>('DELETE_SOURCE');
+  const [dialogStep, setDialogStep] = useState<DialogStep>('SELECT_PROVIDER');
   const [dialogFile, setDialogFile] = useState<UnifiedFile | null>(null);
   const [targetName, setTargetName] = useState('');
 
@@ -209,36 +210,75 @@ const ManagerFilesScreen: React.FC = () => {
     }
   }, [nav]);
 
-  // Manejo de la transferencia con validación de cantidad de proveedores
-  const handleTransferFile = async (file: UnifiedFile) => {
+  // Paso 1: Valida cuentas conectadas y abre el selector de destino
+  const handleTransferFile = (file: UnifiedFile) => {
     const connectedCount = Object.keys(connectedProviders || {}).length;
 
-    // Si tiene menos de 2 proveedores conectados, mostramos el modal directamente en pantalla
     if (connectedCount < 2) {
       setDialogStep('NEED_MORE_PROVIDERS');
       setDialogVisible(true);
       return;
     }
 
-    const targetProvider = file.provider === 'google-drive' ? 'onedrive' : 'google-drive';
-    const target = targetProvider === 'google-drive' ? 'Google Drive' : 'OneDrive';
-    setTargetName(target);
+    setDialogFile(file);
+    setDialogStep('SELECT_PROVIDER');
+    setDialogVisible(true);
+  };
+
+  // Paso 2: Al seleccionar el proveedor destino, verifica la existencia previa de duplicados
+  const handleSelectDestination = async (destination: ProviderType) => {
+    if (!dialogFile) return;
+
+    const nameLabel = destination === 'google-drive' ? 'Google Drive' : 'OneDrive';
+    setTargetName(nameLabel);
 
     try {
+      const hasConflict = await transferService.checkDestinationConflict(dialogFile.name, destination);
+
+      if (hasConflict) {
+        setDialogStep('CONFLICT_RESOLUTION');
+      } else {
+        await executeTransfer(dialogFile, destination, 'replace');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', 'No se pudo verificar la existencia del archivo en el destino.');
+    }
+  };
+
+  // Paso 3: Resuelve la estrategia elegida (Reemplazar / Renombrar / Cancelar)
+  const handleResolveConflict = async (strategy: 'replace' | 'rename' | 'cancel') => {
+    if (strategy === 'cancel' || !dialogFile) {
+      setDialogVisible(false);
+      setDialogFile(null);
+      return;
+    }
+
+    const targetProvider: ProviderType = targetName === 'Google Drive' ? 'google-drive' : 'onedrive';
+    await executeTransfer(dialogFile, targetProvider, strategy);
+  };
+
+  // Paso 4: Realiza la transferencia efectiva con el servicio
+  const executeTransfer = async (
+    file: UnifiedFile,
+    toProvider: ProviderType,
+    conflictStrategy: 'replace' | 'rename' | 'cancel'
+  ) => {
+    try {
+      setDialogVisible(false);
       setTransferringFile(file);
 
       const isTransferred = await transferService.transferToDestination({
         fileId: file.id,
         fileName: file.name,
-        mimeType: file.mimeType,
-        fromProvider: file.provider as any,
-        toProvider: targetProvider,
+        mimeType: file.mimeType || '',
+        fromProvider: file.provider as ProviderType,
+        toProvider,
+        conflictStrategy,
       });
 
       setTransferringFile(null);
 
       if (isTransferred) {
-        setDialogFile(file);
         setDialogStep('DELETE_SOURCE');
         setDialogVisible(true);
       } else {
@@ -451,19 +491,25 @@ const ManagerFilesScreen: React.FC = () => {
         fileName={transferringFile?.name}
       />
 
-      {/* Modal Dialog (Validador de Proveedores / Confirmación) */}
+      {/* Modal Dialog (Selector / Conflicto / Eliminación Fuente) */}
       <TransferConfirmDialog
         visible={dialogVisible}
         step={dialogStep}
         title="Transferencia realizada con éxito"
         fileName={dialogFile?.name}
+        targetProvider={targetName}
         message={`El archivo fue enviado exitosamente a ${targetName}. ¿Qué deseas hacer con el archivo original fuente?`}
+        onSelectDestination={handleSelectDestination}
+        onResolveConflict={handleResolveConflict}
         onKeep={handleKeepOriginal}
         onDestroy={handleDestroyOriginal}
         onKeepSource={handleKeepOriginal}
         onDestroySource={handleDestroyOriginal}
         onGoToProviders={() => (nav as any).navigate('AddProvider')}
-        onClose={() => setDialogVisible(false)}
+        onClose={() => {
+          setDialogVisible(false);
+          setDialogFile(null);
+        }}
       />
     </View>
   );
