@@ -2,9 +2,13 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { ProviderType } from '../../services/transfer.service';
 
-export type DialogStep = 'SELECT_PROVIDER' | 'CONFLICT_RESOLUTION' | 'DELETE_SOURCE';
+export type DialogStep = 
+  | 'SELECT_PROVIDER' 
+  | 'CONFLICT_RESOLUTION' 
+  | 'DELETE_SOURCE' 
+  | 'NEED_MORE_PROVIDERS';
 
-interface TransferConfirmDialogProps {
+export interface TransferConfirmDialogProps {
   visible: boolean;
   step?: DialogStep;
   title?: string;
@@ -15,12 +19,15 @@ interface TransferConfirmDialogProps {
   onResolveConflict?: (strategy: 'replace' | 'rename' | 'cancel') => void;
   onKeepSource?: () => void;
   onDestroySource?: () => void;
+  onKeep?: () => void;      // <--- Agregado para compatibilidad
+  onDestroy?: () => void;   // <--- Agregado para compatibilidad
+  onGoToProviders?: () => void;
   onClose: () => void;
 }
 
 export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
   visible,
-  step = 'SELECT_PROVIDER',
+  step = 'DELETE_SOURCE',
   title,
   message,
   fileName,
@@ -29,8 +36,14 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
   onResolveConflict,
   onKeepSource,
   onDestroySource,
+  onKeep,
+  onDestroy,
+  onGoToProviders,
   onClose,
 }) => {
+  const handleKeep = onKeepSource || onKeep || onClose;
+  const handleDestroy = onDestroySource || onDestroy;
+
   return (
     <Modal
       visible={visible}
@@ -41,6 +54,29 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
       <View style={styles.overlay}>
         <View style={styles.container}>
           
+          {/* VISTA AVISO: Requiere al menos 2 proveedores */}
+          {step === 'NEED_MORE_PROVIDERS' && (
+            <>
+              <Text style={styles.title}>Conecta otro proveedor de nube</Text>
+              <Text style={styles.subtitle}>
+                Para poder realizar transferencias entre nubes necesitas tener al menos 2 proveedores de almacenamiento vinculados.
+              </Text>
+
+              <Pressable
+                style={({ pressed }) => [styles.button, styles.actionButton, pressed && styles.buttonPressed]}
+                onPress={() => {
+                  onClose();
+                  onGoToProviders?.();
+                }}
+              >
+                <Text style={styles.actionText}>Conectar otros servicios</Text>
+              </Pressable>
+
+             
+               
+            </>
+          )}
+
           {/* VISTA 1: Seleccionar Proveedor Destino */}
           {step === 'SELECT_PROVIDER' && (
             <>
@@ -58,37 +94,28 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
 
               <Pressable
                 style={({ pressed }) => [styles.button, styles.primaryButton, pressed && styles.buttonPressed]}
-                onPress={() => {
-                  console.log('Seleccionado: Google Drive');
-                  onSelectDestination?.('google-drive');
-                }}
+                onPress={() => onSelectDestination?.('google-drive')}
               >
                 <Text style={styles.primaryText}>Google Drive</Text>
               </Pressable>
 
               <Pressable
                 style={({ pressed }) => [styles.button, styles.primaryButton, pressed && styles.buttonPressed]}
-                onPress={() => {
-                  console.log('Seleccionado: OneDrive');
-                  onSelectDestination?.('onedrive');
-                }}
+                onPress={() => onSelectDestination?.('onedrive')}
               >
                 <Text style={styles.primaryText}>OneDrive</Text>
               </Pressable>
 
               <Pressable
                 style={({ pressed }) => [styles.button, styles.secondaryButton, pressed && styles.buttonPressed]}
-                onPress={() => {
-                  console.log('Acción cancelada');
-                  onClose();
-                }}
+                onPress={onClose}
               >
                 <Text style={styles.secondaryText}>Cancelar</Text>
               </Pressable>
             </>
           )}
 
-          {/* VISTA 2: Resolución de Conflicto (Si el archivo ya existe) */}
+          {/* VISTA 2: Resolución de Conflicto */}
           {step === 'CONFLICT_RESOLUTION' && (
             <>
               <Text style={styles.title}>Archivo existente</Text>
@@ -119,10 +146,10 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
             </>
           )}
 
-          {/* VISTA 3: Eliminar Fuente post-transferencia */}
+          {/* VISTA 3: Eliminar Fuente / Confirmación Post-Transferencia */}
           {step === 'DELETE_SOURCE' && (
             <>
-              <Text style={styles.title}>{title || 'Transferencia exitosa'}</Text>
+              <Text style={styles.title}>{title || 'Transferencia realizada con éxito'}</Text>
               {fileName && (
                 <View style={styles.fileBadge}>
                   <Text style={styles.fileName} numberOfLines={1}>
@@ -131,19 +158,19 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
                 </View>
               )}
               <Text style={styles.subtitle}>
-                {message || `El archivo fue transferido exitosamente. ¿Qué deseas hacer con el archivo original?`}
+                {message || 'El archivo fue transferido exitosamente. ¿Qué deseas hacer con el archivo original?'}
               </Text>
 
               <Pressable
                 style={({ pressed }) => [styles.button, styles.dangerButton, pressed && styles.buttonPressed]}
-                onPress={() => onDestroySource?.()}
+                onPress={handleDestroy}
               >
                 <Text style={styles.dangerText}>Eliminar original</Text>
               </Pressable>
 
               <Pressable
                 style={({ pressed }) => [styles.button, styles.secondaryButton, pressed && styles.buttonPressed]}
-                onPress={() => onKeepSource?.()}
+                onPress={handleKeep}
               >
                 <Text style={styles.secondaryText}>Conservar original</Text>
               </Pressable>
@@ -170,7 +197,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.15)',
   },
   title: {
     fontSize: 18,
@@ -198,6 +224,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginBottom: 20,
     textAlign: 'center',
+    lineHeight: 18,
   },
   button: {
     width: '100%',
@@ -207,6 +234,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 10,
     borderWidth: 1,
+  },
+  actionButton: {
+    backgroundColor: '#0066FF',
+    borderColor: '#0052CC',
+  },
+  actionText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
   },
   primaryButton: {
     backgroundColor: '#EBF3FF',

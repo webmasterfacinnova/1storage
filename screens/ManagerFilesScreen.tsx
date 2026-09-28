@@ -24,7 +24,7 @@ import { transferService } from '../services/transfer.service';
 import { UnifiedFile, ProviderMeta } from '../types/storage';
 
 // Modales
-import { TransferConfirmDialog } from '../components/modals/TransferConfirmDialog';
+import { TransferConfirmDialog, DialogStep } from '../components/modals/TransferConfirmDialog';
 import { TransferLoadingModal } from '../components/modals/TransferLoadingModal';
 
 // Redux hooks
@@ -95,16 +95,11 @@ const ManagerFilesScreen: React.FC = () => {
   // Estado para el modal de carga durante la transferencia
   const [transferringFile, setTransferringFile] = useState<UnifiedFile | null>(null);
 
-  // Estado para el modal de confirmación final (éxito)
-  const [modalConfig, setModalConfig] = useState<{
-    visible: boolean;
-    file: UnifiedFile | null;
-    targetName: string;
-  }>({
-    visible: false,
-    file: null,
-    targetName: '',
-  });
+  // Estados para el Modal de Transferencia / Confirmación
+  const [dialogVisible, setDialogVisible] = useState(false);
+  const [dialogStep, setDialogStep] = useState<DialogStep>('DELETE_SOURCE');
+  const [dialogFile, setDialogFile] = useState<UnifiedFile | null>(null);
+  const [targetName, setTargetName] = useState('');
 
   const connectedProviders = useAppSelector(selectConnectedProviders);
   const providerKeys = useMemo(() => Object.keys(connectedProviders || {}), [connectedProviders]);
@@ -214,13 +209,22 @@ const ManagerFilesScreen: React.FC = () => {
     }
   }, [nav]);
 
-  // Manejo de la transferencia con Modal de Carga Comercial
+  // Manejo de la transferencia con validación de cantidad de proveedores
   const handleTransferFile = async (file: UnifiedFile) => {
+    const connectedCount = Object.keys(connectedProviders || {}).length;
+
+    // Si tiene menos de 2 proveedores conectados, mostramos el modal directamente en pantalla
+    if (connectedCount < 2) {
+      setDialogStep('NEED_MORE_PROVIDERS');
+      setDialogVisible(true);
+      return;
+    }
+
     const targetProvider = file.provider === 'google-drive' ? 'onedrive' : 'google-drive';
-    const targetName = targetProvider === 'google-drive' ? 'Google Drive' : 'OneDrive';
+    const target = targetProvider === 'google-drive' ? 'Google Drive' : 'OneDrive';
+    setTargetName(target);
 
     try {
-      // Activa el modal de carga mostrando el nombre del archivo
       setTransferringFile(file);
 
       const isTransferred = await transferService.transferToDestination({
@@ -231,15 +235,12 @@ const ManagerFilesScreen: React.FC = () => {
         toProvider: targetProvider,
       });
 
-      // Oculta el modal de carga antes de mostrar el de éxito
       setTransferringFile(null);
 
       if (isTransferred) {
-        setModalConfig({
-          visible: true,
-          file,
-          targetName,
-        });
+        setDialogFile(file);
+        setDialogStep('DELETE_SOURCE');
+        setDialogVisible(true);
       } else {
         Alert.alert('Error', 'No se pudo completar la transferencia.');
       }
@@ -250,12 +251,14 @@ const ManagerFilesScreen: React.FC = () => {
   };
 
   const handleKeepOriginal = () => {
-    setModalConfig({ visible: false, file: null, targetName: '' });
+    setDialogVisible(false);
+    setDialogFile(null);
   };
 
   const handleDestroyOriginal = async () => {
-    const file = modalConfig.file;
-    setModalConfig({ visible: false, file: null, targetName: '' });
+    const file = dialogFile;
+    setDialogVisible(false);
+    setDialogFile(null);
 
     if (!file) return;
 
@@ -448,15 +451,19 @@ const ManagerFilesScreen: React.FC = () => {
         fileName={transferringFile?.name}
       />
 
-      {/* Modal Dialog de Confirmación (Post-Transferencia) */}
+      {/* Modal Dialog (Validador de Proveedores / Confirmación) */}
       <TransferConfirmDialog
-        visible={modalConfig.visible}
+        visible={dialogVisible}
+        step={dialogStep}
         title="Transferencia realizada con éxito"
-        fileName={modalConfig.file?.name}
-        message={`El archivo fue enviado exitosamente a ${modalConfig.targetName}. ¿Qué deseas hacer con el archivo original fuente?`}
+        fileName={dialogFile?.name}
+        message={`El archivo fue enviado exitosamente a ${targetName}. ¿Qué deseas hacer con el archivo original fuente?`}
         onKeep={handleKeepOriginal}
         onDestroy={handleDestroyOriginal}
-        onClose={handleKeepOriginal}
+        onKeepSource={handleKeepOriginal}
+        onDestroySource={handleDestroyOriginal}
+        onGoToProviders={() => (nav as any).navigate('AddProvider')}
+        onClose={() => setDialogVisible(false)}
       />
     </View>
   );

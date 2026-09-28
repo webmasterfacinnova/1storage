@@ -9,6 +9,7 @@ import { transferService, ProviderType } from '../services/transfer.service';
 import FileCard from '../components/storage/FileCard';
 import { TransferConfirmDialog, DialogStep } from '../components/modals/TransferConfirmDialog';
 import { UnifiedFile } from '../types/storage';
+import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
 import {
   setFolderFilesLoading,
   setFolderFiles,
@@ -46,6 +47,8 @@ const FileListScreen = () => {
 
   const provider = route.params?.provider || 'google-drive';
   const isOneDrive = provider === 'onedrive';
+
+  const connectedProviders = useSelector(selectConnectedProviders);
 
   const files = useSelector((state: any) => isOneDrive ? selectOnedriveCurrentFolderFiles(state) : selectCurrentFolderFiles(state));
   const folderId = useSelector((state: any) => isOneDrive ? selectOnedriveCurrentFolderId(state) : selectCurrentFolderId(state));
@@ -146,8 +149,28 @@ const FileListScreen = () => {
     }
   };
 
-  // Manejo de la transferencia
+  // Manejo de la transferencia con verificación de cuentas conectadas
   const handleStartTransfer = (file: UnifiedFile) => {
+    const connectedCount = Object.keys(connectedProviders || {}).length;
+
+    if (connectedCount < 2) {
+      Alert.alert(
+        'Conecta otra cuenta de almacenamiento',
+        'Para transferir archivos entre servicios necesitas tener al menos 2 nubes vinculadas (por ejemplo, Google Drive y OneDrive). Agrega otra cuenta para empezar a mover tus archivos fácilmente.',
+        [
+          {
+            text: 'Cancelar',
+            style: 'cancel',
+          },
+          {
+            text: 'Conectar nube',
+            onPress: () => navigation.navigate('AddProvider'),
+          },
+        ]
+      );
+      return;
+    }
+
     setSelectedFile(file);
     setModalStep('SELECT_PROVIDER');
     setModalVisible(true);
