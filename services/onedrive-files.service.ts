@@ -347,6 +347,27 @@ class OneDriveFilesService {
 
     return extMap[ext] || { label: 'Other', icon: '📦' };
   }
+
+  async checkFileExists(fileName: string, folderId: string = 'root'): Promise<OneDriveFile | null> {
+    const endpoint =
+      folderId === 'root'
+        ? `${GRAPH_API_BASE}/me/drive/root/children?$filter=name eq '${encodeURIComponent(fileName)}'`
+        : `${GRAPH_API_BASE}/me/drive/items/${folderId}/children?$filter=name eq '${encodeURIComponent(fileName)}'`;
+
+    const response = await this._fetchWithAuth(endpoint);
+
+    if (!response || !response.ok) {
+      if (response) console.error('OneDrive checkFileExists API error:', response.status, await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.value && data.value.length > 0) {
+      return this._mapOneDriveItem(data.value[0]);
+    }
+
+    return null;
+  }
 }
 
 export const oneDriveFilesService = new OneDriveFilesService();

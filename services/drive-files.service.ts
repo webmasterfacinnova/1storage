@@ -48,6 +48,30 @@ class DriveFilesService {
   private static readonly FIELDS_FULL = 'files(id,name,mimeType,size,modifiedTime,iconLink,webViewLink,thumbnailLink,parents,trashed),nextPageToken';
   private static readonly PAGE_SIZE = 20;
 
+  async checkFileExists(fileName: string, folderId: string = 'root'): Promise<DriveFile | null> {
+    const token = await getAuthToken();
+    if (!token) return null;
+
+    const safeName = fileName.replace(/'/g, "\\'");
+    const query = `'${folderId}' in parents and name = '${safeName}' and trashed = false`;
+    const params = new URLSearchParams({
+      pageSize: '1',
+      fields: 'files(id, name, mimeType, size)',
+      q: query,
+    });
+
+    try {
+      const res = await fetch(`${DRIVE_API_BASE}/files?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.files && data.files.length > 0 ? data.files[0] : null;
+    } catch {
+      return null;
+    }
+  }
+
   async getPreviews(
     pageSize: number = DriveFilesService.PAGE_SIZE,
     pageToken?: string,
@@ -203,8 +227,26 @@ class DriveFilesService {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
-      return res.ok;
-    } catch { return false; }
+
+      if (res.ok) return true;
+
+      // Si falla por falta de permisos de borrado permanente (403), mover a la papelera
+      if (res.status === 403) {
+        const trashRes = await fetch(`${DRIVE_API_BASE}/files/${fileId}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ trashed: true }),
+        });
+        return trashRes.ok;
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   async emptyTrash(): Promise<boolean> {

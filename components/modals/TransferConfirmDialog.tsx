@@ -1,76 +1,157 @@
 import React from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  StyleSheet,
-  TouchableWithoutFeedback,
-} from 'react-native';
-import { Button } from '../common/Button';
+import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
+import { ProviderType } from '../../services/transfer.service';
+
+export type DialogStep = 'SELECT_PROVIDER' | 'CONFLICT_RESOLUTION' | 'DELETE_SOURCE';
 
 interface TransferConfirmDialogProps {
   visible: boolean;
-  title: string;
-  message: string;
+  step?: DialogStep;
+  title?: string;
+  message?: string;
   fileName?: string;
-  onKeep: () => void;      // Acción: Permitir / Conservar original
-  onDestroy: () => void;   // Acción: Destruir / Eliminar original
-  onClose?: () => void;    // Acción opcional para cerrar/cancelar
+  targetProvider?: string;
+  onSelectDestination?: (provider: ProviderType) => void;
+  onResolveConflict?: (strategy: 'replace' | 'rename' | 'cancel') => void;
+  onKeepSource?: () => void;
+  onDestroySource?: () => void;
+  onClose: () => void;
 }
 
 export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
   visible,
+  step = 'SELECT_PROVIDER',
   title,
   message,
   fileName,
-  onKeep,
-  onDestroy,
+  targetProvider,
+  onSelectDestination,
+  onResolveConflict,
+  onKeepSource,
+  onDestroySource,
   onClose,
 }) => {
-  if (!visible) return null;
-
   return (
     <Modal
+      visible={visible}
       transparent
       animationType="fade"
-      visible={visible}
-      onRequestClose={onClose || onKeep}
+      onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <View style={styles.dialogContainer}>
-              <Text style={styles.title}>{title}</Text>
-              
-              {fileName ? (
-                <Text style={styles.fileNameText} numberOfLines={2}>
-                  📄 {fileName}
-                </Text>
-              ) : null}
+      <View style={styles.overlay}>
+        <View style={styles.container}>
+          
+          {/* VISTA 1: Seleccionar Proveedor Destino */}
+          {step === 'SELECT_PROVIDER' && (
+            <>
+              <Text style={styles.title}>Seleccionar Destino</Text>
+              {fileName && (
+                <View style={styles.fileBadge}>
+                  <Text style={styles.fileName} numberOfLines={1}>
+                    📄 {fileName}
+                  </Text>
+                </View>
+              )}
+              <Text style={styles.subtitle}>
+                ¿A qué proveedor deseas transferir este archivo?
+              </Text>
 
-              <Text style={styles.message}>{message}</Text>
+              <Pressable
+                style={({ pressed }) => [styles.button, styles.primaryButton, pressed && styles.buttonPressed]}
+                onPress={() => {
+                  console.log('Seleccionado: Google Drive');
+                  onSelectDestination?.('google-drive');
+                }}
+              >
+                <Text style={styles.primaryText}>Google Drive</Text>
+              </Pressable>
 
-              <View style={styles.buttonContainer}>
-                <Button
-                  title="Conservar"
-                  onPress={onKeep}
-                  color="#E8EAF6"
-                  textColor="#1A237E"
-                  style={styles.fullWidthButton}
-                />
+              <Pressable
+                style={({ pressed }) => [styles.button, styles.primaryButton, pressed && styles.buttonPressed]}
+                onPress={() => {
+                  console.log('Seleccionado: OneDrive');
+                  onSelectDestination?.('onedrive');
+                }}
+              >
+                <Text style={styles.primaryText}>OneDrive</Text>
+              </Pressable>
 
-                <Button
-                  title="Eliminar"
-                  onPress={onDestroy}
-                  color="#D32F2F"
-                  textColor="#FFFFFF"
-                  style={styles.fullWidthButton}
-                />
-              </View>
-            </View>
-          </TouchableWithoutFeedback>
+              <Pressable
+                style={({ pressed }) => [styles.button, styles.secondaryButton, pressed && styles.buttonPressed]}
+                onPress={() => {
+                  console.log('Acción cancelada');
+                  onClose();
+                }}
+              >
+                <Text style={styles.secondaryText}>Cancelar</Text>
+              </Pressable>
+            </>
+          )}
+
+          {/* VISTA 2: Resolución de Conflicto (Si el archivo ya existe) */}
+          {step === 'CONFLICT_RESOLUTION' && (
+            <>
+              <Text style={styles.title}>Archivo existente</Text>
+              <Text style={styles.subtitle}>
+                Ya existe un archivo con el nombre &quot;{fileName}&quot; en {targetProvider}. ¿Qué deseas hacer?
+              </Text>
+
+              <Pressable
+                style={({ pressed }) => [styles.button, styles.primaryButton, pressed && styles.buttonPressed]}
+                onPress={() => onResolveConflict?.('replace')}
+              >
+                <Text style={styles.primaryText}>Reemplazar existente</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [styles.button, styles.primaryButton, pressed && styles.buttonPressed]}
+                onPress={() => onResolveConflict?.('rename')}
+              >
+                <Text style={styles.primaryText}>Mantener ambos (Renombrar)</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [styles.button, styles.secondaryButton, pressed && styles.buttonPressed]}
+                onPress={() => onResolveConflict?.('cancel')}
+              >
+                <Text style={styles.secondaryText}>Cancelar</Text>
+              </Pressable>
+            </>
+          )}
+
+          {/* VISTA 3: Eliminar Fuente post-transferencia */}
+          {step === 'DELETE_SOURCE' && (
+            <>
+              <Text style={styles.title}>{title || 'Transferencia exitosa'}</Text>
+              {fileName && (
+                <View style={styles.fileBadge}>
+                  <Text style={styles.fileName} numberOfLines={1}>
+                    📄 {fileName}
+                  </Text>
+                </View>
+              )}
+              <Text style={styles.subtitle}>
+                {message || `El archivo fue transferido exitosamente. ¿Qué deseas hacer con el archivo original?`}
+              </Text>
+
+              <Pressable
+                style={({ pressed }) => [styles.button, styles.dangerButton, pressed && styles.buttonPressed]}
+                onPress={() => onDestroySource?.()}
+              >
+                <Text style={styles.dangerText}>Eliminar original</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [styles.button, styles.secondaryButton, pressed && styles.buttonPressed]}
+                onPress={() => onKeepSource?.()}
+              >
+                <Text style={styles.secondaryText}>Conservar original</Text>
+              </Pressable>
+            </>
+          )}
+
         </View>
-      </TouchableWithoutFeedback>
+      </View>
     </Modal>
   );
 };
@@ -78,50 +159,83 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
   },
-  dialogContainer: {
-    width: '100%',
+  container: {
+    width: '90%',
     maxWidth: 420,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 8,
+    alignItems: 'center',
+    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.15)',
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1A237E',
-    marginBottom: 8,
+    color: '#1E293B',
+    marginBottom: 16,
+    textAlign: 'center',
   },
-  fileNameText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333333',
-    backgroundColor: '#F1F3F5',
-    padding: 8,
-    borderRadius: 6,
-    marginVertical: 6,
-  },
-  message: {
-    fontSize: 14,
-    color: '#555555',
-    lineHeight: 20,
-    marginVertical: 10,
-  },
-  buttonContainer: {
-    flexDirection: 'column',
-    gap: 10,
-    marginTop: 20,
-  },
-  fullWidthButton: {
+  fileBadge: {
     width: '100%',
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  fileName: {
+    fontSize: 14,
+    color: '#334155',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  button: {
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    borderWidth: 1,
+  },
+  primaryButton: {
+    backgroundColor: '#EBF3FF',
+    borderColor: '#D0E2FF',
+  },
+  secondaryButton: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+  },
+  dangerButton: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  primaryText: {
+    color: '#0066FF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  secondaryText: {
+    color: '#475569',
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  dangerText: {
+    color: '#DC2626',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

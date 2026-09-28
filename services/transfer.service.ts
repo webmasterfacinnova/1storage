@@ -1,3 +1,4 @@
+// services/transfer.service.ts
 import { driveFilesService } from './drive-files.service';
 import { oneDriveFilesService } from './onedrive-files.service';
 
@@ -9,51 +10,98 @@ export interface TransferParams {
   mimeType: string;
   fromProvider: ProviderType;
   toProvider: ProviderType;
+  conflictStrategy?: 'replace' | 'rename' | 'cancel';
 }
 
 class TransferService {
   /**
-   * Paso 1: Descarga el archivo de la plataforma origen y lo sube a la de destino.
+   * Verifica si el archivo existe en el destino
    */
-  async transferToDestination(params: TransferParams): Promise<boolean> {
-    const { fileId, fileName, mimeType, fromProvider, toProvider } = params;
-
-    let blob: Blob | null = null;
-    if (fromProvider === 'google-drive') {
-      blob = await driveFilesService.downloadFile(fileId);
-    } else {
-      blob = await oneDriveFilesService.downloadFile(fileId);
-    }
-
-    if (!blob) throw new Error('No se pudo descargar el archivo del servicio de origen.');
-
-    // Forzar el mimeType si el Blob resultante no tiene tipo asignado
-    if ((!blob.type || blob.type === 'application/octet-stream') && mimeType) {
-      blob = new Blob([blob], { type: mimeType });
-    }
-
-    let uploadSuccess = false;
+  async checkDestinationConflict(fileName: string, toProvider: ProviderType): Promise<boolean> {
     if (toProvider === 'google-drive') {
-      const res = await driveFilesService.uploadFile(blob, fileName, mimeType);
-      uploadSuccess = Boolean(res);
+      const existing = await driveFilesService.checkFileExists(fileName);
+      return existing !== null;
     } else {
-      const res = await oneDriveFilesService.uploadFile(blob, fileName);
-      uploadSuccess = Boolean(res);
+      const existing = await oneDriveFilesService.checkFileExists(fileName);
+      return existing !== null;
     }
-
-    return uploadSuccess;
   }
 
   /**
-   * Paso 2: Elimina permanentemente el archivo original de la plataforma de origen.
+   * Genera un nombre de archivo modificado tipo "archivo (1).txt"
+   */
+  getModifiedFileName(fileName: string): string {
+    const lastDotIndex = fileName.lastIndexOf('.');
+    if (lastDotIndex === -1) {
+      return `${fileName} (1)`;
+    }
+    const name = fileName.substring(0, lastDotIndex);
+    const ext = fileName.substring(lastDotIndex);
+    return `${name} (1)${ext}`;
+  }
+
+  /**
+   * Paso 1: Descarga el archivo de la plataforma origen y lo sube a la de destino.
+   */
+  async transferToDestination(params: TransferParams): Promise<boolean> {
+    const { fileId, mimeType, fromProvider, toProvider, conflictStrategy } = params;
+    let fileName = params.fileName;
+
+    try {
+      // 1. Manejo de duplicados / estrategia de conflicto
+      if (conflictStrategy === 'cancel') {
+        return false;
+      }
+
+      if (conflictStrategy === 'rename') {
+        fileName = this.getModifiedFileName(fileName);
+      }
+
+      // 2. Descargar archivo del proveedor origen
+      let blob: Blob | null = null;
+      if (fromProvider === 'google-drive') {
+        blob = await driveFilesService.downloadFile(fileId);
+      } else if (fromProvider === 'onedrive') {
+        blob = await oneDriveFilesService.downloadFile(fileId);
+      }
+
+      if (!blob) {
+        console.error('[TransferService] Error al descargar el archivo de origen');
+        return false;
+      }
+
+      // 3. Subir archivo al proveedor destino
+      let uploadedFile = null;
+      if (toProvider === 'google-drive') {
+        uploadedFile = await driveFilesService.uploadFile(blob, fileName, mimeType);
+      } else if (toProvider === 'onedrive') {
+        uploadedFile = await oneDriveFilesService.uploadFile(blob, fileName);
+      }
+
+      return uploadedFile !== null;
+    } catch (error) {
+      console.error('[TransferService] Error durante la transferencia:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Elimina el archivo original de la plataforma de origen tras transferirlo o solicitar su borrado.
    */
   async deleteFromSource(fileId: string, provider: ProviderType): Promise<boolean> {
-    if (provider === 'google-drive') {
-      return await driveFilesService.deleteFilePermanently(fileId);
-    } else {
-      return await oneDriveFilesService.deleteFilePermanently(fileId);
+    try {
+      if (provider === 'google-drive') {
+        return await driveFilesService.deleteFilePermanently(fileId);
+      } else if (provider === 'onedrive') {
+        return await oneDriveFilesService.deleteFilePermanently(fileId);
+      }
+      return false;
+    } catch (error) {
+      console.error('[TransferService] Error al eliminar archivo de la fuente:', error);
+      return false;
     }
   }
 }
 
 export const transferService = new TransferService();
+export default TransferService;
