@@ -260,6 +260,36 @@ const ManagerFilesScreen: React.FC = () => {
       return;
     }
 
+    if (strategy === 'rename') {
+      // Solicita el nuevo nombre en un cuadro de diálogo antes de iniciar la transferencia
+      Alert.prompt(
+        'Renombrar archivo',
+        `Ingresa el nuevo nombre para guardar en ${targetName}:`,
+        [
+          {
+            text: 'Cancelar',
+            style: 'cancel',
+            onPress: () => {
+              setDialogVisible(false);
+              setDialogFile(null);
+              setTargetProviderId(null);
+            },
+          },
+          {
+            text: 'Transferir con nuevo nombre',
+            onPress: async (newName) => {
+              if (!newName || !newName.trim()) return;
+              const renamedFile = { ...dialogFile, name: newName.trim() };
+              await executeTransfer(renamedFile, targetProviderId, 'rename');
+            },
+          },
+        ],
+        'plain-text',
+        dialogFile.name
+      );
+      return;
+    }
+
     await executeTransfer(dialogFile, targetProviderId, strategy);
   };
 
@@ -499,7 +529,7 @@ const ManagerFilesScreen: React.FC = () => {
         fileName={transferringFile?.name}
       />
 
-      {/* Modal Dialog Unificado (Single Modal Manager) */}
+      {/* Modal Dialog Unificado */}
       <TransferConfirmDialog
         visible={dialogVisible}
         step={dialogStep}
