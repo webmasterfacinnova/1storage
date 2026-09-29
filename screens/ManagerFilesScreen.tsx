@@ -100,6 +100,7 @@ const ManagerFilesScreen: React.FC = () => {
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogStep, setDialogStep] = useState<DialogStep>('SELECT_PROVIDER');
   const [dialogFile, setDialogFile] = useState<UnifiedFile | null>(null);
+  const [targetProviderId, setTargetProviderId] = useState<ProviderType | null>(null);
   const [targetName, setTargetName] = useState('');
 
   const connectedProviders = useAppSelector(selectConnectedProviders);
@@ -221,15 +222,20 @@ const ManagerFilesScreen: React.FC = () => {
     }
 
     setDialogFile(file);
+    setTargetProviderId(null);
+    setTargetName('');
     setDialogStep('SELECT_PROVIDER');
     setDialogVisible(true);
   };
 
-  // Paso 2: Al seleccionar el proveedor destino, verifica la existencia previa de duplicados
+  // Paso 2: Al seleccionar el proveedor destino
   const handleSelectDestination = async (destination: ProviderType) => {
     if (!dialogFile) return;
 
-    const nameLabel = destination === 'google-drive' ? 'Google Drive' : 'OneDrive';
+    const targetMeta = connectedProviders[destination];
+    const nameLabel = targetMeta?.name || PROVIDER_META[destination]?.name || destination;
+    
+    setTargetProviderId(destination);
     setTargetName(nameLabel);
 
     try {
@@ -247,14 +253,14 @@ const ManagerFilesScreen: React.FC = () => {
 
   // Paso 3: Resuelve la estrategia elegida (Reemplazar / Renombrar / Cancelar)
   const handleResolveConflict = async (strategy: 'replace' | 'rename' | 'cancel') => {
-    if (strategy === 'cancel' || !dialogFile) {
+    if (strategy === 'cancel' || !dialogFile || !targetProviderId) {
       setDialogVisible(false);
       setDialogFile(null);
+      setTargetProviderId(null);
       return;
     }
 
-    const targetProvider: ProviderType = targetName === 'Google Drive' ? 'google-drive' : 'onedrive';
-    await executeTransfer(dialogFile, targetProvider, strategy);
+    await executeTransfer(dialogFile, targetProviderId, strategy);
   };
 
   // Paso 4: Realiza la transferencia efectiva con el servicio
@@ -293,12 +299,14 @@ const ManagerFilesScreen: React.FC = () => {
   const handleKeepOriginal = () => {
     setDialogVisible(false);
     setDialogFile(null);
+    setTargetProviderId(null);
   };
 
   const handleDestroyOriginal = async () => {
     const file = dialogFile;
     setDialogVisible(false);
     setDialogFile(null);
+    setTargetProviderId(null);
 
     if (!file) return;
 
@@ -491,12 +499,14 @@ const ManagerFilesScreen: React.FC = () => {
         fileName={transferringFile?.name}
       />
 
-      {/* Modal Dialog (Selector / Conflicto / Eliminación Fuente) */}
+      {/* Modal Dialog Unificado (Single Modal Manager) */}
       <TransferConfirmDialog
         visible={dialogVisible}
         step={dialogStep}
         title="Transferencia realizada con éxito"
         fileName={dialogFile?.name}
+        sourceProvider={dialogFile?.provider}
+        connectedProviders={connectedProviders}
         targetProvider={targetName}
         message={`El archivo fue enviado exitosamente a ${targetName}. ¿Qué deseas hacer con el archivo original fuente?`}
         onSelectDestination={handleSelectDestination}
@@ -509,6 +519,7 @@ const ManagerFilesScreen: React.FC = () => {
         onClose={() => {
           setDialogVisible(false);
           setDialogFile(null);
+          setTargetProviderId(null);
         }}
       />
     </View>

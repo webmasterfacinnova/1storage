@@ -1,36 +1,44 @@
+// components/modals/TransferConfirmDialog.tsx
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
-import { ProviderType } from '../../services/transfer.service';
+import { Modal, View, Text, StyleSheet, TouchableWithoutFeedback } from 'react-native';
+import Button from '../common/Button';
 
-export type DialogStep = 
-  | 'SELECT_PROVIDER' 
-  | 'CONFLICT_RESOLUTION' 
-  | 'DELETE_SOURCE' 
-  | 'NEED_MORE_PROVIDERS';
+export type DialogStep = 'SELECT_PROVIDER' | 'CONFLICT_RESOLUTION' | 'DELETE_SOURCE' | 'NEED_MORE_PROVIDERS';
 
-export interface TransferConfirmDialogProps {
+interface Props {
   visible: boolean;
-  step?: DialogStep;
+  step: DialogStep;
   title?: string;
   message?: string;
   fileName?: string;
+  sourceProvider?: string;
+  connectedProviders?: Record<string, any>;
   targetProvider?: string;
-  onSelectDestination?: (provider: ProviderType) => void;
-  onResolveConflict?: (strategy: 'replace' | 'rename' | 'cancel') => void;
+  onSelectDestination: (provider: any) => void;
+  onResolveConflict: (strategy: 'replace' | 'rename' | 'cancel') => void;
   onKeepSource?: () => void;
   onDestroySource?: () => void;
-  onKeep?: () => void;      // <--- Agregado para compatibilidad
-  onDestroy?: () => void;   // <--- Agregado para compatibilidad
+  onKeep?: () => void;
+  onDestroy?: () => void;
   onGoToProviders?: () => void;
   onClose: () => void;
 }
 
-export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
+const getProviderDisplayName = (key?: string) => {
+  if (!key) return '';
+  if (key.toLowerCase().includes('onedrive')) return 'Microsoft OneDrive';
+  if (key.toLowerCase().includes('drive')) return 'Google Drive';
+  return key;
+};
+
+export const TransferConfirmDialog: React.FC<Props> = ({
   visible,
-  step = 'DELETE_SOURCE',
+  step,
   title,
   message,
   fileName,
+  sourceProvider,
+  connectedProviders = {},
   targetProvider,
   onSelectDestination,
   onResolveConflict,
@@ -41,159 +49,208 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
   onGoToProviders,
   onClose,
 }) => {
+  if (!visible) return null;
+
   const handleKeep = onKeepSource || onKeep || onClose;
-  const handleDestroy = onDestroySource || onDestroy;
+  const handleDestroy = onDestroySource || onDestroy || onClose;
+
+  const formattedSource = getProviderDisplayName(sourceProvider);
+  const formattedTarget = getProviderDisplayName(targetProvider);
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <View style={styles.overlay}>
-        <View style={styles.container}>
-          
-          {/* VISTA AVISO: Requiere al menos 2 proveedores */}
-          {step === 'NEED_MORE_PROVIDERS' && (
-            <>
-              <Text style={styles.title}>Conecta otro proveedor de nube</Text>
-              <Text style={styles.subtitle}>
-                Para poder realizar transferencias entre nubes necesitas tener al menos 2 proveedores de almacenamiento vinculados.
-              </Text>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={s.overlay}>
+          <TouchableWithoutFeedback>
+            <View style={s.card}>
 
-              <Pressable
-                style={({ pressed }) => [styles.button, styles.actionButton, pressed && styles.buttonPressed]}
-                onPress={() => {
-                  onClose();
-                  onGoToProviders?.();
-                }}
-              >
-                <Text style={styles.actionText}>Conectar otros servicios</Text>
-              </Pressable>
+              {/* PASO 1: Seleccionar Destino con el flujo visual (Origen -> Destino) */}
+              {step === 'SELECT_PROVIDER' && (
+                <>
+                  <Text style={s.title}>{title || 'Transferir Archivo'}</Text>
 
-             
-               
-            </>
-          )}
+                  {/* Badge de archivo */}
+                  {fileName && (
+                    <View style={s.fileBadgeContainer}>
+                      <Text style={s.fileBadgeText} numberOfLines={1}>
+                        {fileName}
+                      </Text>
+                    </View>
+                  )}
 
-          {/* VISTA 1: Seleccionar Proveedor Destino */}
-          {step === 'SELECT_PROVIDER' && (
-            <>
-              <Text style={styles.title}>Seleccionar Destino</Text>
-              {fileName && (
-                <View style={styles.fileBadge}>
-                  <Text style={styles.fileName} numberOfLines={1}>
-                    📄 {fileName}
-                  </Text>
-                </View>
+                  {/* Diagrama de Flujo: Origen -> Destino */}
+                  <View style={s.flowContainer}>
+                    {/* Proveedor Origen */}
+                    <View style={s.flowStep}>
+                      <Text style={s.flowTag}>proveedor origen</Text>
+                      <View style={s.providerBox}>
+                        <Text style={s.providerBoxText}>{formattedSource || 'Origen'}</Text>
+                      </View>
+                    </View>
+
+                    {/* Flecha indicadora */}
+                    <Text style={s.arrow}>↓</Text>
+
+                    {/* Proveedor Destino */}
+                    <View style={s.flowStep}>
+                      <Text style={s.flowTag}>proveedor destino</Text>
+                      <View style={s.btnList}>
+                        {Object.keys(connectedProviders)
+                          .filter((p) => p !== sourceProvider)
+                          .map((p) => {
+                            const name = connectedProviders[p]?.name || getProviderDisplayName(p);
+                            const isOneDrive = p.toLowerCase().includes('onedrive');
+                            return (
+                              <Button
+                                key={p}
+                                title={name}
+                                onPress={() => onSelectDestination(p)}
+                                color={isOneDrive ? '#0078d4' : '#0f9d58'}
+                                style={s.actionBtn}
+                              />
+                            );
+                          })}
+                      </View>
+                    </View>
+                  </View>
+
+                  <Button
+                    title="Cancelar"
+                    variant="ghost"
+                    color="#666666"
+                    onPress={onClose}
+                    style={s.cancelBtn}
+                  />
+                </>
               )}
-              <Text style={styles.subtitle}>
-                ¿A qué proveedor deseas transferir este archivo?
-              </Text>
 
-              <Pressable
-                style={({ pressed }) => [styles.button, styles.primaryButton, pressed && styles.buttonPressed]}
-                onPress={() => onSelectDestination?.('google-drive')}
-              >
-                <Text style={styles.primaryText}>Google Drive</Text>
-              </Pressable>
-
-              <Pressable
-                style={({ pressed }) => [styles.button, styles.primaryButton, pressed && styles.buttonPressed]}
-                onPress={() => onSelectDestination?.('onedrive')}
-              >
-                <Text style={styles.primaryText}>OneDrive</Text>
-              </Pressable>
-
-              <Pressable
-                style={({ pressed }) => [styles.button, styles.secondaryButton, pressed && styles.buttonPressed]}
-                onPress={onClose}
-              >
-                <Text style={styles.secondaryText}>Cancelar</Text>
-              </Pressable>
-            </>
-          )}
-
-          {/* VISTA 2: Resolución de Conflicto */}
-          {step === 'CONFLICT_RESOLUTION' && (
-            <>
-              <Text style={styles.title}>Archivo existente</Text>
-              <Text style={styles.subtitle}>
-                Ya existe un archivo con el nombre &quot;{fileName}&quot; en {targetProvider}. ¿Qué deseas hacer?
-              </Text>
-
-              <Pressable
-                style={({ pressed }) => [styles.button, styles.primaryButton, pressed && styles.buttonPressed]}
-                onPress={() => onResolveConflict?.('replace')}
-              >
-                <Text style={styles.primaryText}>Reemplazar existente</Text>
-              </Pressable>
-
-              <Pressable
-                style={({ pressed }) => [styles.button, styles.primaryButton, pressed && styles.buttonPressed]}
-                onPress={() => onResolveConflict?.('rename')}
-              >
-                <Text style={styles.primaryText}>Mantener ambos (Renombrar)</Text>
-              </Pressable>
-
-              <Pressable
-                style={({ pressed }) => [styles.button, styles.secondaryButton, pressed && styles.buttonPressed]}
-                onPress={() => onResolveConflict?.('cancel')}
-              >
-                <Text style={styles.secondaryText}>Cancelar</Text>
-              </Pressable>
-            </>
-          )}
-
-          {/* VISTA 3: Eliminar Fuente / Confirmación Post-Transferencia */}
-          {step === 'DELETE_SOURCE' && (
-            <>
-              <Text style={styles.title}>{title || 'Transferencia realizada con éxito'}</Text>
-              {fileName && (
-                <View style={styles.fileBadge}>
-                  <Text style={styles.fileName} numberOfLines={1}>
-                    📄 {fileName}
+              {/* PASO 2: Resolver Conflicto de Duplicados */}
+              {step === 'CONFLICT_RESOLUTION' && (
+                <>
+                  <Text style={s.title}>Archivo Ya Existente</Text>
+                  <Text style={s.subtitle}>
+                    Ya existe un archivo llamado <Text style={s.bold}>{fileName}</Text> en{' '}
+                    <Text style={s.bold}>{formattedTarget || 'el destino'}</Text>.
                   </Text>
-                </View>
+
+                  <View style={s.btnList}>
+                    <Button
+                      title="Reemplazar archivo"
+                      onPress={() => onResolveConflict('replace')}
+                      color="#0078d4"
+                      style={s.actionBtn}
+                    />
+                    <Button
+                      title="Guardar ambos (Renombrar)"
+                      variant="outline"
+                      color="#333333"
+                      onPress={() => onResolveConflict('rename')}
+                      style={s.actionBtn}
+                    />
+                    <Button
+                      title="Cancelar"
+                      variant="ghost"
+                      color="#666666"
+                      onPress={() => onResolveConflict('cancel')}
+                      style={s.cancelBtn}
+                    />
+                  </View>
+                </>
               )}
-              <Text style={styles.subtitle}>
-                {message || 'El archivo fue transferido exitosamente. ¿Qué deseas hacer con el archivo original?'}
-              </Text>
 
-              <Pressable
-                style={({ pressed }) => [styles.button, styles.dangerButton, pressed && styles.buttonPressed]}
-                onPress={handleDestroy}
-              >
-                <Text style={styles.dangerText}>Eliminar original</Text>
-              </Pressable>
+              {/* PASO 3: Eliminar Fuente Original tras Transferencia Exitosa */}
+              {step === 'DELETE_SOURCE' && (
+                <>
+                  <Text style={s.title}>{title || 'Transferencia realizada con éxito'}</Text>
 
-              <Pressable
-                style={({ pressed }) => [styles.button, styles.secondaryButton, pressed && styles.buttonPressed]}
-                onPress={handleKeep}
-              >
-                <Text style={styles.secondaryText}>Conservar original</Text>
-              </Pressable>
-            </>
-          )}
+                  {fileName && (
+                    <View style={s.fileBadgeContainer}>
+                      <Text style={s.fileBadgeText} numberOfLines={1}>
+                        {fileName}
+                      </Text>
+                    </View>
+                  )}
 
+                  <Text style={s.subtitle}>
+                    {message || (
+                      <>
+                        El archivo fue enviado exitosamente a{' '}
+                        <Text style={s.bold}>{formattedTarget}</Text>. ¿Qué deseas hacer con el archivo original fuente?
+                      </>
+                    )}
+                  </Text>
+
+                  <View style={s.btnList}>
+                    <Button
+                      title="Conservar archivo original"
+                      onPress={handleKeep}
+                      color="#0078d4"
+                      style={s.actionBtn}
+                    />
+                    <Button
+                      title="Eliminar archivo original"
+                      variant="outline"
+                      color="#d32f2f"
+                      onPress={handleDestroy}
+                      style={s.actionBtn}
+                    />
+                    <Button
+                      title="Cancelar"
+                      variant="ghost"
+                      color="#666666"
+                      onPress={onClose}
+                      style={s.cancelBtn}
+                    />
+                  </View>
+                </>
+              )}
+
+              {/* PASO 4: Requiere más cuentas */}
+              {step === 'NEED_MORE_PROVIDERS' && (
+                <>
+                  <Text style={s.title}>Se requiere otra cuenta</Text>
+                  <Text style={s.subtitle}>
+                    Necesitas al menos dos cuentas de almacenamiento conectadas para poder realizar transferencias.
+                  </Text>
+
+                  <View style={s.btnList}>
+                    <Button
+                      title="Conectar proveedor"
+                      onPress={onGoToProviders || onClose}
+                      color="#0078d4"
+                      style={s.actionBtn}
+                    />
+                    <Button
+                      title="Cerrar"
+                      variant="ghost"
+                      color="#666666"
+                      onPress={onClose}
+                      style={s.cancelBtn}
+                    />
+                  </View>
+                </>
+              )}
+
+            </View>
+          </TouchableWithoutFeedback>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
-  container: {
-    width: '90%',
-    maxWidth: 420,
-    backgroundColor: '#FFFFFF',
+  card: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
@@ -201,77 +258,80 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  fileBadge: {
-    width: '100%',
-    backgroundColor: '#F1F5F9',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  fileName: {
-    fontSize: 14,
-    color: '#334155',
-    fontWeight: '500',
+    color: '#111111',
+    marginBottom: 14,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 13,
-    color: '#64748B',
-    marginBottom: 20,
+    fontSize: 14,
+    color: '#555555',
     textAlign: 'center',
-    lineHeight: 18,
+    marginBottom: 20,
+    lineHeight: 20,
   },
-  button: {
+  bold: {
+    fontWeight: '700',
+    color: '#111111',
+  },
+  fileBadgeContainer: {
+    backgroundColor: '#f1f3f5',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 16,
+    maxWidth: '100%',
+  },
+  fileBadgeText: {
+    fontSize: 13,
+    color: '#333333',
+    fontWeight: '500',
+  },
+  flowContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  flowStep: {
+    width: '100%',
+    alignItems: 'flex-start',
+  },
+  flowTag: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#888888',
+    textTransform: 'lowercase',
+    marginBottom: 4,
+    marginLeft: 2,
+  },
+  providerBox: {
     width: '100%',
     paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#f8f9fa',
     borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
   },
-  actionButton: {
-    backgroundColor: '#0066FF',
-    borderColor: '#0052CC',
-  },
-  actionText: {
-    color: '#FFFFFF',
+  providerBoxText: {
+    fontSize: 14,
     fontWeight: '600',
-    fontSize: 14,
+    color: '#333333',
   },
-  primaryButton: {
-    backgroundColor: '#EBF3FF',
-    borderColor: '#D0E2FF',
+  arrow: {
+    fontSize: 18,
+    color: '#888888',
+    marginVertical: 6,
   },
-  secondaryButton: {
-    backgroundColor: '#F1F5F9',
-    borderColor: '#E2E8F0',
+  btnList: {
+    width: '100%',
+    gap: 10,
   },
-  dangerButton: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FCA5A5',
+  actionBtn: {
+    width: '100%',
+    paddingVertical: 12,
   },
-  buttonPressed: {
-    opacity: 0.7,
-  },
-  primaryText: {
-    color: '#0066FF',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  secondaryText: {
-    color: '#475569',
-    fontWeight: '500',
-    fontSize: 14,
-  },
-  dangerText: {
-    color: '#DC2626',
-    fontWeight: '600',
-    fontSize: 14,
+  cancelBtn: {
+    width: '100%',
+    marginTop: 6,
   },
 });
