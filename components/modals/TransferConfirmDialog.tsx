@@ -194,13 +194,6 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                       onPress={handleDestroy}
                       style={s.actionBtn}
                     />
-                    <Button
-                      title="Cancelar"
-                      variant="ghost"
-                      color="#666666"
-                      onPress={onClose}
-                      style={s.cancelBtn}
-                    />
                   </View>
                 </>
               )}

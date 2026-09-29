@@ -261,32 +261,65 @@ const ManagerFilesScreen: React.FC = () => {
     }
 
     if (strategy === 'rename') {
-      // Solicita el nuevo nombre en un cuadro de diálogo antes de iniciar la transferencia
-      Alert.prompt(
-        'Renombrar archivo',
-        `Ingresa el nuevo nombre para guardar en ${targetName}:`,
-        [
-          {
-            text: 'Cancelar',
-            style: 'cancel',
-            onPress: () => {
-              setDialogVisible(false);
-              setDialogFile(null);
-              setTargetProviderId(null);
+      // Manejo seguro para Web
+      if (Platform.OS === 'web') {
+        const newName = window.prompt(
+          `Ingresa el nuevo nombre para guardar en ${targetName}:`,
+          dialogFile.name
+        );
+        if (newName && newName.trim()) {
+          const renamedFile = { ...dialogFile, name: newName.trim() };
+          await executeTransfer(renamedFile, targetProviderId, 'rename');
+        } else {
+          setDialogVisible(false);
+          setDialogFile(null);
+          setTargetProviderId(null);
+        }
+        return;
+      }
+
+      // Manejo para iOS
+      if (Platform.OS === 'ios') {
+        Alert.prompt(
+          'Renombrar archivo',
+          `Ingresa el nuevo nombre para guardar en ${targetName}:`,
+          [
+            {
+              text: 'Cancelar',
+              style: 'cancel',
+              onPress: () => {
+                setDialogVisible(false);
+                setDialogFile(null);
+                setTargetProviderId(null);
+              },
             },
-          },
-          {
-            text: 'Transferir con nuevo nombre',
-            onPress: async (newName) => {
-              if (!newName || !newName.trim()) return;
-              const renamedFile = { ...dialogFile, name: newName.trim() };
-              await executeTransfer(renamedFile, targetProviderId, 'rename');
+            {
+              text: 'Transferir con nuevo nombre',
+              onPress: async (newName) => {
+                if (!newName || !newName.trim()) return;
+                const renamedFile = { ...dialogFile, name: newName.trim() };
+                await executeTransfer(renamedFile, targetProviderId, 'rename');
+              },
             },
-          },
-        ],
-        'plain-text',
-        dialogFile.name
-      );
+          ],
+          'plain-text',
+          dialogFile.name
+        );
+      } else {
+        // Fallback para Android
+        const newName = window.prompt(
+          `Ingresa el nuevo nombre para guardar en ${targetName}:`,
+          dialogFile.name
+        );
+        if (newName && newName.trim()) {
+          const renamedFile = { ...dialogFile, name: newName.trim() };
+          await executeTransfer(renamedFile, targetProviderId, 'rename');
+        } else {
+          setDialogVisible(false);
+          setDialogFile(null);
+          setTargetProviderId(null);
+        }
+      }
       return;
     }
 
