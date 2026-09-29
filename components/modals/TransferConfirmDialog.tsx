@@ -1,6 +1,7 @@
 // components/modals/TransferConfirmDialog.tsx
 import React from 'react';
 import { Modal, View, Text, StyleSheet, TouchableWithoutFeedback } from 'react-native';
+import { ArrowUpDown } from 'lucide-react-native'; // Importación de Lucide Icons[cite: 1]
 import Button from '../common/Button';
 
 export type DialogStep = 'SELECT_PROVIDER' | 'CONFLICT_RESOLUTION' | 'DELETE_SOURCE' | 'NEED_MORE_PROVIDERS';
@@ -67,7 +68,10 @@ export const TransferConfirmDialog: React.FC<Props> = ({
               {/* PASO 1: Seleccionar Destino con el flujo visual (Origen -> Destino) */}
               {step === 'SELECT_PROVIDER' && (
                 <>
-                  <Text style={s.title}>{title || 'Transferir Archivo'}</Text>
+                  <View style={s.titleHeader}>
+                    <ArrowUpDown size={22} color="#0078d4" style={s.titleIcon} />
+                    <Text style={s.title}>{title || 'Transferir Archivo'}</Text>
+                  </View>
 
                   {/* Badge de archivo */}
                   {fileName && (
@@ -88,8 +92,10 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                       </View>
                     </View>
 
-                    {/* Flecha indicadora */}
-                    <Text style={s.arrow}>↓</Text>
+                    {/* Icono de flechas intercambio/transferencia */}
+                    <View style={s.arrowContainer}>
+                      <ArrowUpDown size={20} color="#888888" />
+                    </View>
 
                     {/* Proveedor Destino */}
                     <View style={s.flowStep}>
@@ -161,7 +167,10 @@ export const TransferConfirmDialog: React.FC<Props> = ({
               {/* PASO 3: Eliminar Fuente Original tras Transferencia Exitosa */}
               {step === 'DELETE_SOURCE' && (
                 <>
-                  <Text style={s.title}>{title || 'Transferencia realizada con éxito'}</Text>
+                  <View style={s.titleHeader}>
+                    <ArrowUpDown size={22} color="#34a853" style={s.titleIcon} />
+                    <Text style={s.title}>{title || 'Transferencia realizada con éxito'}</Text>
+                  </View>
 
                   {fileName && (
                     <View style={s.fileBadgeContainer}>
@@ -248,11 +257,19 @@ const s = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
   },
+  titleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  titleIcon: {
+    marginRight: 8,
+  },
   title: {
     fontSize: 18,
     fontWeight: '700',
     color: '#111111',
-    marginBottom: 14,
     textAlign: 'center',
   },
   subtitle: {
@@ -310,10 +327,10 @@ const s = StyleSheet.create({
     fontWeight: '600',
     color: '#333333',
   },
-  arrow: {
-    fontSize: 18,
-    color: '#888888',
-    marginVertical: 6,
+  arrowContainer: {
+    marginVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   btnList: {
     width: '100%',

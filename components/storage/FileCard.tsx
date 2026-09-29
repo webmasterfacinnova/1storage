@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import { ArrowUpDown } from 'lucide-react-native';
 import { UnifiedFile } from '../../types/storage';
 import { getAuthToken } from '../../utils/secureStorage';
 import OneDriveAuthService from '../../services/auth/onedrive-auth.service';
@@ -76,7 +76,7 @@ const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete, onTransfer
 
   const getFileIcon = () => {
     if (isFolder) return '📁';
-    if (file.mimeType?.startsWith('image/')) return '🖼️';
+    if (file.mimeType?.startsWith('image/')) return '🖼️️';
     if (file.mimeType?.startsWith('video/')) return '🎬';
     if (file.mimeType?.startsWith('audio/')) return '🎵';
     if (file.mimeType?.includes('pdf')) return '📄';
@@ -135,20 +135,7 @@ const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete, onTransfer
               onPress={() => onTransfer(file)}
               activeOpacity={0.6}
             >
-              <Svg
-                width={18}
-                height={18}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#0066CC"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <Path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
-                <Path d="M12 12v9" />
-                <Path d="m16 16-4-4-4 4" />
-              </Svg>
+              <ArrowUpDown size={18} color="#0066CC" />
             </TouchableOpacity>
           )}
 
