@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
   Linking,
   Platform,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import FileCard, { categorizeMimeType } from '../components/storage/FileCard';
@@ -20,9 +21,19 @@ import ProviderSelector from '../components/storage/ProviderSelector';
 import TypeSummaryScroll from '../components/storage/TypeSummaryScroll';
 import SortBar, { SortOption } from '../components/storage/SortBar';
 import { fetchProviderFilesPage } from '../services/storage-registry.service';
+import { transferService, ProviderType } from '../services/transfer.service';
 import { UnifiedFile, ProviderMeta } from '../types/storage';
-import { useSelector } from 'react-redux';
+
+// Modales
+import { TransferConfirmDialog, DialogStep } from '../components/modals/TransferConfirmDialog';
+import { TransferLoadingModal } from '../components/modals/TransferLoadingModal';
+
+// Redux hooks
+import { useAppDispatch, useAppSelector } from '../hooks/store';
+
 import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
+import { removeDriveFile } from '../store/slices/driveFilesSlice';
+import { removeOnedriveFile } from '../store/slices/onedriveFilesSlice';
 
 const googleDriveIcon = require('../assets/googledrive.png');
 const oneDriveIcon = require('../assets/onedrive.png');
@@ -65,6 +76,7 @@ const getCategoryKey = (mimeType?: string, fileName?: string): string => {
 
 const ManagerFilesScreen: React.FC = () => {
   const nav = useNavigation();
+  const dispatch = useAppDispatch();
   const { height: windowHeight } = useWindowDimensions();
   const [headerH, setHeaderH] = useState(56);
   const [viewportH, setViewportH] = useState(0);
@@ -81,7 +93,17 @@ const ManagerFilesScreen: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('name');
   const [activeProvider, setActiveProvider] = useState<string>(PROVIDER_ALL);
 
-  const connectedProviders = useSelector(selectConnectedProviders);
+  // Estado para el modal de carga durante la transferencia
+  const [transferringFile, setTransferringFile] = useState<UnifiedFile | null>(null);
+
+  // Estados para el Modal de Transferencia / Confirmación
+  const [dialogVisible, setDialogVisible] = useState(false);
+  const [dialogStep, setDialogStep] = useState<DialogStep>('SELECT_PROVIDER');
+  const [dialogFile, setDialogFile] = useState<UnifiedFile | null>(null);
+  const [targetProviderId, setTargetProviderId] = useState<ProviderType | null>(null);
+  const [targetName, setTargetName] = useState('');
+
+  const connectedProviders = useAppSelector(selectConnectedProviders);
   const providerKeys = useMemo(() => Object.keys(connectedProviders || {}), [connectedProviders]);
 
   useEffect(() => {
@@ -188,6 +210,189 @@ const ManagerFilesScreen: React.FC = () => {
       }
     }
   }, [nav]);
+
+  // Paso 1: Valida cuentas conectadas y abre el selector de destino
+  const handleTransferFile = (file: UnifiedFile) => {
+    const connectedCount = Object.keys(connectedProviders || {}).length;
+
+    if (connectedCount < 2) {
+      setDialogStep('NEED_MORE_PROVIDERS');
+      setDialogVisible(true);
+      return;
+    }
+
+    setDialogFile(file);
+    setTargetProviderId(null);
+    setTargetName('');
+    setDialogStep('SELECT_PROVIDER');
+    setDialogVisible(true);
+  };
+
+  // Paso 2: Al seleccionar el proveedor destino
+  const handleSelectDestination = async (destination: ProviderType) => {
+    if (!dialogFile) return;
+
+    const targetMeta = connectedProviders[destination];
+    const nameLabel = targetMeta?.name || PROVIDER_META[destination]?.name || destination;
+    
+    setTargetProviderId(destination);
+    setTargetName(nameLabel);
+
+    try {
+      const hasConflict = await transferService.checkDestinationConflict(dialogFile.name, destination);
+
+      if (hasConflict) {
+        setDialogStep('CONFLICT_RESOLUTION');
+      } else {
+        await executeTransfer(dialogFile, destination, 'replace');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', 'No se pudo verificar la existencia del archivo en el destino.');
+    }
+  };
+
+  // Paso 3: Resuelve la estrategia elegida (Reemplazar / Renombrar / Cancelar)
+  const handleResolveConflict = async (strategy: 'replace' | 'rename' | 'cancel') => {
+    if (strategy === 'cancel' || !dialogFile || !targetProviderId) {
+      setDialogVisible(false);
+      setDialogFile(null);
+      setTargetProviderId(null);
+      return;
+    }
+
+    if (strategy === 'rename') {
+      // Manejo seguro para Web
+      if (Platform.OS === 'web') {
+        const newName = window.prompt(
+          `Ingresa el nuevo nombre para guardar en ${targetName}:`,
+          dialogFile.name
+        );
+        if (newName && newName.trim()) {
+          const renamedFile = { ...dialogFile, name: newName.trim() };
+          await executeTransfer(renamedFile, targetProviderId, 'rename');
+        } else {
+          setDialogVisible(false);
+          setDialogFile(null);
+          setTargetProviderId(null);
+        }
+        return;
+      }
+
+      // Manejo para iOS
+      if (Platform.OS === 'ios') {
+        Alert.prompt(
+          'Renombrar archivo',
+          `Ingresa el nuevo nombre para guardar en ${targetName}:`,
+          [
+            {
+              text: 'Cancelar',
+              style: 'cancel',
+              onPress: () => {
+                setDialogVisible(false);
+                setDialogFile(null);
+                setTargetProviderId(null);
+              },
+            },
+            {
+              text: 'Transferir con nuevo nombre',
+              onPress: async (newName) => {
+                if (!newName || !newName.trim()) return;
+                const renamedFile = { ...dialogFile, name: newName.trim() };
+                await executeTransfer(renamedFile, targetProviderId, 'rename');
+              },
+            },
+          ],
+          'plain-text',
+          dialogFile.name
+        );
+      } else {
+        // Fallback para Android
+        const newName = window.prompt(
+          `Ingresa el nuevo nombre para guardar en ${targetName}:`,
+          dialogFile.name
+        );
+        if (newName && newName.trim()) {
+          const renamedFile = { ...dialogFile, name: newName.trim() };
+          await executeTransfer(renamedFile, targetProviderId, 'rename');
+        } else {
+          setDialogVisible(false);
+          setDialogFile(null);
+          setTargetProviderId(null);
+        }
+      }
+      return;
+    }
+
+    await executeTransfer(dialogFile, targetProviderId, strategy);
+  };
+
+  // Paso 4: Realiza la transferencia efectiva con el servicio
+  const executeTransfer = async (
+    file: UnifiedFile,
+    toProvider: ProviderType,
+    conflictStrategy: 'replace' | 'rename' | 'cancel'
+  ) => {
+    try {
+      setDialogVisible(false);
+      setTransferringFile(file);
+
+      const isTransferred = await transferService.transferToDestination({
+        fileId: file.id,
+        fileName: file.name,
+        mimeType: file.mimeType || '',
+        fromProvider: file.provider as ProviderType,
+        toProvider,
+        conflictStrategy,
+      });
+
+      setTransferringFile(null);
+
+      if (isTransferred) {
+        setDialogStep('DELETE_SOURCE');
+        setDialogVisible(true);
+      } else {
+        Alert.alert('Error', 'No se pudo completar la transferencia.');
+      }
+    } catch (err: any) {
+      setTransferringFile(null);
+      Alert.alert('Error', err.message || 'Error al procesar la transferencia.');
+    }
+  };
+
+  const handleKeepOriginal = () => {
+    setDialogVisible(false);
+    setDialogFile(null);
+    setTargetProviderId(null);
+  };
+
+  const handleDestroyOriginal = async () => {
+    const file = dialogFile;
+    setDialogVisible(false);
+    setDialogFile(null);
+    setTargetProviderId(null);
+
+    if (!file) return;
+
+    try {
+      setLoading(true);
+      const deleted = await transferService.deleteFromSource(file.id, file.provider as any);
+      if (deleted) {
+        setPreviews(prev => prev.filter(f => f.id !== file.id));
+
+        if (file.provider === 'google-drive') {
+          dispatch(removeDriveFile(file.id));
+        } else {
+          dispatch(removeOnedriveFile(file.id));
+        }
+      } else {
+        Alert.alert('Aviso', 'El archivo se transfirió, pero no se pudo eliminar el original.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', 'Ocurrió un problema al intentar eliminar el archivo original.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onScroll = useCallback((e: any) => {
     const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
@@ -305,7 +510,7 @@ const ManagerFilesScreen: React.FC = () => {
           <Text style={s.secCount}>{filtered.length} file{filtered.length !== 1 ? 's' : ''}</Text>
         </View>
 
-        {/* Lista de Archivos / Estado Vacío con Botón */}
+        {/* Lista de Archivos / Estado Vacío */}
         {filtered.length === 0 && !loading && !loadingMore && !hasMore && (
           <View style={s.empty}>
             <Text style={s.emptyIcon}>📂</Text>
@@ -326,7 +531,14 @@ const ManagerFilesScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         )}
-        {filtered.map(f => <FileCard key={fileKey(f)} file={f} onPress={handleFilePress} />)}
+        {filtered.map(f => (
+          <FileCard 
+            key={fileKey(f)} 
+            file={f} 
+            onPress={handleFilePress}
+            onTransfer={handleTransferFile}
+          />
+        ))}
 
         {/* Indicador de Carga */}
         {hasMore && (
@@ -343,6 +555,36 @@ const ManagerFilesScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
+
+      {/* Modal Carga de Transferencia */}
+      <TransferLoadingModal
+        visible={!!transferringFile}
+        fileName={transferringFile?.name}
+      />
+
+      {/* Modal Dialog Unificado */}
+      <TransferConfirmDialog
+        visible={dialogVisible}
+        step={dialogStep}
+        title="Transferencia realizada con éxito"
+        fileName={dialogFile?.name}
+        sourceProvider={dialogFile?.provider}
+        connectedProviders={connectedProviders}
+        targetProvider={targetName}
+        message={`El archivo fue enviado exitosamente a ${targetName}. ¿Qué deseas hacer con el archivo original fuente?`}
+        onSelectDestination={handleSelectDestination}
+        onResolveConflict={handleResolveConflict}
+        onKeep={handleKeepOriginal}
+        onDestroy={handleDestroyOriginal}
+        onKeepSource={handleKeepOriginal}
+        onDestroySource={handleDestroyOriginal}
+        onGoToProviders={() => (nav as any).navigate('AddProvider')}
+        onClose={() => {
+          setDialogVisible(false);
+          setDialogFile(null);
+          setTargetProviderId(null);
+        }}
+      />
     </View>
   );
 };

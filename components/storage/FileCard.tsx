@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { ArrowUpDown } from 'lucide-react-native';
 import { UnifiedFile } from '../../types/storage';
 import { getAuthToken } from '../../utils/secureStorage';
 import OneDriveAuthService from '../../services/auth/onedrive-auth.service';
@@ -29,9 +30,10 @@ interface FileCardProps {
   file: UnifiedFile;
   onPress?: (file: UnifiedFile) => void;
   onDelete?: (file: UnifiedFile) => void;
+  onTransfer?: (file: UnifiedFile) => void;
 }
 
-const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete }) => {
+const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete, onTransfer }) => {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
 
@@ -74,7 +76,7 @@ const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete }) => {
 
   const getFileIcon = () => {
     if (isFolder) return '📁';
-    if (file.mimeType?.startsWith('image/')) return '🖼️';
+    if (file.mimeType?.startsWith('image/')) return '🖼️️';
     if (file.mimeType?.startsWith('video/')) return '🎬';
     if (file.mimeType?.startsWith('audio/')) return '🎵';
     if (file.mimeType?.includes('pdf')) return '📄';
@@ -126,14 +128,26 @@ const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete }) => {
       {isFolder ? (
         <Text style={styles.arrow}>›</Text>
       ) : (
-        onDelete && (
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => onDelete(file)}
-          >
-            <Text style={styles.deleteText}>🗑️</Text>
-          </TouchableOpacity>
-        )
+        <View style={styles.actionsContainer}>
+          {onTransfer && (
+            <TouchableOpacity
+              style={styles.transferButton}
+              onPress={() => onTransfer(file)}
+              activeOpacity={0.6}
+            >
+              <ArrowUpDown size={18} color="#0066CC" />
+            </TouchableOpacity>
+          )}
+
+          {onDelete && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => onDelete(file)}
+            >
+              <Text style={styles.actionText}>🗑️</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
     </TouchableOpacity>
   );
@@ -189,10 +203,24 @@ const styles = StyleSheet.create({
     color: '#ccc',
     paddingLeft: 8,
   },
-  deleteButton: {
-    padding: 8,
+  actionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  deleteText: {
+  actionButton: {
+    padding: 8,
+    marginLeft: 4,
+  },
+  transferButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EBF3FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
+  actionText: {
     fontSize: 16,
   },
 });

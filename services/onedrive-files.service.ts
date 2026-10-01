@@ -124,6 +124,37 @@ class OneDriveFilesService {
     };
   }
 
+  async downloadFile(fileId: string): Promise<Blob | null> {
+    const url = `${GRAPH_API_BASE}/me/drive/items/${fileId}/content`;
+    const res = await this._fetchWithAuth(url);
+    if (!res || !res.ok) return null;
+    return await res.blob();
+  }
+
+  async uploadFile(blob: Blob, fileName: string): Promise<OneDriveFile | null> {
+    const url = `${GRAPH_API_BASE}/me/drive/root:/${encodeURIComponent(fileName)}:/content`;
+    const token = await this._getToken();
+    if (!token) return null;
+
+    try {
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': blob.type || 'application/octet-stream',
+        },
+        body: blob,
+      });
+
+      if (!res.ok) return null;
+      const item = await res.json();
+      return this._mapOneDriveItem(item);
+    } catch (err) {
+      console.error('uploadFile OneDrive error:', err);
+      return null;
+    }
+  }
+
   async getPreviews(
     pageSize: number = 20,
     pageToken?: string
@@ -315,6 +346,27 @@ class OneDriveFilesService {
     };
 
     return extMap[ext] || { label: 'Other', icon: '📦' };
+  }
+
+  async checkFileExists(fileName: string, folderId: string = 'root'): Promise<OneDriveFile | null> {
+    const endpoint =
+      folderId === 'root'
+        ? `${GRAPH_API_BASE}/me/drive/root/children?$filter=name eq '${encodeURIComponent(fileName)}'`
+        : `${GRAPH_API_BASE}/me/drive/items/${folderId}/children?$filter=name eq '${encodeURIComponent(fileName)}'`;
+
+    const response = await this._fetchWithAuth(endpoint);
+
+    if (!response || !response.ok) {
+      if (response) console.error('OneDrive checkFileExists API error:', response.status, await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.value && data.value.length > 0) {
+      return this._mapOneDriveItem(data.value[0]);
+    }
+
+    return null;
   }
 }
 

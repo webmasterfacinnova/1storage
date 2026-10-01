@@ -58,6 +58,11 @@ const driveFilesSlice = createSlice({
   name: 'driveFiles',
   initialState,
   reducers: {
+    removeDriveFile: (state, action: PayloadAction<string>) => {
+      state.currentFolderFiles = state.currentFolderFiles.filter(f => f.id !== action.payload);
+      state.largestFiles = state.largestFiles.filter(f => f.id !== action.payload);
+    },
+
     // Largest files
     setLargestFilesLoading: (state, action: PayloadAction<boolean>) => {
       state.largestFilesLoading = action.payload;
@@ -145,6 +150,7 @@ const driveFilesSlice = createSlice({
 });
 
 export const {
+  removeDriveFile,
   setLargestFilesLoading,
   setLargestFiles,
   setLargestFilesError,

@@ -1,15 +1,15 @@
 // screens/FileListScreen.tsx
-// File browser: browse files in a folder, filter by type, sort by size/name/date
-// Supports both Google Drive and OneDrive via the `provider` route param.
-
 import React, { useEffect, useCallback, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { driveFilesService } from '../services/drive-files.service';
 import { oneDriveFilesService } from '../services/onedrive-files.service';
+import { transferService, ProviderType } from '../services/transfer.service';
 import FileCard from '../components/storage/FileCard';
+import { TransferConfirmDialog, DialogStep } from '../components/modals/TransferConfirmDialog';
 import { UnifiedFile } from '../types/storage';
+import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
 import {
   setFolderFilesLoading,
   setFolderFiles,
@@ -45,11 +45,11 @@ const FileListScreen = () => {
   const route = useRoute<RouteProp<{ params: FileListRouteParams }, 'params'>>();
   const dispatch = useDispatch();
 
-  // Determine which provider we're browsing
   const provider = route.params?.provider || 'google-drive';
   const isOneDrive = provider === 'onedrive';
 
-  // Select from the correct Redux slice
+  const connectedProviders = useSelector(selectConnectedProviders);
+
   const files = useSelector((state: any) => isOneDrive ? selectOnedriveCurrentFolderFiles(state) : selectCurrentFolderFiles(state));
   const folderId = useSelector((state: any) => isOneDrive ? selectOnedriveCurrentFolderId(state) : selectCurrentFolderId(state));
   const folderName = useSelector((state: any) => isOneDrive ? selectOnedriveCurrentFolderName(state) : selectCurrentFolderName(state));
@@ -59,9 +59,13 @@ const FileListScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'size' | 'name' | 'date'>('size');
 
-  // Track the last folder we loaded to avoid re-fetch loops
+  // Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalStep, setModalStep] = useState<DialogStep>('SELECT_PROVIDER');
+  const [selectedFile, setSelectedFile] = useState<UnifiedFile | null>(null);
+  const [targetProvider, setTargetProvider] = useState<ProviderType>('onedrive');
+
   const lastLoadedFolderRef = React.useRef<string | null>(null);
-  // Keep a ref to the current nextPageToken so fetchFiles doesn't need it as a dependency
   const nextPageTokenRef = React.useRef(nextPageToken);
   nextPageTokenRef.current = nextPageToken;
 
@@ -69,7 +73,6 @@ const FileListScreen = () => {
     const targetFolderId = route.params?.folderId || 'root';
     const targetFolderName = route.params?.folderName || (isOneDrive ? 'OneDrive' : 'My Drive');
 
-    // Prevent re-fetching the same folder (avoids loop on push navigation)
     if (!append && lastLoadedFolderRef.current === targetFolderId) return;
     if (!append) lastLoadedFolderRef.current = targetFolderId;
 
@@ -89,7 +92,7 @@ const FileListScreen = () => {
           append,
         }));
       } else {
-        lastLoadedFolderRef.current = null; // Permite reintentar si falló
+        lastLoadedFolderRef.current = null;
         dispatch(setODFolderFilesError('Could not fetch files'));
       }
     } else {
@@ -108,7 +111,7 @@ const FileListScreen = () => {
           append,
         }));
       } else {
-        lastLoadedFolderRef.current = null; // Permite reintentar si falló
+        lastLoadedFolderRef.current = null;
         dispatch(setFolderFilesError('Could not fetch files'));
       }
     }
@@ -125,7 +128,6 @@ const FileListScreen = () => {
 
   const isFolder = (file: any): boolean => {
     if (isOneDrive) {
-      // OneDrive folders have a `folder` property (not a mimeType)
       return file.mimeType === 'application/vnd.google-apps.folder' || file.folder !== undefined;
     }
     return file.mimeType === 'application/vnd.google-apps.folder';
@@ -144,6 +146,96 @@ const FileListScreen = () => {
       navigation.goBack();
     } else {
       (navigation as any).navigate('StorageBreakdown');
+    }
+  };
+
+  // Manejo de la transferencia con verificación de cuentas conectadas
+  const handleStartTransfer = (file: UnifiedFile) => {
+    const connectedCount = Object.keys(connectedProviders || {}).length;
+
+    if (connectedCount < 2) {
+      Alert.alert(
+        'Conecta otra cuenta de almacenamiento',
+        'Para transferir archivos entre servicios necesitas tener al menos 2 nubes vinculadas (por ejemplo, Google Drive y OneDrive). Agrega otra cuenta para empezar a mover tus archivos fácilmente.',
+        [
+          {
+            text: 'Cancelar',
+            style: 'cancel',
+          },
+          {
+            text: 'Conectar nube',
+            onPress: () => navigation.navigate('AddProvider'),
+          },
+        ]
+      );
+      return;
+    }
+
+    setSelectedFile(file);
+    setModalStep('SELECT_PROVIDER');
+    setModalVisible(true);
+  };
+
+  const handleSelectDestination = async (destination: ProviderType) => {
+    if (!selectedFile) return;
+    setTargetProvider(destination);
+
+    const hasConflict = await transferService.checkDestinationConflict(selectedFile.name, destination);
+    if (hasConflict) {
+      setModalStep('CONFLICT_RESOLUTION');
+    } else {
+      await executeTransfer(selectedFile, destination, 'replace');
+    }
+  };
+
+  const handleResolveConflict = async (strategy: 'replace' | 'rename' | 'cancel') => {
+    if (strategy === 'cancel' || !selectedFile) {
+      setModalVisible(false);
+      return;
+    }
+    await executeTransfer(selectedFile, targetProvider, strategy);
+  };
+
+  const executeTransfer = async (file: UnifiedFile, toProvider: ProviderType, conflictStrategy: 'replace' | 'rename' | 'cancel') => {
+    try {
+      const success = await transferService.transferToDestination({
+        fileId: file.id,
+        fileName: file.name,
+        mimeType: file.mimeType || '',
+        fromProvider: file.provider as ProviderType,
+        toProvider,
+        conflictStrategy,
+      });
+
+      if (success) {
+        setModalStep('DELETE_SOURCE');
+      } else {
+        setModalVisible(false);
+        Alert.alert('Error', 'La transferencia falló.');
+      }
+    } catch (err: any) {
+      setModalVisible(false);
+      Alert.alert('Error', err?.message || 'Error durante la transferencia');
+    }
+  };
+
+  const handleDeleteSource = async () => {
+    if (!selectedFile) return;
+    const success = await transferService.deleteFromSource(selectedFile.id, selectedFile.provider as ProviderType);
+    setModalVisible(false);
+    if (success) {
+      onRefresh();
+    } else {
+      Alert.alert('Aviso', 'El archivo se transfirió pero no se pudo eliminar el original.');
+    }
+  };
+
+  const handleDeleteFile = async (file: UnifiedFile) => {
+    const success = await transferService.deleteFromSource(file.id, file.provider as ProviderType);
+    if (success) {
+      onRefresh();
+    } else {
+      Alert.alert('Error', 'No se pudo eliminar el archivo.');
     }
   };
 
@@ -226,6 +318,8 @@ const FileListScreen = () => {
                       handleFolderPress(f);
                     }
                   }}
+                  onTransfer={handleStartTransfer}
+                  onDelete={handleDeleteFile}
                 />
               );
             })
@@ -233,6 +327,18 @@ const FileListScreen = () => {
           <Text style={styles.loadingText}>No files found</Text>
         )}
       </ScrollView>
+
+      <TransferConfirmDialog
+        visible={modalVisible}
+        step={modalStep}
+        fileName={selectedFile?.name}
+        targetProvider={targetProvider === 'google-drive' ? 'Google Drive' : 'OneDrive'}
+        onSelectDestination={handleSelectDestination}
+        onResolveConflict={handleResolveConflict}
+        onKeepSource={() => setModalVisible(false)}
+        onDestroySource={handleDeleteSource}
+        onClose={() => setModalVisible(false)}
+      />
     </View>
   );
 };
