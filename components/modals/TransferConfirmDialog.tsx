@@ -267,7 +267,12 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                   <View style={s.btnList}>
                     <Button
                       title="Conectar proveedor"
-                      onPress={onGoToProviders || onClose}
+                      onPress={() => {
+                        onClose();
+                        if (onGoToProviders) {
+                          onGoToProviders();
+                        }
+                      }}
                       color="#0078d4"
                       style={s.actionBtn}
                     />
