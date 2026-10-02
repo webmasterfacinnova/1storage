@@ -1,7 +1,7 @@
 // components/modals/TransferConfirmDialog.tsx
-import React from 'react';
-import { Modal, View, Text, StyleSheet, TouchableWithoutFeedback } from 'react-native';
-import { ArrowUpDown } from 'lucide-react-native'; // Importación de Lucide Icons[cite: 1]
+import React, { useState, useEffect } from 'react';
+import { Modal, View, Text, StyleSheet, TouchableWithoutFeedback, TextInput } from 'react-native';
+import { ArrowUpDown } from 'lucide-react-native';
 import Button from '../common/Button';
 
 export type DialogStep = 'SELECT_PROVIDER' | 'CONFLICT_RESOLUTION' | 'DELETE_SOURCE' | 'NEED_MORE_PROVIDERS';
@@ -16,7 +16,7 @@ interface Props {
   connectedProviders?: Record<string, any>;
   targetProvider?: string;
   onSelectDestination: (provider: any) => void;
-  onResolveConflict: (strategy: 'replace' | 'rename' | 'cancel') => void;
+  onResolveConflict: (strategy: 'replace' | 'rename' | 'cancel', newName?: string) => void;
   onKeepSource?: () => void;
   onDestroySource?: () => void;
   onKeep?: () => void;
@@ -50,6 +50,16 @@ export const TransferConfirmDialog: React.FC<Props> = ({
   onGoToProviders,
   onClose,
 }) => {
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [newName, setNewName] = useState(fileName || '');
+
+  useEffect(() => {
+    if (visible) {
+      setIsRenaming(false);
+      setNewName(fileName || '');
+    }
+  }, [visible, fileName]);
+
   if (!visible) return null;
 
   const handleKeep = onKeepSource || onKeep || onClose;
@@ -58,6 +68,12 @@ export const TransferConfirmDialog: React.FC<Props> = ({
   const formattedSource = getProviderDisplayName(sourceProvider);
   const formattedTarget = getProviderDisplayName(targetProvider);
 
+  const handleConfirmRename = () => {
+    if (newName.trim()) {
+      onResolveConflict('rename', newName.trim());
+    }
+  };
+
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
@@ -65,7 +81,7 @@ export const TransferConfirmDialog: React.FC<Props> = ({
           <TouchableWithoutFeedback>
             <View style={s.card}>
 
-              {/* PASO 1: Seleccionar Destino con el flujo visual (Origen -> Destino) */}
+              {/* PASO 1: Seleccionar Destino */}
               {step === 'SELECT_PROVIDER' && (
                 <>
                   <View style={s.titleHeader}>
@@ -73,7 +89,6 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                     <Text style={s.title}>{title || 'Transferir Archivo'}</Text>
                   </View>
 
-                  {/* Badge de archivo */}
                   {fileName && (
                     <View style={s.fileBadgeContainer}>
                       <Text style={s.fileBadgeText} numberOfLines={1}>
@@ -82,9 +97,7 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                     </View>
                   )}
 
-                  {/* Diagrama de Flujo: Origen -> Destino */}
                   <View style={s.flowContainer}>
-                    {/* Proveedor Origen */}
                     <View style={s.flowStep}>
                       <Text style={s.flowTag}>proveedor origen</Text>
                       <View style={s.providerBox}>
@@ -92,12 +105,10 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                       </View>
                     </View>
 
-                    {/* Icono de flechas intercambio/transferencia */}
                     <View style={s.arrowContainer}>
                       <ArrowUpDown size={20} color="#888888" />
                     </View>
 
-                    {/* Proveedor Destino */}
                     <View style={s.flowStep}>
                       <Text style={s.flowTag}>proveedor destino</Text>
                       <View style={s.btnList}>
@@ -130,41 +141,79 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                 </>
               )}
 
-              {/* PASO 2: Resolver Conflicto de Duplicados */}
+              {/* PASO 2: Resolver Conflicto de Duplicados / Formulario de Renombrado */}
               {step === 'CONFLICT_RESOLUTION' && (
                 <>
-                  <Text style={s.title}>Archivo Ya Existente</Text>
+                  <Text style={s.title}>
+                    {isRenaming ? 'Renombrar Archivo' : 'Archivo Ya Existente'}
+                  </Text>
+                  
                   <Text style={s.subtitle}>
-                    Ya existe un archivo llamado <Text style={s.bold}>{fileName}</Text> en{' '}
-                    <Text style={s.bold}>{formattedTarget || 'el destino'}</Text>.
+                    {isRenaming ? (
+                      `Ingresa el nuevo nombre para guardar en ${formattedTarget || 'el destino'}:`
+                    ) : (
+                      <>
+                        Ya existe un archivo llamado <Text style={s.bold}>{fileName}</Text> en{' '}
+                        <Text style={s.bold}>{formattedTarget || 'el destino'}</Text>.
+                      </>
+                    )}
                   </Text>
 
-                  <View style={s.btnList}>
-                    <Button
-                      title="Reemplazar archivo"
-                      onPress={() => onResolveConflict('replace')}
-                      color="#0078d4"
-                      style={s.actionBtn}
-                    />
-                    <Button
-                      title="Guardar ambos (Renombrar)"
-                      variant="outline"
-                      color="#333333"
-                      onPress={() => onResolveConflict('rename')}
-                      style={s.actionBtn}
-                    />
-                    <Button
-                      title="Cancelar"
-                      variant="ghost"
-                      color="#666666"
-                      onPress={() => onResolveConflict('cancel')}
-                      style={s.cancelBtn}
-                    />
-                  </View>
+                  {isRenaming ? (
+                    <View style={s.inputContainer}>
+                      <TextInput
+                        style={s.textInput}
+                        value={newName}
+                        onChangeText={setNewName}
+                        autoFocus
+                        selectTextOnFocus
+                        placeholder="Nombre del archivo"
+                        placeholderTextColor="#999999"
+                      />
+                      <View style={s.btnList}>
+                        <Button
+                          title="Guardar y transferir"
+                          onPress={handleConfirmRename}
+                          color="#0078d4"
+                          style={s.actionBtn}
+                        />
+                        <Button
+                          title="Volver"
+                          variant="outline"
+                          color="#333333"
+                          onPress={() => setIsRenaming(false)}
+                          style={s.actionBtn}
+                        />
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={s.btnList}>
+                      <Button
+                        title="Reemplazar archivo"
+                        onPress={() => onResolveConflict('replace')}
+                        color="#0078d4"
+                        style={s.actionBtn}
+                      />
+                      <Button
+                        title="Guardar ambos (Renombrar)"
+                        variant="outline"
+                        color="#333333"
+                        onPress={() => setIsRenaming(true)}
+                        style={s.actionBtn}
+                      />
+                      <Button
+                        title="Cancelar"
+                        variant="ghost"
+                        color="#666666"
+                        onPress={() => onResolveConflict('cancel')}
+                        style={s.cancelBtn}
+                      />
+                    </View>
+                  )}
                 </>
               )}
 
-              {/* PASO 3: Eliminar Fuente Original tras Transferencia Exitosa */}
+              {/* PASO 3: Eliminar Fuente Original */}
               {step === 'DELETE_SOURCE' && (
                 <>
                   <View style={s.titleHeader}>
@@ -343,5 +392,21 @@ const s = StyleSheet.create({
   cancelBtn: {
     width: '100%',
     marginTop: 6,
+  },
+  inputContainer: {
+    width: '100%',
+    marginBottom: 10,
+  },
+  textInput: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#d0d0d0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#333333',
+    backgroundColor: '#f9f9f9',
+    marginBottom: 16,
   },
 });
