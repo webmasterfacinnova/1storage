@@ -4,6 +4,7 @@ import { ArrowUpDown } from 'lucide-react-native';
 import { UnifiedFile } from '../../types/storage';
 import { getAuthToken } from '../../utils/secureStorage';
 import OneDriveAuthService from '../../services/auth/onedrive-auth.service';
+import ProviderBadge from './ProviderBadge'; // <--- 1. Importar el badge
 
 const onedriveAuth = new OneDriveAuthService();
 
@@ -76,7 +77,7 @@ const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete, onTransfer
 
   const getFileIcon = () => {
     if (isFolder) return '📁';
-    if (file.mimeType?.startsWith('image/')) return '🖼️️';
+    if (file.mimeType?.startsWith('image/')) return '🖼';
     if (file.mimeType?.startsWith('video/')) return '🎬';
     if (file.mimeType?.startsWith('audio/')) return '🎵';
     if (file.mimeType?.includes('pdf')) return '📄';
@@ -114,9 +115,19 @@ const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete, onTransfer
       <View style={styles.thumbnailContainer}>{renderThumbnail()}</View>
 
       <View style={styles.infoContainer}>
-        <Text style={styles.fileName} numberOfLines={1}>
-          {file.name}
-        </Text>
+        {/* Header con el nombre del archivo y la insignia del proveedor */}
+        <View style={styles.titleRow}>
+          <Text style={styles.fileName} numberOfLines={1}>
+            {file.name}
+          </Text>
+          {/* 2. Añadir el Badge pasándole file.provider */}
+          {file.provider && (
+            <View style={styles.badgeContainer}>
+              <ProviderBadge providerId={file.provider} />
+            </View>
+          )}
+        </View>
+
         <Text style={styles.fileDetails}>
           {isFolder ? 'Folder' : formatFileSize(file.size)} •{' '}
           {file.modifiedTime
@@ -187,11 +198,21 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     flex: 1,
+    paddingRight: 8,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   fileName: {
+    flexShrink: 1,
     fontSize: 15,
     fontWeight: '500',
     color: '#333333',
+  },
+  badgeContainer: {
+    marginLeft: 4,
   },
   fileDetails: {
     fontSize: 13,
