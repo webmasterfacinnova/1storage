@@ -93,7 +93,10 @@ const ManagerFilesScreen: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('name');
   const [activeProvider, setActiveProvider] = useState<string>(PROVIDER_ALL);
 
-  // Estado para el modal de carga durante la transferencia
+  // Estado para controlar la carga durante la selección del destino
+  const [isProcessingDestination, setIsProcessingDestination] = useState(false);
+
+  // Estado para el modal de carga durante la transferencia en progreso
   const [transferringFile, setTransferringFile] = useState<UnifiedFile | null>(null);
 
   // Estados para el Modal de Transferencia / Confirmación
@@ -238,6 +241,7 @@ const ManagerFilesScreen: React.FC = () => {
     setTargetProviderId(destination);
     setTargetName(nameLabel);
 
+    setIsProcessingDestination(true);
     try {
       const hasConflict = await transferService.checkDestinationConflict(dialogFile.name, destination);
 
@@ -248,6 +252,8 @@ const ManagerFilesScreen: React.FC = () => {
       }
     } catch (err: any) {
       Alert.alert('Error', 'No se pudo verificar la existencia del archivo en el destino.');
+    } finally {
+      setIsProcessingDestination(false);
     }
   };
 
@@ -515,7 +521,8 @@ const ManagerFilesScreen: React.FC = () => {
       <TransferConfirmDialog
         visible={dialogVisible}
         step={dialogStep}
-        title="Transferencia realizada con éxito"
+        title={dialogStep === 'DELETE_SOURCE' ? 'Transferencia realizada con éxito' : 'Confirmar Transferencia'}
+        isLoading={isProcessingDestination}
         fileName={dialogFile?.name}
         sourceProvider={dialogFile?.provider}
         connectedProviders={connectedProviders}
