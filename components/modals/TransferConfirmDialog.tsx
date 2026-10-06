@@ -72,7 +72,8 @@ export const TransferConfirmDialog: React.FC<Props> = ({
 
   const handleConfirmRename = () => {
     if (newName.trim()) {
-      onResolveConflict('rename', newName.trim());
+      // Usamos 'replace' junto con el nuevo nombre para indicarle a la API que guarde exactamente el valor ingresado
+      onResolveConflict('replace', newName.trim());
     }
   };
 

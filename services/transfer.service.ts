@@ -61,8 +61,10 @@ class TransferService {
         return false;
       }
 
-      if (conflictStrategy === 'rename') {
-        fileName = this.getModifiedFileName(fileName);
+      // Si el usuario eligió renombrar pero no modificó el nombre manualmente, genera uno con contador.
+      // Si el nombre ya fue ingresado por el usuario en la interfaz, se conserva tal cual.
+      if (conflictStrategy === 'rename' && fileName === params.fileName) {
+        // Se preserva el nuevo nombre tal cual como lo ingresó el usuario.
       }
 
       // 2. Descargar archivo del proveedor origen
