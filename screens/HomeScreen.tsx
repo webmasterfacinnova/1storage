@@ -1,12 +1,26 @@
 // screens/HomeScreen.tsx
-import React, { useEffect, useCallback, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshControl, useWindowDimensions } from 'react-native';
+import React, { useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  RefreshControl,
+  SafeAreaView,
+} from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { selectCurrentUser, logout } from '../store/slices/authSlice';
 import { authService } from '../services/auth.service';
 import { driveService } from '../services/drive.service';
-import { setQuotaLoading, setQuota, setQuotaError, selectDriveQuota, selectDriveLoading, selectDriveError } from '../store/slices/driveSlice';
+import {
+  setQuotaLoading,
+  setQuota,
+  setQuotaError,
+  selectDriveQuota,
+  selectDriveLoading,
+} from '../store/slices/driveSlice';
 import { oneDriveService } from '../services/onedrive.service';
 import {
   setQuotaLoading as setODQuotaLoading,
@@ -14,7 +28,6 @@ import {
   setQuotaError as setODQuotaError,
   selectOnedriveQuota,
   selectOnedriveLoading,
-  selectOnedriveError,
 } from '../store/slices/onedriveSlice';
 import { selectConnectedProviders, clearAllProviders } from '../store/slices/connectedProvidersSlice';
 
@@ -22,10 +35,8 @@ const HomeScreen = () => {
   const user = useSelector(selectCurrentUser);
   const quota = useSelector(selectDriveQuota);
   const quotaLoading = useSelector(selectDriveLoading);
-  const quotaError = useSelector(selectDriveError);
   const odQuota = useSelector(selectOnedriveQuota);
   const odQuotaLoading = useSelector(selectOnedriveLoading);
-  const odQuotaError = useSelector(selectOnedriveError);
 
   const connectedProviders = useSelector(selectConnectedProviders);
   const isGoogleDriveConnected = !!connectedProviders['google-drive'];
@@ -33,9 +44,6 @@ const HomeScreen = () => {
 
   const navigation = useNavigation();
   const dispatch = useDispatch();
-  const { height: windowHeight } = useWindowDimensions();
-  const [headerH, setHeaderH] = useState(74);
-  const [footerH, setFooterH] = useState(53);
 
   const fetchStorageQuota = useCallback(async () => {
     dispatch(setQuotaLoading(true));
@@ -79,404 +87,575 @@ const HomeScreen = () => {
     }
   };
 
-  const usagePercent = quota ? driveService.usagePercentage(quota) : 0;
-  const barColor = usagePercent > 90 ? '#e53935' : usagePercent > 70 ? '#fb8c00' : '#4285f4';
+  // Cálculos de capacidad combinada y por proveedor
+  const driveUsage = quota?.usage || 0;
+  const driveLimit = quota?.limit || 15 * 1024 * 1024 * 1024; // 15 GB por defecto
 
-  const odUsagePercent = odQuota ? oneDriveService.usagePercentage(odQuota) : 0;
-  const odBarColor = odUsagePercent > 90 ? '#e53935' : odUsagePercent > 70 ? '#fb8c00' : '#0078d4';
+  const odUsage = odQuota?.usage || 0;
+  const odLimit = odQuota?.limit || 5 * 1024 * 1024 * 1024; // 5 GB por defecto
 
-  const getConnectedSubtext = () => {
-    if (isGoogleDriveConnected && isOneDriveConnected) return 'Google Drive + OneDrive conectados';
-    if (isGoogleDriveConnected) return 'Google Drive conectado';
-    if (isOneDriveConnected) return 'OneDrive conectado';
-    return 'Sin proveedores de almacenamiento conectados';
-  };
+  const totalUsage = driveUsage + odUsage;
+  const totalLimit = (isGoogleDriveConnected ? driveLimit : 0) + (isOneDriveConnected ? odLimit : 0);
+  const drivePercentOfTotal = totalLimit > 0 ? (driveUsage / totalLimit) * 100 : 0;
+
+  const driveUsagePercent = driveLimit > 0 ? (driveUsage / driveLimit) * 100 : 0;
+  const odUsagePercent = odLimit > 0 ? (odUsage / odLimit) * 100 : 0;
+
+  const trashUsage = (quota?.usageInDriveTrash || 0) + (odQuota?.usageInDriveTrash || 0);
 
   return (
-    <View style={[styles.container, { height: windowHeight }]}>
-      <View style={styles.header} onLayout={e => setHeaderH(e.nativeEvent.layout.height)}>
-        <Image
-          source={require('../assets/LogoSlogan.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-      </View>
-
-      <ScrollView
-        style={[styles.content, { height: Math.max(windowHeight - headerH - footerH, 0) }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={quotaLoading || odQuotaLoading}
-            onRefresh={() => {
-              if (isGoogleDriveConnected) fetchStorageQuota();
-              if (isOneDriveConnected) fetchOneDriveQuota();
-            }}
-          />
-        }
-      >
-        <View style={styles.welcomeCard}>
-          {user?.photoURL ? (
-            <Image source={{ uri: user.photoURL }} style={styles.userAvatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>{user?.name?.charAt(0) || user?.email?.charAt(0)}</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        {/* Header superior con logo S1 storage */}
+        <View style={styles.topBar}>
+          <View style={styles.brandContainer}>
+            <View style={styles.logoBadge}>
+              <Text style={styles.logoBadgeText}>S1</Text>
             </View>
-          )}
-          <View style={styles.welcomeInfo}>
-            <Text style={styles.welcomeText}>Bienvenido, {user?.name || user?.email}</Text>
-            <Text style={[styles.welcomeSubtext, !isGoogleDriveConnected && !isOneDriveConnected && { color: '#888888' }]}>
-              {getConnectedSubtext()}
-            </Text>
+            <Text style={styles.brandTitle}>storage</Text>
           </View>
         </View>
 
-        {/* Tarjeta de Google Drive visible siempre */}
-        <View style={styles.storageCard}>
-          <Text style={styles.storageTitle}>Almacenamiento de Google Drive</Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={quotaLoading || odQuotaLoading}
+              onRefresh={() => {
+                if (isGoogleDriveConnected) fetchStorageQuota();
+                if (isOneDriveConnected) fetchOneDriveQuota();
+              }}
+            />
+          }
+        >
+          {/* Encabezado del usuario */}
+          <View style={styles.headerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.dateText}>MARTES, 8 DE OCTUBRE</Text>
+              <Text style={styles.greetingText}>
+                Hola, {user?.name || user?.email || 'Mario Alejandro Fariña Spinola'}
+              </Text>
+              <Text style={styles.subtitleText}>Tu resumen de almacenamiento está listo.</Text>
+            </View>
 
-          {!isGoogleDriveConnected ? (
-            <Text style={styles.loadingText}>No conectado — Toca en Agregar proveedor abajo para vincular</Text>
-          ) : quotaLoading ? (
-            <Text style={styles.loadingText}>Cargando información de almacenamiento...</Text>
-          ) : quotaError ? (
-            <Text style={styles.errorText}>No se pudo cargar la información de almacenamiento</Text>
-          ) : quota ? (
-            <>
-              <View style={styles.quotaRow}>
-                <View style={styles.quotaItem}>
-                  <Text style={styles.quotaValue}>{driveService.formatBytes(quota.usage)}</Text>
-                  <Text style={styles.quotaLabel}>Usado</Text>
-                </View>
-                <View style={styles.quotaItem}>
-                  <Text style={styles.quotaValue}>
-                    {quota.limit ? driveService.formatBytes(quota.limit) : 'Ilimitado'}
+            <View style={styles.userBadgeWrapper}>
+              <View style={styles.userBadge}>
+                <View style={styles.avatarCircle}>
+                  <Text style={styles.avatarInitial}>
+                    {(user?.name || user?.email || 'MA').substring(0, 2).toUpperCase()}
                   </Text>
-                  <Text style={styles.quotaLabel}>Total</Text>
                 </View>
-                <View style={styles.quotaItem}>
-                  <Text style={styles.quotaValue}>{driveService.formatBytes(quota.usageInDriveTrash)}</Text>
-                  <Text style={styles.quotaLabel}>Papelera</Text>
+                <View>
+                  <Text style={styles.accountType}>Cuenta personal</Text>
+                  <Text style={styles.userEmail}>{user?.email || 'marioale.2808@gmail.com'}</Text>
                 </View>
               </View>
 
-              {quota.limit && (
-                <View style={styles.progressBarContainer}>
-                  <View style={styles.progressBarBg}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        { width: `${Math.min(usagePercent, 100)}%`, backgroundColor: barColor },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.progressText}>
-                    {usagePercent.toFixed(1)}% usado
+              {/* Botón superior de cerrar sesión */}
+              <TouchableOpacity
+                style={styles.headerLogoutBtn}
+                onPress={handleLogout}
+                accessibilityLabel="Cerrar sesión"
+              >
+                <Text style={styles.headerLogoutIcon}>🚪</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Sección central: Tarjeta de Espacio Total a ancho completo */}
+          <View style={styles.summaryRow}>
+            <View style={styles.totalSpaceCard}>
+              <Text style={styles.totalSpaceLabel}>Espacio total</Text>
+              <View style={styles.totalSpaceValueRow}>
+                <Text style={styles.totalSpaceNumber}>
+                  {(totalUsage / (1024 * 1024 * 1024)).toFixed(1)}
+                </Text>
+                <Text style={styles.totalSpaceUnit}>GB utilizados</Text>
+              </View>
+
+              <View style={styles.mainProgressBarBg}>
+                <View
+                  style={[
+                    styles.mainProgressBarFill,
+                    { width: `${Math.min(drivePercentOfTotal, 100)}%` },
+                  ]}
+                />
+              </View>
+
+              <View style={styles.totalSpaceFooter}>
+                <Text style={styles.totalSpaceFooterText}>
+                  Google Drive · {drivePercentOfTotal.toFixed(1)}%
+                </Text>
+                <Text style={styles.totalSpaceFooterText}>
+                  {totalLimit > 0 ? `${(totalLimit / (1024 * 1024 * 1024)).toFixed(0)} GB total` : '--'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Sección de Conexiones */}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Conexiones</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('AddProvider' as never)}>
+              <Text style={styles.addProviderLink}>+ Añadir</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.connectionsRow}>
+            {/* Tarjeta Google Drive */}
+            <View style={styles.providerCard}>
+              <View style={styles.providerCardHeader}>
+                <View style={styles.providerIconWrapper}>
+                  <Text style={[styles.providerIconText, { color: '#4285F4' }]}>G</Text>
+                </View>
+                <View style={styles.providerMeta}>
+                  <Text style={styles.providerName}>Google Drive</Text>
+                  <Text style={styles.providerSubtext}>
+                    {isGoogleDriveConnected ? 'Sincronizado hace 2 min' : 'No conectado'}
                   </Text>
                 </View>
-              )}
-            </>
-          ) : (
-            <Text style={styles.loadingText}>Toca para cargar información de almacenamiento</Text>
-          )}
-        </View>
+                <TouchableOpacity style={styles.moreButton}>
+                  <Text style={styles.moreButtonText}>•••</Text>
+                </TouchableOpacity>
+              </View>
 
-        {/* Tarjeta de OneDrive visible siempre */}
-        <View style={[styles.storageCard, { borderLeftWidth: 3, borderLeftColor: '#0078d4' }]}>
-          <Text style={styles.storageTitle}>Almacenamiento de OneDrive</Text>
-
-          {!isOneDriveConnected ? (
-            <Text style={styles.loadingText}>No conectado — Toca en Agregar proveedor abajo para vincular</Text>
-          ) : odQuotaLoading ? (
-            <Text style={styles.loadingText}>Cargando información de almacenamiento...</Text>
-          ) : odQuotaError ? (
-            <Text style={styles.errorText}>No se pudo cargar la información de almacenamiento</Text>
-          ) : odQuota ? (
-            <>
-              <View style={styles.quotaRow}>
-                <View style={styles.quotaItem}>
-                  <Text style={styles.quotaValue}>{oneDriveService.formatBytes(odQuota.usage)}</Text>
-                  <Text style={styles.quotaLabel}>Usado</Text>
-                </View>
-                <View style={styles.quotaItem}>
-                  <Text style={styles.quotaValue}>
-                    {odQuota.limit ? oneDriveService.formatBytes(odQuota.limit) : 'Ilimitado'}
-                  </Text>
-                  <Text style={styles.quotaLabel}>Total</Text>
-                </View>
-                <View style={styles.quotaItem}>
-                  <Text style={styles.quotaValue}>{oneDriveService.formatBytes(odQuota.usageInDriveTrash)}</Text>
-                  <Text style={styles.quotaLabel}>Papelera</Text>
+              <View style={styles.providerUsageRow}>
+                <Text style={styles.providerUsageValue}>
+                  {driveService.formatBytes(driveUsage)}
+                </Text>
+                <View style={styles.percentBadge}>
+                  <Text style={styles.percentBadgeText}>{driveUsagePercent.toFixed(1)}% usado</Text>
                 </View>
               </View>
 
-              {odQuota.limit && (
-                <View style={styles.progressBarContainer}>
-                  <View style={styles.progressBarBg}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        { width: `${Math.min(odUsagePercent, 100)}%`, backgroundColor: odBarColor },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.progressText}>
-                    {odUsagePercent.toFixed(1)}% usado
+              <Text style={styles.providerLimitText}>
+                de {driveService.formatBytes(driveLimit)} disponibles
+              </Text>
+
+              <View style={styles.providerProgressBarBg}>
+                <View
+                  style={[
+                    styles.providerProgressBarFill,
+                    {
+                      width: `${Math.min(driveUsagePercent, 100)}%`,
+                      backgroundColor: '#4285F4',
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+
+            {/* Tarjeta OneDrive */}
+            <View style={styles.providerCard}>
+              <View style={styles.providerCardHeader}>
+                <View style={styles.providerIconWrapper}>
+                  <Text style={[styles.providerIconText, { color: '#0078D4' }]}>O</Text>
+                </View>
+                <View style={styles.providerMeta}>
+                  <Text style={styles.providerName}>OneDrive</Text>
+                  <Text style={styles.providerSubtext}>
+                    {isOneDriveConnected ? 'Sincronizado hace 2 min' : 'No conectado'}
                   </Text>
                 </View>
-              )}
-            </>
-          ) : (
-            <Text style={styles.loadingText}>Toca para cargar información de almacenamiento</Text>
-          )}
-        </View>
+                <TouchableOpacity style={styles.moreButton}>
+                  <Text style={styles.moreButtonText}>•••</Text>
+                </TouchableOpacity>
+              </View>
 
-        <Text style={styles.sectionTitle}>Configuración</Text>
+              <View style={styles.providerUsageRow}>
+                <Text style={styles.providerUsageValue}>
+                  {oneDriveService.formatBytes(odUsage)}
+                </Text>
+                <View style={styles.percentBadge}>
+                  <Text style={styles.percentBadgeText}>{odUsagePercent.toFixed(1)}% usado</Text>
+                </View>
+              </View>
 
-        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('ManagerFiles' as never)}>
-          <View style={styles.configIcon}>
-            <Text style={styles.configIconText}>📁</Text>
-          </View>
-          <View style={styles.configInfo}>
-            <Text style={styles.configTitle}>Gestionar archivos</Text>
-            <Text style={styles.configDesc}>Explora tus archivos en todos los almacenamientos conectados</Text>
-          </View>
-          <Text style={styles.configArrow}>›</Text>
-        </TouchableOpacity>
+              <Text style={styles.providerLimitText}>
+                de {oneDriveService.formatBytes(odLimit)} disponibles
+              </Text>
 
-        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('CleanTrash' as never)}>
-          <View style={styles.configIcon}>
-            <Text style={styles.configIconText}>🗑️</Text>
+              <View style={styles.providerProgressBarBg}>
+                <View
+                  style={[
+                    styles.providerProgressBarFill,
+                    {
+                      width: `${Math.min(odUsagePercent, 100)}%`,
+                      backgroundColor: '#0078D4',
+                    },
+                  ]}
+                />
+              </View>
+            </View>
           </View>
-          <View style={styles.configInfo}>
-            <Text style={styles.configTitle}>Limpiar papelera</Text>
-            <Text style={styles.configDesc}>
-              {quota ? `${driveService.formatBytes(quota.usageInDriveTrash)} en la papelera — espacio recuperable` : 'Libera espacio de la papelera'}
-            </Text>
-          </View>
-          <Text style={styles.configArrow}>›</Text>
-        </TouchableOpacity>
 
-        <TouchableOpacity style={styles.configCard} onPress={() => navigation.navigate('AddProvider' as never)}>
-          <View style={styles.configIcon}>
-            <Text style={styles.configIconText}>🔗</Text>
-          </View>
-          <View style={styles.configInfo}>
-            <Text style={styles.configTitle}>Agregar proveedor</Text>
-            <Text style={styles.configDesc}>Conecta OneDrive, Dropbox u otro almacenamiento en la nube</Text>
-          </View>
-          <Text style={styles.configArrow}>›</Text>
-        </TouchableOpacity>
+          {/* Acciones rápidas / ¿Qué necesitas hacer? */}
+          <Text style={[styles.sectionTitle, { marginTop: 28 }]}>¿Qué necesitas hacer?</Text>
 
-        <TouchableOpacity style={styles.configCard} onPress={() => {}}>
-          <View style={styles.configIcon}>
-            <Text style={styles.configIconText}>⚙️</Text>
-          </View>
-          <View style={styles.configInfo}>
-            <Text style={styles.configTitle}>Ajustes</Text>
-            <Text style={styles.configDesc}>Sincronización automática, notificaciones, carpeta de subida predeterminada</Text>
-          </View>
-          <Text style={styles.configArrow}>›</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <View style={styles.actionsRow}>
+            {/* Gestionar archivos */}
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => navigation.navigate('ManagerFiles' as never)}
+            >
+              <View style={[styles.actionIconContainer, { backgroundColor: '#FFF4E5' }]}>
+                <Text style={{ fontSize: 18 }}>📁</Text>
+              </View>
+              <View style={styles.actionContent}>
+                <Text style={styles.actionTitle}>Gestionar archivos</Text>
+                <Text style={styles.actionDescription} numberOfLines={1}>
+                  Explora tus archivos en todos los almacenam...
+                </Text>
+              </View>
+              <Text style={styles.actionArrow}>›</Text>
+            </TouchableOpacity>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} onLayout={e => setFooterH(e.nativeEvent.layout.height)}>
-        <Text style={styles.logoutText}>Cerrar sesión</Text>
-      </TouchableOpacity>
-    </View>
+            {/* Limpiar papelera */}
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => navigation.navigate('CleanTrash' as never)}
+            >
+              <View style={[styles.actionIconContainer, { backgroundColor: '#FFF0F0' }]}>
+                <Text style={{ fontSize: 18 }}>🗑️</Text>
+              </View>
+              <View style={styles.actionContent}>
+                <Text style={styles.actionTitle}>Limpiar papelera</Text>
+                <Text style={styles.actionDescription} numberOfLines={1}>
+                  {driveService.formatBytes(trashUsage)} en la papelera · espacio recuperable
+                </Text>
+              </View>
+              <Text style={styles.actionArrow}>›</Text>
+            </TouchableOpacity>
+
+            {/* Agregar proveedor */}
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => navigation.navigate('AddProvider' as never)}
+            >
+              <View style={[styles.actionIconContainer, { backgroundColor: '#FFF4E5' }]}>
+                <Text style={{ fontSize: 18 }}>🔗</Text>
+              </View>
+              <View style={styles.actionContent}>
+                <Text style={styles.actionTitle}>Agregar proveedor</Text>
+                <Text style={styles.actionDescription} numberOfLines={1}>
+                  Conecta OneDrive, Dropbox u otro almacena...
+                </Text>
+              </View>
+              <Text style={styles.actionArrow}>›</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FAF8F5',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f0f7fe',
+    backgroundColor: '#FAF8F5',
   },
-  header: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    backgroundColor: '#d7eefb',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0ecf5',
-  },
-  logo: {
-    width: 180,
-    height: 50,
-  },
-  content: {
-    padding: 16,
-  },
-  welcomeCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
+  topBar: {
+    height: 56,
+    backgroundColor: '#FF6B35',
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
   },
-  userAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 16,
-  },
-  avatarPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#1a73e8',
-    marginRight: 16,
-    justifyContent: 'center',
+  brandContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  avatarText: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: 'bold',
+  logoBadge: {
+    backgroundColor: '#1E293B',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginRight: 6,
   },
-  welcomeInfo: {
-    flex: 1,
+  logoBadgeText: {
+    color: '#FF6B35',
+    fontWeight: '800',
+    fontSize: 14,
   },
-  welcomeText: {
-    fontSize: 18,
-    color: '#333',
-  },
-  welcomeSubtext: {
-    fontSize: 13,
-    color: '#34a853',
-    marginTop: 2,
-  },
-  storageCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  storageTitle: {
-    fontSize: 18,
+  brandTitle: {
+    color: '#FFFFFF',
     fontWeight: '700',
-    color: '#1a237e',
-    marginBottom: 16,
+    fontSize: 18,
   },
-  quotaRow: {
+  scrollContent: {
+    padding: 24,
+  },
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: 24,
   },
-  quotaItem: {
-    alignItems: 'center',
-  },
-  quotaValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a237e',
-  },
-  quotaLabel: {
-    fontSize: 14,
-    color: '#5f6368',
-    marginTop: 2,
-  },
-  progressBarContainer: {
-    marginTop: 8,
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: '#e0ecf5',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  progressText: {
+  dateText: {
+    color: '#FF6B35',
     fontSize: 12,
-    color: '#5f6368',
-    marginTop: 4,
-    textAlign: 'right',
-  },
-  loadingText: {
-    color: '#999999',
-    fontSize: 14,
-    textAlign: 'center',
-    paddingVertical: 20,
-  },
-  errorText: {
-    color: '#e53935',
-    fontSize: 14,
-    textAlign: 'center',
-    paddingVertical: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
     fontWeight: '700',
-    color: '#1a237e',
-    marginBottom: 12,
-    marginTop: 8,
+    letterSpacing: 0.5,
+    marginBottom: 4,
   },
-  configCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
+  greetingText: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  subtitleText: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 4,
+  },
+  userBadgeWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    gap: 8,
   },
-  configIcon: {
+  userBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  headerLogoutBtn: {
+    backgroundColor: '#FFFFFF',
     width: 40,
     height: 40,
-    borderRadius: 10,
-    backgroundColor: '#e0f7ff',
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
-  configIconText: {
-    fontSize: 20,
+  headerLogoutIcon: {
+    fontSize: 16,
   },
-  configInfo: {
+  avatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FED7AA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  avatarInitial: {
+    color: '#C2410C',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  accountType: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  userEmail: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  summaryRow: {
+    marginBottom: 28,
+  },
+  totalSpaceCard: {
+    width: '100%',
+    backgroundColor: '#0F172A',
+    borderRadius: 16,
+    padding: 20,
+    justifyContent: 'space-between',
+  },
+  totalSpaceLabel: {
+    color: '#94A3B8',
+    fontSize: 12,
+  },
+  totalSpaceValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginVertical: 12,
+  },
+  totalSpaceNumber: {
+    color: '#FFFFFF',
+    fontSize: 36,
+    fontWeight: '800',
+    marginRight: 8,
+  },
+  totalSpaceUnit: {
+    color: '#94A3B8',
+    fontSize: 14,
+  },
+  mainProgressBarBg: {
+    height: 6,
+    backgroundColor: '#334155',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  mainProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#3B82F6',
+    borderRadius: 3,
+  },
+  totalSpaceFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  totalSpaceFooterText: {
+    color: '#64748B',
+    fontSize: 11,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  addProviderLink: {
+    color: '#FF6B35',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  connectionsRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  providerCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  providerCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  providerIconWrapper: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  providerIconText: {
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  providerMeta: {
     flex: 1,
   },
-  configTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#333',
+  providerName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  configDesc: {
+  providerSubtext: {
+    fontSize: 10,
+    color: '#94A3B8',
+  },
+  moreButton: {
+    padding: 4,
+  },
+  moreButtonText: {
+    color: '#94A3B8',
     fontSize: 12,
-    color: '#5f6368',
+  },
+  providerUsageRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  providerUsageValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  percentBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  percentBadgeText: {
+    fontSize: 10,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  providerLimitText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 2,
+    marginBottom: 12,
+  },
+  providerProgressBarBg: {
+    height: 4,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  providerProgressBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  actionCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  actionIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  actionContent: {
+    flex: 1,
+  },
+  actionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  actionDescription: {
+    fontSize: 10,
+    color: '#94A3B8',
     marginTop: 2,
   },
-  configArrow: {
-    fontSize: 22,
-    color: '#ccc',
-    marginLeft: 8,
-  },
-  logoutButton: {
-    padding: 16,
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0ecf5',
-  },
-  logoutText: {
-    color: '#e53935',
-    fontSize: 16,
+  actionArrow: {
+    fontSize: 18,
+    color: '#CBD5E1',
+    marginLeft: 4,
   },
 });
 
