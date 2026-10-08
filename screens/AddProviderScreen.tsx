@@ -21,20 +21,20 @@ const AddProviderScreen: React.FC = () => {
       return <ActivityIndicator size="small" color="#0078D4" />;
     }
     if (isConnected) {
-      return <Text style={styles.statusConnected}>Connected</Text>;
+      return <Text style={styles.statusConnected}>Conectado</Text>;
     }
-    return <Text style={styles.statusAvailable}>Available</Text>;
+    return <Text style={styles.statusAvailable}>Disponible</Text>;
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>← Volver</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Connect Providers</Text>
+        <Text style={styles.title}>Conectar proveedores</Text>
         <Text style={styles.subtitle}>
-          Link additional storage providers to manage all your files in one place.
+          Vincular proveedores de almacenamiento adicionales para gestionar todos tus archivos en un solo lugar.
         </Text>
       </View>
 
@@ -66,7 +66,7 @@ const AddProviderScreen: React.FC = () => {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Your data is stored securely. We only access files you explicitly grant permission to.
+          Tus datos se almacenan de forma segura. Solo accedemos a los archivos a los que nos otorgas permiso explícitamente.
         </Text>
       </View>
     </ScrollView>

@@ -16,7 +16,7 @@ export const StorageSummaryBar: React.FC<StorageSummaryBarProps> = ({
     <View style={styles.bar}>
       <View style={styles.cell}>
         <Text style={styles.val}>{fileCount}</Text>
-        <Text style={styles.lbl}>Files</Text>
+        <Text style={styles.lbl}>Archivos</Text>
       </View>
       <View style={styles.cell}>
         <Text style={styles.val}>{providersCount}</Text>

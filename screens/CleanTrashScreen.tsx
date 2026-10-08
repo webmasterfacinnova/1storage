@@ -1,5 +1,5 @@
 // screens/CleanTrashScreen.tsx
-// Clean trash: view and permanently delete trashed files
+// Limpiar papelera: ver y eliminar permanentemente archivos en la papelera
 
 import React, { useEffect, useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, Alert } from 'react-native';
@@ -35,7 +35,7 @@ const CleanTrashScreen = () => {
     if (result) {
       dispatch(setTrashedFiles({ files: result.files, nextPageToken: result.nextPageToken, append }));
     } else {
-      dispatch(setTrashedFilesError('Could not fetch trashed files'));
+      dispatch(setTrashedFilesError('No se pudieron obtener los archivos de la papelera'));
     }
   }, [dispatch, nextPageToken]);
 
@@ -61,12 +61,12 @@ const CleanTrashScreen = () => {
     if (selectedFiles.size === 0) return;
 
     Alert.alert(
-      'Permanently Delete',
-      `Are you sure you want to permanently delete ${selectedFiles.size} file(s)? This cannot be undone.`, 
+      'Eliminar permanentemente',
+      `¿Estás seguro de que deseas eliminar permanentemente ${selectedFiles.size} archivo(s)? Esta acción no se puede deshacer.`, 
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Eliminar',
           style: 'destructive',
           onPress: async () => {
             setIsDeleting(true);
@@ -80,7 +80,7 @@ const CleanTrashScreen = () => {
             }
             setSelectedFiles(new Set());
             setIsDeleting(false);
-            Alert.alert('Deleted', `${successCount} file(s) permanently deleted.`);
+            Alert.alert('Eliminado(s)', `${successCount} archivo(s) eliminado(s) permanentemente.`);
           },
         },
       ],
@@ -89,21 +89,21 @@ const CleanTrashScreen = () => {
 
   const handleEmptyTrash = async () => {
     Alert.alert(
-      'Empty Trash',
-      'Are you sure you want to permanently delete ALL files in trash? This cannot be undone.',
+      'Vaciar papelera',
+      '¿Estás seguro de que deseas eliminar permanentemente TODOS los archivos de la papelera? Esta acción no se puede deshacer.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Empty Trash',
+          text: 'Vaciar papelera',
           style: 'destructive',
           onPress: async () => {
             setIsDeleting(true);
             const success = await driveFilesService.emptyTrash();
             if (success) {
               dispatch(clearTrashedFiles());
-              Alert.alert('Trash Emptied', 'All files have been permanently deleted.');
+              Alert.alert('Papelera vaciada', 'Todos los archivos han sido eliminados permanentemente.');
             } else {
-              Alert.alert('Error', 'Failed to empty trash.');
+              Alert.alert('Error', 'No se pudo vaciar la papelera.');
             }
             setIsDeleting(false);
           },
@@ -119,19 +119,19 @@ const CleanTrashScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Trash</Text>
+        <Text style={styles.title}>Papelera</Text>
       </View>
 
       <View style={styles.statsCard}>
-        <Text style={styles.statsTitle}>Trash Stats</Text>
+        <Text style={styles.statsTitle}>Estadísticas de la papelera</Text>
         <View style={styles.statsRow}>
           <View style={styles.statsItem}>
             <Text style={styles.statsValue}>{trashedFiles.length}</Text>
-            <Text style={styles.statsLabel}>Files</Text>
+            <Text style={styles.statsLabel}>Archivos</Text>
           </View>
           <View style={styles.statsItem}>
             <Text style={styles.statsValue}>{driveService.formatBytes(totalTrashSize)}</Text>
-            <Text style={styles.statsLabel}>Total Size</Text>
+            <Text style={styles.statsLabel}>Tamaño total</Text>
           </View>
         </View>
         <TouchableOpacity
@@ -139,7 +139,7 @@ const CleanTrashScreen = () => {
           onPress={handleEmptyTrash}
           disabled={isDeleting || trashedFiles.length === 0}
         >
-          <Text style={styles.emptyButtonText}>Empty Trash</Text>
+          <Text style={styles.emptyButtonText}>Vaciar papelera</Text>
         </TouchableOpacity>
       </View>
 
@@ -149,7 +149,7 @@ const CleanTrashScreen = () => {
           onPress={handleDeleteSelected}
           disabled={isDeleting || selectedFiles.size === 0}
         >
-          <Text style={styles.deleteSelectedButtonText}>Delete Selected ({selectedFiles.size})</Text>
+          <Text style={styles.deleteSelectedButtonText}>Eliminar seleccionados ({selectedFiles.size})</Text>
         </TouchableOpacity>
       </View>
 
@@ -177,13 +177,14 @@ const CleanTrashScreen = () => {
             </TouchableOpacity>
           ))
         ) : (
-          <Text style={styles.loadingText}>Trash is empty</Text>
+          <Text style={styles.loadingText}>La papelera está vacía</Text>
         )}
       </ScrollView>
     </View>
   );
 };
 
+// Estilos sin modificaciones
 const styles = StyleSheet.create({
   container: {
     flex: 1,

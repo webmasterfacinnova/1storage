@@ -49,7 +49,7 @@ export const ProviderActionButton: React.FC<ProviderActionButtonProps> = ({
         style={styles.disconnectButton}
         onPress={handleDisconnect}
       >
-        <Text style={styles.disconnectButtonText}>Disconnect</Text>
+        <Text style={styles.disconnectButtonText}>Desconectar</Text>
       </TouchableOpacity>
     );
   }
@@ -59,7 +59,7 @@ export const ProviderActionButton: React.FC<ProviderActionButtonProps> = ({
       style={[styles.button, { backgroundColor: color }]}
       onPress={onConnect}
     >
-      <Text style={styles.connectButtonText}>Connect</Text>
+      <Text style={styles.connectButtonText}>Conectar</Text>
     </TouchableOpacity>
   );
 };

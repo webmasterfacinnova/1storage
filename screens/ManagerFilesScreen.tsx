@@ -4,7 +4,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
   ScrollView,
   RefreshControl,
@@ -14,12 +13,17 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+
+// Componentes modulares
 import FileCard, { categorizeMimeType } from '../components/storage/FileCard';
 import FileTypeTabs, { FILE_TYPE_TABS } from '../components/storage/FileTypeTabs';
 import StorageSummaryBar from '../components/storage/StorageSummaryBar';
 import ProviderSelector from '../components/storage/ProviderSelector';
 import TypeSummaryScroll from '../components/storage/TypeSummaryScroll';
 import SortBar, { SortOption } from '../components/storage/SortBar';
+import HeaderBar from '../components/storage/HeaderBar';
+import EmptyFilesView from '../components/storage/EmptyFilesView';
+
 import { fetchProviderFilesPage } from '../services/storage-registry.service';
 import { transferService, ProviderType } from '../services/transfer.service';
 import { UnifiedFile, ProviderMeta } from '../types/storage';
@@ -30,7 +34,6 @@ import { TransferLoadingModal } from '../components/modals/TransferLoadingModal'
 
 // Redux hooks
 import { useAppDispatch, useAppSelector } from '../hooks/store';
-
 import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
 import { removeDriveFile } from '../store/slices/driveFilesSlice';
 import { removeOnedriveFile } from '../store/slices/onedriveFilesSlice';
@@ -48,7 +51,7 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     color: '#34a853',
     icon: googleDriveIcon,
   },
-  'onedrive': {
+  onedrive: {
     id: 'onedrive',
     short: 'OD',
     name: 'OneDrive',
@@ -93,13 +96,9 @@ const ManagerFilesScreen: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('name');
   const [activeProvider, setActiveProvider] = useState<string>(PROVIDER_ALL);
 
-  // Estado para controlar la carga durante la selección del destino
   const [isProcessingDestination, setIsProcessingDestination] = useState(false);
-
-  // Estado para el modal de carga durante la transferencia en progreso
   const [transferringFile, setTransferringFile] = useState<UnifiedFile | null>(null);
 
-  // Estados para el Modal de Transferencia / Confirmación
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogStep, setDialogStep] = useState<DialogStep>('SELECT_PROVIDER');
   const [dialogFile, setDialogFile] = useState<UnifiedFile | null>(null);
@@ -154,8 +153,8 @@ const ManagerFilesScreen: React.FC = () => {
       setPreviews(merged);
       setTokens(nt);
     } catch (err: any) {
-      console.error('ManagerFiles loadInitial error:', err);
-      setError(err?.message || 'Could not load files');
+      console.error('Error en ManagerFiles loadInitial:', err);
+      setError(err?.message || 'No se pudieron cargar los archivos');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -214,7 +213,6 @@ const ManagerFilesScreen: React.FC = () => {
     }
   }, [nav]);
 
-  // Paso 1: Valida cuentas conectadas y abre el selector de destino
   const handleTransferFile = (file: UnifiedFile) => {
     const connectedCount = Object.keys(connectedProviders || {}).length;
 
@@ -231,7 +229,6 @@ const ManagerFilesScreen: React.FC = () => {
     setDialogVisible(true);
   };
 
-  // Paso 2: Al seleccionar el proveedor destino
   const handleSelectDestination = async (destination: ProviderType) => {
     if (!dialogFile) return;
 
@@ -257,7 +254,6 @@ const ManagerFilesScreen: React.FC = () => {
     }
   };
 
-  // Paso 3: Resuelve la estrategia elegida (Reemplazar / Renombrar / Cancelar)
   const handleResolveConflict = async (strategy: 'replace' | 'rename' | 'cancel', newName?: string) => {
     if (strategy === 'cancel' || !dialogFile || !targetProviderId) {
       setDialogVisible(false);
@@ -281,7 +277,6 @@ const ManagerFilesScreen: React.FC = () => {
     await executeTransfer(dialogFile, targetProviderId, strategy);
   };
 
-  // Paso 4: Realiza la transferencia efectiva con el servicio
   const executeTransfer = async (
     file: UnifiedFile,
     toProvider: ProviderType,
@@ -393,13 +388,12 @@ const ManagerFilesScreen: React.FC = () => {
 
   return (
     <View style={[s.container, { height: windowHeight }]}>
-      {/* Header */}
-      <View style={s.hdr} onLayout={e => setHeaderH(e.nativeEvent.layout.height)}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={s.back}>
-          <Text style={s.backTxt}>‹</Text>
-        </TouchableOpacity>
-        <Text style={s.title}>Manager Files</Text>
-      </View>
+      {/* Componente Header */}
+      <HeaderBar
+        title="Gestor de Archivos"
+        onBack={() => nav.goBack()}
+        onLayout={e => setHeaderH(e.nativeEvent.layout.height)}
+      />
 
       <ScrollView
         style={{ height: Math.max(windowHeight - headerH, 0) }}
@@ -411,7 +405,6 @@ const ManagerFilesScreen: React.FC = () => {
         onLayout={e => setViewportH(e.nativeEvent.layout.height)}
         onContentSizeChange={(_, h) => setContentH(h)}
       >
-        {/* Barra de Resumen */}
         <StorageSummaryBar
           fileCount={previews.length}
           providersCount={
@@ -421,12 +414,11 @@ const ManagerFilesScreen: React.FC = () => {
           }
           providerLabel={
             activeProvider === PROVIDER_ALL
-              ? 'Providers'
-              : PROVIDER_META[activeProvider]?.name || 'Provider'
+              ? 'Proveedores'
+              : PROVIDER_META[activeProvider]?.name || 'Proveedor'
           }
         />
 
-        {/* Selector de Proveedores con Logos */}
         <ProviderSelector
           activeProvider={activeProvider}
           providerKeys={providerKeys}
@@ -435,7 +427,6 @@ const ManagerFilesScreen: React.FC = () => {
           onSelectProvider={setActiveProvider}
         />
 
-        {/* Carrusel de Conteo por Tipo */}
         <TypeSummaryScroll
           summaryItems={summary}
           onSelectType={label => {
@@ -444,10 +435,8 @@ const ManagerFilesScreen: React.FC = () => {
           }}
         />
 
-        {/* Tabs de Filtro de Archivo */}
         <FileTypeTabs activeTab={tab} onTabChange={setTab} />
 
-        {/* Barra de Búsqueda y Filtros de Ordenamiento */}
         <SortBar
           sortBy={sortBy}
           onSelectSort={setSortBy}
@@ -457,35 +446,22 @@ const ManagerFilesScreen: React.FC = () => {
           onToggleSearch={() => setShowSearch(!showSearch)}
         />
 
-        {/* Header de Sección */}
         <View style={s.sec}>
           <Text style={s.secTitle}>
-            {tab === 'all' ? 'All Files' : FILE_TYPE_TABS.find(t => t.key === tab)?.label || 'Files'}
+            {tab === 'all' ? 'Todos los archivos' : FILE_TYPE_TABS.find(t => t.key === tab)?.label || 'Archivos'}
           </Text>
-          <Text style={s.secCount}>{filtered.length} file{filtered.length !== 1 ? 's' : ''}</Text>
+          <Text style={s.secCount}>{filtered.length} archivo{filtered.length !== 1 ? 's' : ''}</Text>
         </View>
 
-        {/* Lista de Archivos / Estado Vacío */}
+        {/* Componente de Estado Vacío */}
         {filtered.length === 0 && !loading && !loadingMore && !hasMore && (
-          <View style={s.empty}>
-            <Text style={s.emptyIcon}>📂</Text>
-            <Text style={s.emptyTitle}>No files</Text>
-            <Text style={s.emptyDesc}>
-              {search 
-                ? 'Try a different search' 
-                : !connectedProviders[activeProvider] && activeProvider !== PROVIDER_ALL
-                ? 'Authentication failed or account disconnected'
-                : 'Connect a provider'}
-            </Text>
-
-            <TouchableOpacity 
-              style={s.connectBtn} 
-              onPress={() => (nav as any).navigate('AddProvider')}
-            >
-              <Text style={s.connectBtnText}>Connect Provider</Text>
-            </TouchableOpacity>
-          </View>
+          <EmptyFilesView
+            search={search}
+            isConnected={!!connectedProviders[activeProvider] || activeProvider === PROVIDER_ALL}
+            onConnect={() => (nav as any).navigate('AddProvider')}
+          />
         )}
+
         {filtered.map(f => (
           <FileCard 
             key={fileKey(f)} 
@@ -495,29 +471,25 @@ const ManagerFilesScreen: React.FC = () => {
           />
         ))}
 
-        {/* Indicador de Carga */}
         {hasMore && (
           <View style={s.lmBtn}>
             <ActivityIndicator size="small" color="#1a237e" />
-            <Text style={s.lmText}>{filtered.length > 0 ? 'Loading more…' : 'Searching…'}</Text>
+            <Text style={s.lmText}>{filtered.length > 0 ? 'Cargando más…' : 'Buscando…'}</Text>
           </View>
         )}
 
-        {/* Fin de Lista */}
         {!hasMore && filtered.length > 0 && (
           <View style={s.endRow}>
-            <Text style={s.endText}>· End of list ·</Text>
+            <Text style={s.endText}>· Fin de la lista ·</Text>
           </View>
         )}
       </ScrollView>
 
-      {/* Modal Carga de Transferencia */}
       <TransferLoadingModal
         visible={!!transferringFile}
         fileName={transferringFile?.name}
       />
 
-      {/* Modal Dialog Unificado */}
       <TransferConfirmDialog
         visible={dialogVisible}
         step={dialogStep}
@@ -547,39 +519,11 @@ const ManagerFilesScreen: React.FC = () => {
 
 const s = StyleSheet.create({
   container: { flex: 1, minHeight: 0, backgroundColor: '#f8f9fa' },
-  hdr: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-    paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e9ecef',
-  },
-  back: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
-  backTxt: { fontSize: 28, color: '#1a237e', fontWeight: '300', lineHeight: 30 },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#1a237e' },
-
   sec: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   secTitle: { fontSize: 16, fontWeight: '700', color: '#333' },
   secCount: { fontSize: 13, color: '#999' },
-
-  empty: { alignItems: 'center', paddingVertical: 60 },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: '600', color: '#555', marginBottom: 8 },
-  emptyDesc: { fontSize: 14, color: '#999', textAlign: 'center', paddingHorizontal: 24 },
-
-  connectBtn: {
-    marginTop: 16,
-    backgroundColor: '#0078d4',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  connectBtnText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
   lmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
   lmText: { fontSize: 14, color: '#1a237e', fontWeight: '600' },
-
   endRow: { alignItems: 'center', paddingVertical: 20 },
   endText: { fontSize: 12, color: '#bbb', fontWeight: '500', letterSpacing: 0.5 },
 });

@@ -71,7 +71,7 @@ const FileListScreen = () => {
 
   const fetchFiles = useCallback(async (append = false) => {
     const targetFolderId = route.params?.folderId || 'root';
-    const targetFolderName = route.params?.folderName || (isOneDrive ? 'OneDrive' : 'My Drive');
+    const targetFolderName = route.params?.folderName || (isOneDrive ? 'OneDrive' : 'Mi unidad');
 
     if (!append && lastLoadedFolderRef.current === targetFolderId) return;
     if (!append) lastLoadedFolderRef.current = targetFolderId;
@@ -93,7 +93,7 @@ const FileListScreen = () => {
         }));
       } else {
         lastLoadedFolderRef.current = null;
-        dispatch(setODFolderFilesError('Could not fetch files'));
+        dispatch(setODFolderFilesError('No se pudieron obtener los archivos'));
       }
     } else {
       dispatch(setFolderFilesLoading(true));
@@ -112,7 +112,7 @@ const FileListScreen = () => {
         }));
       } else {
         lastLoadedFolderRef.current = null;
-        dispatch(setFolderFilesError('Could not fetch files'));
+        dispatch(setFolderFilesError('No se pudieron obtener los archivos'));
       }
     }
   }, [dispatch, isOneDrive, route.params?.folderId, route.params?.folderName]);
@@ -258,7 +258,7 @@ const FileListScreen = () => {
       <View style={styles.controls}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search files..."
+          placeholder="Buscar archivos..."
           value={searchQuery}
           onChangeText={setSearchQuery}
           autoCapitalize="none"
@@ -268,19 +268,19 @@ const FileListScreen = () => {
             style={[styles.sortButton, sortBy === 'size' && styles.sortButtonActive]}
             onPress={() => setSortBy('size')}
           >
-            <Text style={[styles.sortButtonText, sortBy === 'size' && styles.sortButtonTextActive]}>Size</Text>
+            <Text style={[styles.sortButtonText, sortBy === 'size' && styles.sortButtonTextActive]}>Tamaño</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.sortButton, sortBy === 'name' && styles.sortButtonActive]}
             onPress={() => setSortBy('name')}
           >
-            <Text style={[styles.sortButtonText, sortBy === 'name' && styles.sortButtonTextActive]}>Name</Text>
+            <Text style={[styles.sortButtonText, sortBy === 'name' && styles.sortButtonTextActive]}>Nombre</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.sortButton, sortBy === 'date' && styles.sortButtonActive]}
             onPress={() => setSortBy('date')}
           >
-            <Text style={[styles.sortButtonText, sortBy === 'date' && styles.sortButtonTextActive]}>Date</Text>
+            <Text style={[styles.sortButtonText, sortBy === 'date' && styles.sortButtonTextActive]}>Fecha</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -324,7 +324,7 @@ const FileListScreen = () => {
               );
             })
         ) : (
-          <Text style={styles.loadingText}>No files found</Text>
+          <Text style={styles.loadingText}>No se encontraron archivos</Text>
         )}
       </ScrollView>
 

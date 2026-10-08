@@ -42,20 +42,20 @@ const LoginScreen = () => {
       dispatch(setLoading(false));
       // No se requiere navigation.replace('Home') ya que AppNavigator redirige automáticamente al cambiar el estado de Redux.
     } catch (err: any) {
-      let message = 'Authentication failed';
+      let message = 'Error de autenticación';
       if (err.message) {
         const msg = err.message.toLowerCase();
         if (msg.includes('network')) {
-          message = 'Network error – please check your connection';
+          message = 'Error de red – por favor comprueba tu conexión';
         } else if (msg.includes('cancelled')) {
-          message = 'Sign in cancelled';
+          message = 'Inicio de sesión cancelado';
         } else {
           message = err.message;
         }
       }
       dispatch(setError(message));
       dispatch(setLoading(false));
-      Alert.alert('Login failed', message);
+      Alert.alert('Error de inicio de sesión', message);
     }
   }, [dispatch]);
 
@@ -69,14 +69,14 @@ const LoginScreen = () => {
         />
       </View>
 
-      <Text style={styles.welcome}>All your storage in one place</Text>
+      <Text style={styles.welcome}>Todo tu almacenamiento en un solo lugar</Text>
 
       <GoogleSignInButton onPress={handleGoogleSignIn} loading={loading} />
 
       {Boolean(error) && <Text style={styles.error}>{error}</Text>}
 
       <Text style={styles.footer}>
-        By continuing, you agree to our Terms of Service and Privacy Policy.
+        Al continuar, aceptas nuestros Términos de servicio y Política de privacidad.
       </Text>
     </View>
   );
