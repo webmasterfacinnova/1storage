@@ -1,4 +1,4 @@
-// screens/AddProviderScreen.tsx
+// app/(protected)/add-provider.tsx
 import React from 'react';
 import {
   View,
@@ -8,12 +8,12 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { useStorageProviders } from '../hooks/useStorageProviders';
-import { ProviderActionButton } from '../components/common/ProviderActionButton';
+import { useRouter } from 'expo-router';
+import { useStorageProviders } from '../../hooks/useStorageProviders';
+import { ProviderActionButton } from '../../components/common/ProviderActionButton';
 
 const AddProviderScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const router = useRouter();
   const { providers } = useStorageProviders();
 
   const getStatusBadge = (isConnecting: boolean, isConnected: boolean) => {
@@ -21,20 +21,20 @@ const AddProviderScreen: React.FC = () => {
       return <ActivityIndicator size="small" color="#0078D4" />;
     }
     if (isConnected) {
-      return <Text style={styles.statusConnected}>Connected</Text>;
+      return <Text style={styles.statusConnected}>Conectado</Text>;
     }
-    return <Text style={styles.statusAvailable}>Available</Text>;
+    return <Text style={styles.statusAvailable}>Disponible</Text>;
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Text style={styles.backText}>← Volver</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Connect Providers</Text>
+        <Text style={styles.title}>Conectar proveedores</Text>
         <Text style={styles.subtitle}>
-          Link additional storage providers to manage all your files in one place.
+          Vincular proveedores de almacenamiento adicionales para gestionar todos tus archivos en un solo lugar.
         </Text>
       </View>
 
@@ -66,7 +66,7 @@ const AddProviderScreen: React.FC = () => {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Your data is stored securely. We only access files you explicitly grant permission to.
+          Tus datos se almacenan de forma segura. Solo accedemos a los archivos a los que nos otorgas permiso explícitamente.
         </Text>
       </View>
     </ScrollView>

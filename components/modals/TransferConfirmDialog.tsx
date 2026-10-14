@@ -15,6 +15,7 @@ interface Props {
   sourceProvider?: string;
   connectedProviders?: Record<string, any>;
   targetProvider?: string;
+  isLoading?: boolean;
   onSelectDestination: (provider: any) => void;
   onResolveConflict: (strategy: 'replace' | 'rename' | 'cancel', newName?: string) => void;
   onKeepSource?: () => void;
@@ -41,6 +42,7 @@ export const TransferConfirmDialog: React.FC<Props> = ({
   sourceProvider,
   connectedProviders = {},
   targetProvider,
+  isLoading = false,
   onSelectDestination,
   onResolveConflict,
   onKeepSource,
@@ -70,13 +72,14 @@ export const TransferConfirmDialog: React.FC<Props> = ({
 
   const handleConfirmRename = () => {
     if (newName.trim()) {
-      onResolveConflict('rename', newName.trim());
+      // Usamos 'replace' junto con el nuevo nombre para indicarle a la API que guarde exactamente el valor ingresado
+      onResolveConflict('replace', newName.trim());
     }
   };
 
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={isLoading ? undefined : onClose}>
+      <TouchableWithoutFeedback onPress={isLoading ? undefined : onClose}>
         <View style={s.overlay}>
           <TouchableWithoutFeedback>
             <View style={s.card}>
@@ -86,7 +89,7 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                 <>
                   <View style={s.titleHeader}>
                     <ArrowUpDown size={22} color="#0078d4" style={s.titleIcon} />
-                    <Text style={s.title}>{title || 'Transferir Archivo'}</Text>
+                    <Text style={s.title}>{title || 'Confirmar Transferencia'}</Text>
                   </View>
 
                   {fileName && (
@@ -121,6 +124,8 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                               <Button
                                 key={p}
                                 title={name}
+                                loading={isLoading}
+                                disabled={isLoading}
                                 onPress={() => onSelectDestination(p)}
                                 color={isOneDrive ? '#0078d4' : '#0f9d58'}
                                 style={s.actionBtn}
@@ -135,6 +140,7 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                     title="Cancelar"
                     variant="ghost"
                     color="#666666"
+                    disabled={isLoading}
                     onPress={onClose}
                     style={s.cancelBtn}
                   />
@@ -169,10 +175,13 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                         selectTextOnFocus
                         placeholder="Nombre del archivo"
                         placeholderTextColor="#999999"
+                        editable={!isLoading}
                       />
                       <View style={s.btnList}>
                         <Button
                           title="Guardar y transferir"
+                          loading={isLoading}
+                          disabled={isLoading}
                           onPress={handleConfirmRename}
                           color="#0078d4"
                           style={s.actionBtn}
@@ -181,6 +190,7 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                           title="Volver"
                           variant="outline"
                           color="#333333"
+                          disabled={isLoading}
                           onPress={() => setIsRenaming(false)}
                           style={s.actionBtn}
                         />
@@ -190,12 +200,15 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                     <View style={s.btnList}>
                       <Button
                         title="Reemplazar archivo"
+                        loading={isLoading}
+                        disabled={isLoading}
                         onPress={() => onResolveConflict('replace')}
                         color="#0078d4"
                         style={s.actionBtn}
                       />
                       <Button
                         title="Guardar ambos (Renombrar)"
+                        disabled={isLoading}
                         variant="outline"
                         color="#333333"
                         onPress={() => setIsRenaming(true)}
@@ -205,6 +218,7 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                         title="Cancelar"
                         variant="ghost"
                         color="#666666"
+                        disabled={isLoading}
                         onPress={() => onResolveConflict('cancel')}
                         style={s.cancelBtn}
                       />
@@ -241,12 +255,16 @@ export const TransferConfirmDialog: React.FC<Props> = ({
                   <View style={s.btnList}>
                     <Button
                       title="Conservar archivo original"
+                      loading={isLoading}
+                      disabled={isLoading}
                       onPress={handleKeep}
                       color="#0078d4"
                       style={s.actionBtn}
                     />
                     <Button
                       title="Eliminar archivo original"
+                      loading={isLoading}
+                      disabled={isLoading}
                       variant="outline"
                       color="#d32f2f"
                       onPress={handleDestroy}
