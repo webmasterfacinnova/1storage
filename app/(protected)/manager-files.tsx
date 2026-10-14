@@ -1,4 +1,4 @@
-// screens/ManagerFilesScreen.tsx
+// app/(protected)/manager-files.tsx
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
   View,
@@ -12,34 +12,34 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 
 // Componentes modulares
-import FileCard, { categorizeMimeType } from '../components/storage/FileCard';
-import FileTypeTabs, { FILE_TYPE_TABS } from '../components/storage/FileTypeTabs';
-import StorageSummaryBar from '../components/storage/StorageSummaryBar';
-import ProviderSelector from '../components/storage/ProviderSelector';
-import TypeSummaryScroll from '../components/storage/TypeSummaryScroll';
-import SortBar, { SortOption } from '../components/storage/SortBar';
-import HeaderBar from '../components/storage/HeaderBar';
-import EmptyFilesView from '../components/storage/EmptyFilesView';
+import FileCard, { categorizeMimeType } from '../../components/storage/FileCard';
+import FileTypeTabs, { FILE_TYPE_TABS } from '../../components/storage/FileTypeTabs';
+import StorageSummaryBar from '../../components/storage/StorageSummaryBar';
+import ProviderSelector from '../../components/storage/ProviderSelector';
+import TypeSummaryScroll from '../../components/storage/TypeSummaryScroll';
+import SortBar, { SortOption } from '../../components/storage/SortBar';
+import HeaderBar from '../../components/storage/HeaderBar';
+import EmptyFilesView from '../../components/storage/EmptyFilesView';
 
-import { fetchProviderFilesPage } from '../services/storage-registry.service';
-import { transferService, ProviderType } from '../services/transfer.service';
-import { UnifiedFile, ProviderMeta } from '../types/storage';
+import { fetchProviderFilesPage } from '../../services/storage-registry.service';
+import { transferService, ProviderType } from '../../services/transfer.service';
+import { UnifiedFile, ProviderMeta } from '../../types/storage';
 
 // Modales
-import { TransferConfirmDialog, DialogStep } from '../components/modals/TransferConfirmDialog';
-import { TransferLoadingModal } from '../components/modals/TransferLoadingModal';
+import { TransferConfirmDialog, DialogStep } from '../../components/modals/TransferConfirmDialog';
+import { TransferLoadingModal } from '../../components/modals/TransferLoadingModal';
 
 // Redux hooks
-import { useAppDispatch, useAppSelector } from '../hooks/store';
-import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
-import { removeDriveFile } from '../store/slices/driveFilesSlice';
-import { removeOnedriveFile } from '../store/slices/onedriveFilesSlice';
+import { useAppDispatch, useAppSelector } from '../../hooks/store';
+import { selectConnectedProviders } from '../../store/slices/connectedProvidersSlice';
+import { removeDriveFile } from '../../store/slices/driveFilesSlice';
+import { removeOnedriveFile } from '../../store/slices/onedriveFilesSlice';
 
-const googleDriveIcon = require('../assets/googledrive.png');
-const oneDriveIcon = require('../assets/onedrive.png');
+const googleDriveIcon = require('../../assets/googledrive.png');
+const oneDriveIcon = require('../../assets/onedrive.png');
 
 const PROVIDER_ALL = 'all';
 
@@ -78,7 +78,7 @@ const getCategoryKey = (mimeType?: string, fileName?: string): string => {
 };
 
 const ManagerFilesScreen: React.FC = () => {
-  const nav = useNavigation();
+  const router = useRouter();
   const dispatch = useAppDispatch();
   const { height: windowHeight } = useWindowDimensions();
   const [headerH, setHeaderH] = useState(56);
@@ -199,10 +199,13 @@ const ManagerFilesScreen: React.FC = () => {
 
   const handleFilePress = useCallback((file: UnifiedFile) => {
     if (file.mimeType === 'application/vnd.google-apps.folder') {
-      (nav as any).navigate('FileList', {
-        folderId: file.id,
-        folderName: file.name,
-        provider: file.provider,
+      router.push({
+        pathname: '/(protected)/file-list',
+        params: {
+          folderId: file.id,
+          folderName: file.name,
+          provider: file.provider,
+        },
       });
     } else if (file.webViewLink) {
       if (Platform.OS === 'web') {
@@ -211,7 +214,7 @@ const ManagerFilesScreen: React.FC = () => {
         Linking.openURL(file.webViewLink).catch(() => {});
       }
     }
-  }, [nav]);
+  }, [router]);
 
   const handleTransferFile = (file: UnifiedFile) => {
     const connectedCount = Object.keys(connectedProviders || {}).length;
@@ -391,7 +394,7 @@ const ManagerFilesScreen: React.FC = () => {
       {/* Componente Header */}
       <HeaderBar
         title="Gestor de Archivos"
-        onBack={() => nav.goBack()}
+        onBack={() => router.back()}
         onLayout={e => setHeaderH(e.nativeEvent.layout.height)}
       />
 
@@ -458,7 +461,7 @@ const ManagerFilesScreen: React.FC = () => {
           <EmptyFilesView
             search={search}
             isConnected={!!connectedProviders[activeProvider] || activeProvider === PROVIDER_ALL}
-            onConnect={() => (nav as any).navigate('AddProvider')}
+            onConnect={() => router.push('/(protected)/add-provider')}
           />
         )}
 
@@ -506,7 +509,7 @@ const ManagerFilesScreen: React.FC = () => {
         onDestroy={handleDestroyOriginal}
         onKeepSource={handleKeepOriginal}
         onDestroySource={handleDestroyOriginal}
-        onGoToProviders={() => (nav as any).navigate('AddProvider')}
+        onGoToProviders={() => router.push('/(protected)/add-provider')}
         onClose={() => {
           setDialogVisible(false);
           setDialogFile(null);

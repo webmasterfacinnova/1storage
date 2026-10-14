@@ -1,4 +1,4 @@
-// screens/HomeScreen.tsx
+// app/(protected)/home.tsx
 import React, { useEffect, useCallback } from 'react';
 import {
   View,
@@ -10,26 +10,26 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
-import { selectCurrentUser, logout } from '../store/slices/authSlice';
-import { authService } from '../services/auth.service';
-import { driveService } from '../services/drive.service';
+import { useRouter } from 'expo-router';
+import { selectCurrentUser, logout } from '../../store/slices/authSlice';
+import { authService } from '../../services/auth.service';
+import { driveService } from '../../services/drive.service';
 import {
   setQuotaLoading,
   setQuota,
   setQuotaError,
   selectDriveQuota,
   selectDriveLoading,
-} from '../store/slices/driveSlice';
-import { oneDriveService } from '../services/onedrive.service';
+} from '../../store/slices/driveSlice';
+import { oneDriveService } from '../../services/onedrive.service';
 import {
   setQuotaLoading as setODQuotaLoading,
   setQuota as setODQuota,
   setQuotaError as setODQuotaError,
   selectOnedriveQuota,
   selectOnedriveLoading,
-} from '../store/slices/onedriveSlice';
-import { selectConnectedProviders, clearAllProviders } from '../store/slices/connectedProvidersSlice';
+} from '../../store/slices/onedriveSlice';
+import { selectConnectedProviders, clearAllProviders } from '../../store/slices/connectedProvidersSlice';
 
 const HomeScreen = () => {
   const user = useSelector(selectCurrentUser);
@@ -42,7 +42,7 @@ const HomeScreen = () => {
   const isGoogleDriveConnected = !!connectedProviders['google-drive'];
   const isOneDriveConnected = !!connectedProviders['onedrive'];
 
-  const navigation = useNavigation();
+  const router = useRouter();
   const dispatch = useDispatch();
 
   const fetchStorageQuota = useCallback(async () => {
@@ -196,7 +196,7 @@ const HomeScreen = () => {
           {/* Sección de Conexiones */}
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Conexiones</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('AddProvider' as never)}>
+            <TouchableOpacity onPress={() => router.push('/(protected)/add-provider')}>
               <Text style={styles.addProviderLink}>+ Añadir</Text>
             </TouchableOpacity>
           </View>
@@ -296,7 +296,7 @@ const HomeScreen = () => {
             {/* Gestionar archivos */}
             <TouchableOpacity
               style={styles.actionCard}
-              onPress={() => navigation.navigate('ManagerFiles' as never)}
+              onPress={() => router.push('/(protected)/manager-files')}
             >
               <View style={[styles.actionIconContainer, { backgroundColor: '#FFF4E5' }]}>
                 <Text style={{ fontSize: 18 }}>📁</Text>
@@ -313,7 +313,7 @@ const HomeScreen = () => {
             {/* Limpiar papelera */}
             <TouchableOpacity
               style={styles.actionCard}
-              onPress={() => navigation.navigate('CleanTrash' as never)}
+              onPress={() => router.push('/(protected)/clean-trash')}
             >
               <View style={[styles.actionIconContainer, { backgroundColor: '#FFF0F0' }]}>
                 <Text style={{ fontSize: 18 }}>🗑️</Text>
@@ -330,7 +330,7 @@ const HomeScreen = () => {
             {/* Agregar proveedor */}
             <TouchableOpacity
               style={styles.actionCard}
-              onPress={() => navigation.navigate('AddProvider' as never)}
+              onPress={() => router.push('/(protected)/add-provider')}
             >
               <View style={[styles.actionIconContainer, { backgroundColor: '#FFF4E5' }]}>
                 <Text style={{ fontSize: 18 }}>🔗</Text>

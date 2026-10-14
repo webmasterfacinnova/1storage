@@ -1,4 +1,4 @@
-// screens/AddProviderScreen.tsx
+// app/(protected)/add-provider.tsx
 import React from 'react';
 import {
   View,
@@ -8,12 +8,12 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { useStorageProviders } from '../hooks/useStorageProviders';
-import { ProviderActionButton } from '../components/common/ProviderActionButton';
+import { useRouter } from 'expo-router';
+import { useStorageProviders } from '../../hooks/useStorageProviders';
+import { ProviderActionButton } from '../../components/common/ProviderActionButton';
 
 const AddProviderScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const router = useRouter();
   const { providers } = useStorageProviders();
 
   const getStatusBadge = (isConnecting: boolean, isConnected: boolean) => {
@@ -29,7 +29,7 @@ const AddProviderScreen: React.FC = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>← Volver</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Conectar proveedores</Text>

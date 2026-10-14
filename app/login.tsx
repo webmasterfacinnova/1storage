@@ -1,4 +1,4 @@
-// screens/LoginScreen.tsx
+// app/login.tsx
 import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Image, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
@@ -8,7 +8,7 @@ import { selectAuthLoading, selectAuthError } from '../store/slices/authSlice';
 import { addProvider } from '../store/slices/connectedProvidersSlice';
 import GoogleSignInButton from '../components/auth/GoogleSignInButton';
 
-const LoginScreen = () => {
+export default function LoginRoute() {
   const dispatch = useDispatch();
   const loading = useSelector(selectAuthLoading);
   const error = useSelector(selectAuthError);
@@ -26,7 +26,6 @@ const LoginScreen = () => {
         })
       );
 
-      // Registrar Google Drive en connectedProvidersSlice al iniciar sesión correctamente
       if (result.token) {
         dispatch(
           addProvider({
@@ -40,7 +39,6 @@ const LoginScreen = () => {
       }
 
       dispatch(setLoading(false));
-      // No se requiere navigation.replace('Home') ya que AppNavigator redirige automáticamente al cambiar el estado de Redux.
     } catch (err: any) {
       let message = 'Error de autenticación';
       if (err.message) {
@@ -80,9 +78,7 @@ const LoginScreen = () => {
       </Text>
     </View>
   );
-};
-
-export default LoginScreen;
+}
 
 const styles = StyleSheet.create({
   container: {

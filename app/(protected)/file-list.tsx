@@ -1,15 +1,15 @@
-// screens/FileListScreen.tsx
+// app/(protected)/file-list.tsx
 import React, { useEffect, useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { driveFilesService } from '../services/drive-files.service';
-import { oneDriveFilesService } from '../services/onedrive-files.service';
-import { transferService, ProviderType } from '../services/transfer.service';
-import FileCard from '../components/storage/FileCard';
-import { TransferConfirmDialog, DialogStep } from '../components/modals/TransferConfirmDialog';
-import { UnifiedFile } from '../types/storage';
-import { selectConnectedProviders } from '../store/slices/connectedProvidersSlice';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { driveFilesService } from '../../services/drive-files.service';
+import { oneDriveFilesService } from '../../services/onedrive-files.service';
+import { transferService, ProviderType } from '../../services/transfer.service';
+import FileCard from '../../components/storage/FileCard';
+import { TransferConfirmDialog, DialogStep } from '../../components/modals/TransferConfirmDialog';
+import { UnifiedFile } from '../../types/storage';
+import { selectConnectedProviders } from '../../store/slices/connectedProvidersSlice';
 import {
   setFolderFilesLoading,
   setFolderFiles,
@@ -19,7 +19,7 @@ import {
   selectCurrentFolderName,
   selectFolderFilesLoading,
   selectFolderFilesNextPage,
-} from '../store/slices/driveFilesSlice';
+} from '../../store/slices/driveFilesSlice';
 import {
   setFolderFilesLoading as setODFolderFilesLoading,
   setFolderFiles as setODFolderFiles,
@@ -29,23 +29,22 @@ import {
   selectOnedriveCurrentFolderName,
   selectOnedriveFolderFilesLoading,
   selectOnedriveFolderFilesNextPage,
-} from '../store/slices/onedriveFilesSlice';
-
-type FileListRouteParams = {
-  folderId?: string;
-  folderName?: string;
-  typeFilter?: string;
-  sort?: 'size' | 'name' | 'date';
-  fileId?: string;
-  provider?: 'google-drive' | 'onedrive';
-};
+} from '../../store/slices/onedriveFilesSlice';
 
 const FileListScreen = () => {
-  const navigation = useNavigation<any>();
-  const route = useRoute<RouteProp<{ params: FileListRouteParams }, 'params'>>();
+  const router = useRouter();
+  const params = useLocalSearchParams<{
+    folderId?: string;
+    folderName?: string;
+    typeFilter?: string;
+    sort?: 'size' | 'name' | 'date';
+    fileId?: string;
+    provider?: 'google-drive' | 'onedrive';
+  }>();
+  
   const dispatch = useDispatch();
 
-  const provider = route.params?.provider || 'google-drive';
+  const provider = params.provider || 'google-drive';
   const isOneDrive = provider === 'onedrive';
 
   const connectedProviders = useSelector(selectConnectedProviders);
@@ -70,8 +69,8 @@ const FileListScreen = () => {
   nextPageTokenRef.current = nextPageToken;
 
   const fetchFiles = useCallback(async (append = false) => {
-    const targetFolderId = route.params?.folderId || 'root';
-    const targetFolderName = route.params?.folderName || (isOneDrive ? 'OneDrive' : 'Mi unidad');
+    const targetFolderId = params.folderId || 'root';
+    const targetFolderName = params.folderName || (isOneDrive ? 'OneDrive' : 'Mi unidad');
 
     if (!append && lastLoadedFolderRef.current === targetFolderId) return;
     if (!append) lastLoadedFolderRef.current = targetFolderId;
@@ -115,7 +114,7 @@ const FileListScreen = () => {
         dispatch(setFolderFilesError('No se pudieron obtener los archivos'));
       }
     }
-  }, [dispatch, isOneDrive, route.params?.folderId, route.params?.folderName]);
+  }, [dispatch, isOneDrive, params.folderId, params.folderName]);
 
   const onRefresh = useCallback(() => {
     lastLoadedFolderRef.current = null;
@@ -124,7 +123,7 @@ const FileListScreen = () => {
 
   useEffect(() => {
     fetchFiles(false);
-  }, [fetchFiles, route.params?.folderId]);
+  }, [fetchFiles, params.folderId]);
 
   const isFolder = (file: any): boolean => {
     if (isOneDrive) {
@@ -134,18 +133,21 @@ const FileListScreen = () => {
   };
 
   const handleFolderPress = (file: any) => {
-    (navigation as any).push('FileList', {
-      folderId: file.id,
-      folderName: file.name,
-      provider,
+    router.push({
+      pathname: '/(protected)/file-list',
+      params: {
+        folderId: file.id,
+        folderName: file.name,
+        provider,
+      },
     });
   };
 
   const handleBackPress = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
+    if (router.canGoBack()) {
+      router.back();
     } else {
-      (navigation as any).navigate('StorageBreakdown');
+      router.replace('/(protected)/storage-breakdown');
     }
   };
 
@@ -164,7 +166,7 @@ const FileListScreen = () => {
           },
           {
             text: 'Conectar nube',
-            onPress: () => navigation.navigate('AddProvider'),
+            onPress: () => router.push('/(protected)/add-provider'),
           },
         ]
       );

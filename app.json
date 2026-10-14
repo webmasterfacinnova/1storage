@@ -25,7 +25,9 @@
           {
             "CFBundleTypeRole": "Editor",
             "CFBundleURLName": "com.onestorage.app",
-            "CFBundleURLSchemes": ["onestorage"]
+            "CFBundleURLSchemes": [
+              "onestorage"
+            ]
           }
         ]
       }
@@ -47,14 +49,20 @@
               "pathPrefix": "/"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["@react-native-google-signin/google-signin"],
+    "plugins": [
+      "@react-native-google-signin/google-signin",
+      "expo-router"
+    ],
     "scheme": "onestorage",
     "extra": {
       "appScheme": "onestorage",

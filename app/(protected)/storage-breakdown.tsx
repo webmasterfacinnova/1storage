@@ -1,13 +1,13 @@
-// screens/StorageBreakdownScreen.tsx
+// app/(protected)/storage-breakdown.tsx
 // Pantalla principal: ¿qué está ocupando espacio en Google Drive?
 // Muestra el almacenamiento por tipo de archivo, archivos más grandes y navegación a explorador de archivos/papelera.
 
 import React, { useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
-import { driveFilesService } from '../services/drive-files.service';
-import { driveService } from '../services/drive.service';
+import { useRouter } from 'expo-router';
+import { driveFilesService } from '../../services/drive-files.service';
+import { driveService } from '../../services/drive.service';
 import {
   setStorageByTypeLoading,
   setStorageByType,
@@ -19,11 +19,11 @@ import {
   selectStorageByTypeLoading,
   selectLargestFiles,
   selectLargestFilesLoading,
-} from '../store/slices/driveFilesSlice';
-import { selectDriveQuota } from '../store/slices/driveSlice';
+} from '../../store/slices/driveFilesSlice';
+import { selectDriveQuota } from '../../store/slices/driveSlice';
 
 const StorageBreakdownScreen = () => {
-  const navigation = useNavigation();
+  const router = useRouter();
   const dispatch = useDispatch();
   const quota = useSelector(selectDriveQuota);
   const storageByType = useSelector(selectStorageByType);
@@ -120,7 +120,7 @@ const StorageBreakdownScreen = () => {
               <TouchableOpacity
                 key={index}
                 style={styles.typeCard}
-                onPress={() => navigation.navigate('FileList', { typeFilter: type.type })}
+                onPress={() => router.push({ pathname: '/(protected)/file-list', params: { typeFilter: type.type } })}
               >
                 <View style={styles.typeIcon}>{type.icon}</View>
                 <View style={styles.typeInfo}>
@@ -153,7 +153,7 @@ const StorageBreakdownScreen = () => {
               <TouchableOpacity
                 key={file.id}
                 style={styles.fileCard}
-                onPress={() => navigation.navigate('FileList', { fileId: file.id })}
+                onPress={() => router.push({ pathname: '/(protected)/file-list', params: { fileId: file.id } })}
               >
                 <View style={styles.fileIcon}>{file.mimeType.includes('folder') ? '📁' : '📄'}</View>
                 <View style={styles.fileInfo}>
@@ -163,7 +163,7 @@ const StorageBreakdownScreen = () => {
                 <Text style={styles.fileArrow}>›</Text>
               </TouchableOpacity>
             ))}
-            <TouchableOpacity style={styles.moreButton} onPress={() => navigation.navigate('FileList', { sort: 'size' })}>
+            <TouchableOpacity style={styles.moreButton} onPress={() => router.push({ pathname: '/(protected)/file-list', params: { sort: 'size' } })}>
               <Text style={styles.moreText}>Ver todos los archivos más grandes</Text>
             </TouchableOpacity>
           </View>
@@ -174,13 +174,13 @@ const StorageBreakdownScreen = () => {
 
       {/* Navegación inferior */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('Home')}>
+        <TouchableOpacity style={styles.navButton} onPress={() => router.replace('/(protected)/home')}>
           <Text style={styles.navButtonText}>Inicio</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('FileList')}>
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/(protected)/file-list')}>
           <Text style={styles.navButtonText}>Archivos</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('CleanTrash')}>
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/(protected)/clean-trash')}>
           <Text style={styles.navButtonText}>Papelera</Text>
         </TouchableOpacity>
       </View>
@@ -188,7 +188,6 @@ const StorageBreakdownScreen = () => {
   );
 };
 
-// Se mantienen los estilos sin modificaciones
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -1,12 +1,12 @@
-// screens/CleanTrashScreen.tsx
+// app/(protected)/clean-trash.tsx
 // Limpiar papelera: ver y eliminar permanentemente archivos en la papelera
 
 import React, { useEffect, useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
-import { driveFilesService } from '../services/drive-files.service';
-import { driveService } from '../services/drive.service';
+import { useRouter } from 'expo-router';
+import { driveFilesService } from '../../services/drive-files.service';
+import { driveService } from '../../services/drive.service';
 import {
   setTrashedFilesLoading,
   setTrashedFiles,
@@ -16,11 +16,11 @@ import {
   selectTrashedFiles,
   selectTrashedFilesLoading,
   selectTrashedFilesNextPage,
-} from '../store/slices/driveFilesSlice';
-import { selectDriveQuota } from '../store/slices/driveSlice';
+} from '../../store/slices/driveFilesSlice';
+import { selectDriveQuota } from '../../store/slices/driveSlice';
 
 const CleanTrashScreen = () => {
-  const navigation = useNavigation();
+  const router = useRouter();
   const dispatch = useDispatch();
   const trashedFiles = useSelector(selectTrashedFiles);
   const loading = useSelector(selectTrashedFilesLoading);
@@ -184,7 +184,6 @@ const CleanTrashScreen = () => {
   );
 };
 
-// Estilos sin modificaciones
 const styles = StyleSheet.create({
   container: {
     flex: 1,
