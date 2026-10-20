@@ -1,16 +1,16 @@
-// app/(protected)/add-provider.tsx
 import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useStorageProviders } from '../../hooks/useStorageProviders';
 import { ProviderActionButton } from '../../components/common/ProviderActionButton';
+import { ScreenContainer } from '../../components/common/ScreenContainer';
 
 const AddProviderScreen: React.FC = () => {
   const router = useRouter();
@@ -26,8 +26,18 @@ const AddProviderScreen: React.FC = () => {
     return <Text style={styles.statusAvailable}>Disponible</Text>;
   };
 
+  // Función auxiliar para determinar el icono local según el proveedor
+  const getProviderIconSource = (providerId: string) => {
+    if (providerId.includes('google')) {
+      return require('../../assets/googledrive.png');
+    }
+    // Por defecto asume OneDrive o el icono alternativo
+    return require('../../assets/onedrive.png');
+  };
+
   return (
-    <ScrollView style={styles.container}>
+    <ScreenContainer>
+      {/* Encabezado */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>← Volver</Text>
@@ -38,142 +48,149 @@ const AddProviderScreen: React.FC = () => {
         </Text>
       </View>
 
-      {providers.map(provider => (
-        <View key={provider.id} style={styles.providerCard}>
-          <View style={styles.providerInfo}>
-            <View style={[styles.iconContainer, { backgroundColor: provider.color + '20' }]}>
-              <Text style={styles.providerIcon}>{provider.icon}</Text>
+      {/* Lista de proveedores */}
+      <View style={styles.providersContainer}>
+        {providers.map(provider => (
+          <View key={provider.id} style={styles.providerCard}>
+            <View style={styles.providerInfo}>
+              <View style={styles.iconContainer}>
+                <Image
+                  source={getProviderIconSource(provider.id)}
+                  style={styles.providerIconImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={styles.providerText}>
+                <Text style={styles.providerName}>{provider.name}</Text>
+                <Text style={styles.providerDescription} numberOfLines={2}>
+                  {provider.description}
+                </Text>
+                {provider.isConnected && provider.accountEmail && (
+                  <Text style={styles.providerAccount} numberOfLines={1}>
+                    {provider.accountEmail}
+                  </Text>
+                )}
+                {getStatusBadge(provider.isConnecting, provider.isConnected)}
+              </View>
             </View>
-            <View style={styles.providerText}>
-              <Text style={styles.providerName}>{provider.name}</Text>
-              <Text style={styles.providerDescription}>{provider.description}</Text>
-              {provider.isConnected && provider.accountEmail && (
-                <Text style={styles.providerAccount}>{provider.accountEmail}</Text>
-              )}
-              {getStatusBadge(provider.isConnecting, provider.isConnected)}
-            </View>
+
+            <ProviderActionButton
+              isConnected={provider.isConnected}
+              isConnecting={provider.isConnecting}
+              color={provider.color}
+              onConnect={provider.onConnect}
+              onDisconnect={provider.onDisconnect}
+            />
           </View>
+        ))}
+      </View>
 
-          <ProviderActionButton
-            isConnected={provider.isConnected}
-            isConnecting={provider.isConnecting}
-            color={provider.color}
-            onConnect={provider.onConnect}
-            onDisconnect={provider.onDisconnect}
-          />
-        </View>
-      ))}
-
+      {/* Pie de página */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>
           Tus datos se almacenan de forma segura. Solo accedemos a los archivos a los que nos otorgas permiso explícitamente.
         </Text>
       </View>
-    </ScrollView>
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
   header: {
-    padding: 24,
-    paddingTop: 60,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
     marginBottom: 16,
   },
+  backButton: {
+    marginBottom: 12,
+  },
   backText: {
-    fontSize: 16,
-    color: '#0078D4',
-    fontWeight: '500',
+    fontSize: 15,
+    color: '#FF6B35',
+    fontWeight: '600',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 15,
-    color: '#666666',
-    lineHeight: 22,
+    fontSize: 13,
+    color: '#64748B',
+    lineHeight: 20,
+  },
+  providersContainer: {
+    gap: 12,
   },
   providerCard: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   providerInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: 10,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
+    overflow: 'hidden',
   },
-  providerIcon: {
-    fontSize: 24,
+  providerIconImage: {
+    width: 24,
+    height: 24,
   },
   providerText: {
     flex: 1,
   },
   providerName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   providerDescription: {
-    fontSize: 13,
-    color: '#888888',
+    fontSize: 11,
+    color: '#94A3B8',
     marginTop: 2,
   },
   providerAccount: {
-    fontSize: 13,
-    color: '#1a1a1a',
-    fontWeight: '500',
+    fontSize: 11,
+    color: '#0F172A',
+    fontWeight: '600',
     marginTop: 4,
   },
   statusConnected: {
-    fontSize: 12,
-    color: '#34A853',
-    fontWeight: '500',
+    fontSize: 11,
+    color: '#10B981',
+    fontWeight: '600',
     marginTop: 4,
   },
   statusAvailable: {
-    fontSize: 12,
-    color: '#888888',
+    fontSize: 11,
+    color: '#94A3B8',
     marginTop: 4,
   },
   footer: {
-    padding: 24,
-    marginTop: 16,
+    marginTop: 24,
+    marginBottom: 20,
+    paddingHorizontal: 12,
   },
   footerText: {
-    fontSize: 13,
-    color: '#999999',
+    fontSize: 11,
+    color: '#94A3B8',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 16,
   },
 });
 
