@@ -132,7 +132,8 @@ class OneDriveFilesService {
   }
 
   async uploadFile(blob: Blob, fileName: string): Promise<OneDriveFile | null> {
-    const url = `${GRAPH_API_BASE}/me/drive/root:/${encodeURIComponent(fileName)}:/content`;
+    // Agregamos @microsoft.graph.conflictBehavior=replace para evitar que OneDrive autorenombre el archivo si ya existe
+    const url = `${GRAPH_API_BASE}/me/drive/root:/${encodeURIComponent(fileName)}:/content?@microsoft.graph.conflictBehavior=replace`;
     const token = await this._getToken();
     if (!token) return null;
 

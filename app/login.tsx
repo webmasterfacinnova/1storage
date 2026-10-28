@@ -1,4 +1,4 @@
-// screens/LoginScreen.tsx
+// app/login.tsx
 import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Image, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
@@ -8,7 +8,7 @@ import { selectAuthLoading, selectAuthError } from '../store/slices/authSlice';
 import { addProvider } from '../store/slices/connectedProvidersSlice';
 import GoogleSignInButton from '../components/auth/GoogleSignInButton';
 
-const LoginScreen = () => {
+export default function LoginRoute() {
   const dispatch = useDispatch();
   const loading = useSelector(selectAuthLoading);
   const error = useSelector(selectAuthError);
@@ -26,7 +26,6 @@ const LoginScreen = () => {
         })
       );
 
-      // Registrar Google Drive en connectedProvidersSlice al iniciar sesión correctamente
       if (result.token) {
         dispatch(
           addProvider({
@@ -40,22 +39,21 @@ const LoginScreen = () => {
       }
 
       dispatch(setLoading(false));
-      // No se requiere navigation.replace('Home') ya que AppNavigator redirige automáticamente al cambiar el estado de Redux.
     } catch (err: any) {
-      let message = 'Authentication failed';
+      let message = 'Error de autenticación';
       if (err.message) {
         const msg = err.message.toLowerCase();
         if (msg.includes('network')) {
-          message = 'Network error – please check your connection';
+          message = 'Error de red – por favor comprueba tu conexión';
         } else if (msg.includes('cancelled')) {
-          message = 'Sign in cancelled';
+          message = 'Inicio de sesión cancelado';
         } else {
           message = err.message;
         }
       }
       dispatch(setError(message));
       dispatch(setLoading(false));
-      Alert.alert('Login failed', message);
+      Alert.alert('Error de inicio de sesión', message);
     }
   }, [dispatch]);
 
@@ -63,26 +61,24 @@ const LoginScreen = () => {
     <View style={styles.container}>
       <View style={styles.logoContainer}>
         <Image
-          source={require('../assets/LogoSlogan.png')}
+          source={require('../assets/images/1StorageLogoTipoSlogan_512.png')}
           style={styles.logo}
           resizeMode="contain"
         />
       </View>
 
-      <Text style={styles.welcome}>All your storage in one place</Text>
+      <Text style={styles.welcome}>Todo tu almacenamiento en un solo lugar</Text>
 
       <GoogleSignInButton onPress={handleGoogleSignIn} loading={loading} />
 
       {Boolean(error) && <Text style={styles.error}>{error}</Text>}
 
       <Text style={styles.footer}>
-        By continuing, you agree to our Terms of Service and Privacy Policy.
+        Al continuar, aceptas nuestros Términos de servicio y Política de privacidad.
       </Text>
     </View>
   );
-};
-
-export default LoginScreen;
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -97,8 +93,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   logo: {
-    width: 240,
-    height: 80,
+    width: 260,
+    height: 90,
   },
   welcome: {
     fontSize: 18,

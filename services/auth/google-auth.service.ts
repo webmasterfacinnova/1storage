@@ -40,6 +40,9 @@ class GoogleAuthService implements AuthService {
   private clientSecret: string = '';
 
   async initialize(): Promise<void> {
+    // Si ya está cargado, evitamos recargarlo innecesariamente
+    if (this.clientId) return;
+
     this.clientId =
       process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
       Constants.expoConfig?.extra?.googleWebClientId ??
@@ -77,6 +80,13 @@ class GoogleAuthService implements AuthService {
 
   async signIn(): Promise<AuthResult> {
     try {
+      // Asegurar que las credenciales estén cargadas antes de usarlas
+      await this.initialize();
+
+      if (!this.clientId) {
+        throw new Error('Google Web Client ID is missing. Check your app.json extra config or environment variables.');
+      }
+
       const redirectUri = makeRedirectUri({ preferLocalhost: true });
       console.log('[GoogleAuth] redirectUri =', redirectUri);
 
@@ -136,7 +146,6 @@ class GoogleAuthService implements AuthService {
         photoURL: userInfo.picture,
       };
 
-      // Guardar access_token y refresh_token
       await saveAuthToken(accessToken);
       if (refreshToken) {
         await saveSecureData('google_refresh_token', refreshToken);
@@ -166,6 +175,7 @@ class GoogleAuthService implements AuthService {
 
   async refreshAccessToken(): Promise<string | null> {
     try {
+      await this.initialize();
       const refreshToken = await getSecureData('google_refresh_token');
       if (!refreshToken) return null;
 
@@ -224,10 +234,8 @@ class GoogleAuthService implements AuthService {
       let token = await getAuthToken();
       if (!token) return null;
 
-      // Intentar obtener los datos del usuario con el token guardado
       let userInfo = await this.getUserInfo(token);
 
-      // Si falla (token expirado / 401), intentamos refrescarlo automáticamente
       if (!userInfo) {
         console.log('[GoogleAuth] Token expirado o inválido. Intentando refrescar...');
         await this.initialize();
@@ -238,7 +246,6 @@ class GoogleAuthService implements AuthService {
         }
       }
 
-      // Si aún no se pudo obtener información del usuario, se limpia la sesión
       if (!userInfo) {
         console.warn('[GoogleAuth] No se pudo renovar la sesión del usuario');
         await clearAuthToken();

@@ -71,7 +71,11 @@ export default {
     web: {
       favicon: "./assets/images/favicon.png",
     },
-    plugins: ["@react-native-google-signin/google-signin"],
+    plugins: [
+      "@react-native-google-signin/google-signin",
+      "expo-router",
+      "expo-status-bar",
+    ],
     scheme: "onestorage",
     extra: {
       appScheme: "onestorage",

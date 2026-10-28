@@ -1,13 +1,13 @@
-// screens/StorageBreakdownScreen.tsx
-// Main screen: what's taking up space in Google Drive?
-// Shows storage by file type, largest files, and navigation to file browser/trash.
+// app/(protected)/storage-breakdown.tsx
+// Pantalla principal: ¿qué está ocupando espacio en Google Drive?
+// Muestra el almacenamiento por tipo de archivo, archivos más grandes y navegación a explorador de archivos/papelera.
 
 import React, { useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
-import { driveFilesService } from '../services/drive-files.service';
-import { driveService } from '../services/drive.service';
+import { useRouter } from 'expo-router';
+import { driveFilesService } from '../../services/drive-files.service';
+import { driveService } from '../../services/drive.service';
 import {
   setStorageByTypeLoading,
   setStorageByType,
@@ -19,11 +19,11 @@ import {
   selectStorageByTypeLoading,
   selectLargestFiles,
   selectLargestFilesLoading,
-} from '../store/slices/driveFilesSlice';
-import { selectDriveQuota } from '../store/slices/driveSlice';
+} from '../../store/slices/driveFilesSlice';
+import { selectDriveQuota } from '../../store/slices/driveSlice';
 
 const StorageBreakdownScreen = () => {
-  const navigation = useNavigation();
+  const router = useRouter();
   const dispatch = useDispatch();
   const quota = useSelector(selectDriveQuota);
   const storageByType = useSelector(selectStorageByType);
@@ -37,7 +37,7 @@ const StorageBreakdownScreen = () => {
     if (result) {
       dispatch(setStorageByType(result));
     } else {
-      dispatch(setStorageByTypeError('Could not fetch storage breakdown'));
+      dispatch(setStorageByTypeError('No se pudo obtener el desglose del almacenamiento'));
     }
   }, [dispatch]);
 
@@ -47,7 +47,7 @@ const StorageBreakdownScreen = () => {
     if (result) {
       dispatch(setLargestFiles({ files: result.files, nextPageToken: result.nextPageToken }));
     } else {
-      dispatch(setLargestFilesError('Could not fetch largest files'));
+      dispatch(setLargestFilesError('No se pudieron obtener los archivos más grandes'));
     }
   }, [dispatch]);
 
@@ -66,33 +66,33 @@ const StorageBreakdownScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Storage Breakdown</Text>
+        <Text style={styles.title}>Desglose de almacenamiento</Text>
       </View>
 
       <ScrollView
         style={styles.content}
         refreshControl={<RefreshControl refreshing={storageByTypeLoading || largestFilesLoading} onRefresh={onRefresh} />}
       >
-        {/* Storage Quota Card */}
+        {/* Tarjeta de Cuota de Almacenamiento */}
         <View style={styles.storageCard}>
-          <Text style={styles.storageTitle}>Google Drive Storage</Text>
+          <Text style={styles.storageTitle}>Almacenamiento de Google Drive</Text>
 
           {quota ? (
             <>
               <View style={styles.quotaRow}>
                 <View style={styles.quotaItem}>
                   <Text style={styles.quotaValue}>{driveService.formatBytes(quota.usage)}</Text>
-                  <Text style={styles.quotaLabel}>Used</Text>
+                  <Text style={styles.quotaLabel}>Usado</Text>
                 </View>
                 <View style={styles.quotaItem}>
                   <Text style={styles.quotaValue}>
-                    {quota.limit ? driveService.formatBytes(quota.limit) : 'Unlimited'}
+                    {quota.limit ? driveService.formatBytes(quota.limit) : 'Ilimitado'}
                   </Text>
                   <Text style={styles.quotaLabel}>Total</Text>
                 </View>
               </View>
 
-              {/* Progress bar */}
+              {/* Barra de progreso */}
               {quota.limit && (
                 <View style={styles.progressBarContainer}>
                   <View style={styles.progressBarBg}>
@@ -100,17 +100,17 @@ const StorageBreakdownScreen = () => {
                       style={[styles.progressBarFill, { width: `${Math.min(usagePercent, 100)}%`, backgroundColor: barColor }]}
                     />
                   </View>
-                  <Text style={styles.progressText}>{usagePercent.toFixed(1)}% used</Text>
+                  <Text style={styles.progressText}>{usagePercent.toFixed(1)}% usado</Text>
                 </View>
               )}
             </>
           ) : (
-            <Text style={styles.loadingText}>Loading storage info...</Text>
+            <Text style={styles.loadingText}>Cargando información de almacenamiento...</Text>
           )}
         </View>
 
-        {/* Storage by Type */}
-        <Text style={styles.sectionTitle}>Storage by File Type</Text>
+        {/* Almacenamiento por tipo */}
+        <Text style={styles.sectionTitle}>Almacenamiento por tipo de archivo</Text>
 
         {storageByTypeLoading ? (
           <ActivityIndicator size="large" color="#4285f4" />
@@ -120,7 +120,7 @@ const StorageBreakdownScreen = () => {
               <TouchableOpacity
                 key={index}
                 style={styles.typeCard}
-                onPress={() => navigation.navigate('FileList', { typeFilter: type.type })}
+                onPress={() => router.push({ pathname: '/(protected)/file-list', params: { typeFilter: type.type } })}
               >
                 <View style={styles.typeIcon}>{type.icon}</View>
                 <View style={styles.typeInfo}>
@@ -139,11 +139,11 @@ const StorageBreakdownScreen = () => {
             ))}
           </View>
         ) : (
-          <Text style={styles.loadingText}>No storage breakdown available</Text>
+          <Text style={styles.loadingText}>No hay desglose de almacenamiento disponible</Text>
         )}
 
-        {/* Largest Files */}
-        <Text style={styles.sectionTitle}>Largest Files</Text>
+        {/* Archivos más grandes */}
+        <Text style={styles.sectionTitle}>Archivos más grandes</Text>
 
         {largestFilesLoading ? (
           <ActivityIndicator size="small" color="#4285f4" />
@@ -153,7 +153,7 @@ const StorageBreakdownScreen = () => {
               <TouchableOpacity
                 key={file.id}
                 style={styles.fileCard}
-                onPress={() => navigation.navigate('FileList', { fileId: file.id })}
+                onPress={() => router.push({ pathname: '/(protected)/file-list', params: { fileId: file.id } })}
               >
                 <View style={styles.fileIcon}>{file.mimeType.includes('folder') ? '📁' : '📄'}</View>
                 <View style={styles.fileInfo}>
@@ -163,25 +163,25 @@ const StorageBreakdownScreen = () => {
                 <Text style={styles.fileArrow}>›</Text>
               </TouchableOpacity>
             ))}
-            <TouchableOpacity style={styles.moreButton} onPress={() => navigation.navigate('FileList', { sort: 'size' })}>
-              <Text style={styles.moreText}>View All Largest Files</Text>
+            <TouchableOpacity style={styles.moreButton} onPress={() => router.push({ pathname: '/(protected)/file-list', params: { sort: 'size' } })}>
+              <Text style={styles.moreText}>Ver todos los archivos más grandes</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <Text style={styles.loadingText}>No large files found</Text>
+          <Text style={styles.loadingText}>No se encontraron archivos grandes</Text>
         )}
       </ScrollView>
 
-      {/* Bottom Navigation */}
+      {/* Navegación inferior */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('Home')}>
-          <Text style={styles.navButtonText}>Home</Text>
+        <TouchableOpacity style={styles.navButton} onPress={() => router.replace('/(protected)/home')}>
+          <Text style={styles.navButtonText}>Inicio</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('FileList')}>
-          <Text style={styles.navButtonText}>Files</Text>
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/(protected)/file-list')}>
+          <Text style={styles.navButtonText}>Archivos</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('CleanTrash')}>
-          <Text style={styles.navButtonText}>Trash</Text>
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/(protected)/clean-trash')}>
+          <Text style={styles.navButtonText}>Papelera</Text>
         </TouchableOpacity>
       </View>
     </View>
