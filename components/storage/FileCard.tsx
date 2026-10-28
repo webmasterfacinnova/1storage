@@ -4,7 +4,7 @@ import { ArrowUpDown } from 'lucide-react-native';
 import { UnifiedFile } from '../../types/storage';
 import { getAuthToken } from '../../utils/secureStorage';
 import OneDriveAuthService from '../../services/auth/onedrive-auth.service';
-import ProviderBadge from './ProviderBadge'; // <--- 1. Importar el badge
+import ProviderBadge from './ProviderBadge';
 
 const onedriveAuth = new OneDriveAuthService();
 
@@ -13,18 +13,18 @@ export const categorizeMimeType = (
   fileName?: string
 ): { label: string } => {
   if (mimeType === 'application/vnd.google-apps.folder') {
-    return { label: 'Folder' };
+    return { label: 'Carpeta' };
   }
-  if (mimeType?.startsWith('image/')) return { label: 'Image' };
+  if (mimeType?.startsWith('image/')) return { label: 'Imagen' };
   if (mimeType?.startsWith('video/')) return { label: 'Video' };
   if (mimeType?.startsWith('audio/')) return { label: 'Audio' };
   if (mimeType?.includes('pdf')) return { label: 'PDF' };
 
   const ext = fileName?.split('.').pop()?.toLowerCase();
   if (['doc', 'docx', 'txt', 'rtf'].includes(ext || '')) return { label: 'Doc' };
-  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext || '')) return { label: 'Archive' };
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext || '')) return { label: 'Archivo comprimido' };
 
-  return { label: 'Other' };
+  return { label: 'Otro' };
 };
 
 interface FileCardProps {
@@ -120,7 +120,6 @@ const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete, onTransfer
           <Text style={styles.fileName} numberOfLines={1}>
             {file.name}
           </Text>
-          {/* 2. Añadir el Badge pasándole file.provider */}
           {file.provider && (
             <View style={styles.badgeContainer}>
               <ProviderBadge providerId={file.provider} />
@@ -129,9 +128,9 @@ const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete, onTransfer
         </View>
 
         <Text style={styles.fileDetails}>
-          {isFolder ? 'Folder' : formatFileSize(file.size)} •{' '}
+          {isFolder ? 'Carpeta' : formatFileSize(file.size)} •{' '}
           {file.modifiedTime
-            ? new Date(file.modifiedTime).toLocaleDateString()
+            ? new Date(file.modifiedTime).toLocaleDateString('es-ES')
             : '—'}
         </Text>
       </View>

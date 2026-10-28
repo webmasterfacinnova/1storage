@@ -1,5 +1,5 @@
 // components/storage/FileTypeTabs.tsx
-// Horizontal tabs for filtering files by type category
+// Pestañas horizontales para filtrar archivos por categoría de tipo
 
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
@@ -11,15 +11,15 @@ export interface FileTypeTab {
 }
 
 export const FILE_TYPE_TABS: FileTypeTab[] = [
-  { key: 'all', label: 'All', icon: '📁' },
-  { key: 'images', label: 'Images', icon: '🖼️' },
+  { key: 'all', label: 'Todos', icon: '📁' },
+  { key: 'images', label: 'Imágenes', icon: '🖼️' },
   { key: 'videos', label: 'Videos', icon: '🎬' },
   { key: 'audio', label: 'Audio', icon: '🎵' },
-  { key: 'docs', label: 'Docs', icon: '📝' },
+  { key: 'docs', label: 'Documentos', icon: '📝' },
   { key: 'pdfs', label: 'PDFs', icon: '📄' },
-  { key: 'archives', label: 'Archives', icon: '🗜️' },
-  { key: 'folders', label: 'Folders', icon: '📁' },
-  { key: 'other', label: 'Other', icon: '📦' },
+  { key: 'archives', label: 'Archivos', icon: '🗜️' },
+  { key: 'folders', label: 'Carpetas', icon: '📁' },
+  { key: 'other', label: 'Otros', icon: '📦' },
 ];
 
 interface FileTypeTabsProps {
@@ -42,7 +42,7 @@ const FileTypeTabs: React.FC<FileTypeTabsProps> = ({ activeTab, onTabChange }) =
               key={tab.key}
               style={[styles.tab, isActive && styles.tabActive]}
               onPress={() => onTabChange(tab.key)}
-              accessibilityLabel={`Filter by ${tab.label}`}
+              accessibilityLabel={`Filtrar por ${tab.label}`}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
             >
