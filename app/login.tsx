@@ -61,7 +61,7 @@ export default function LoginRoute() {
     <View style={styles.container}>
       <View style={styles.logoContainer}>
         <Image
-          source={require('../assets/LogoSlogan.png')}
+          source={require('../assets/images/1StorageLogoTipoSlogan_512.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -93,8 +93,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   logo: {
-    width: 240,
-    height: 80,
+    width: 260,
+    height: 90,
   },
   welcome: {
     fontSize: 18,

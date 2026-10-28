@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -46,18 +46,6 @@ const HomeScreen = () => {
 
   const router = useRouter();
   const dispatch = useDispatch();
-
-  // Fecha dinámica actualizada automáticamente del dispositivo
-  const currentDateFormatted = useMemo(() => {
-    const now = new Date();
-    return now
-      .toLocaleDateString('es-ES', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-      })
-      .toUpperCase();
-  }, []);
 
   const fetchStorageQuota = useCallback(async () => {
     dispatch(setQuotaLoading(true));
@@ -148,11 +136,9 @@ const HomeScreen = () => {
           {/* Encabezado del usuario */}
           <View style={styles.headerRow}>
             <View style={styles.headerInfo}>
-              <Text style={styles.dateText}>{currentDateFormatted}</Text>
               <Text style={styles.greetingText} numberOfLines={1}>
                 Hola, {user?.name || 'Mario Alejandro'}
               </Text>
-              <Text style={styles.subtitleText}>Tu resumen de almacenamiento está listo.</Text>
             </View>
 
             {/* Avatar limpio y botón de salir con Lucide */}
@@ -218,12 +204,12 @@ const HomeScreen = () => {
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Conexiones</Text>
             <TouchableOpacity onPress={() => router.push('/(protected)/add-provider')}>
-              <Text style={styles.addProviderLink}>+ Añadir</Text>
+              <Text style={styles.addProviderLink}>+ Agregar proveedores</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.connectionsRow}>
-            {/* Google Drive */}
+            {/* Google Drive (Siempre visible como inicio de sesión principal) */}
             <View style={styles.providerCard}>
               <View style={styles.providerCardHeader}>
                 <View style={styles.providerIconWrapper}>
@@ -267,49 +253,49 @@ const HomeScreen = () => {
               </View>
             </View>
 
-            {/* OneDrive */}
-            <View style={styles.providerCard}>
-              <View style={styles.providerCardHeader}>
-                <View style={styles.providerIconWrapper}>
-                  <Image
-                    source={require('../../assets/onedrive.png')}
-                    style={styles.providerImageIcon}
-                    resizeMode="contain"
+            {/* OneDrive (Solo aparece si está conectado) */}
+            {isOneDriveConnected && (
+              <View style={styles.providerCard}>
+                <View style={styles.providerCardHeader}>
+                  <View style={styles.providerIconWrapper}>
+                    <Image
+                      source={require('../../assets/onedrive.png')}
+                      style={styles.providerImageIcon}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <View style={styles.providerMeta}>
+                    <Text style={styles.providerName}>OneDrive</Text>
+                    <Text style={styles.providerSubtext}>Sincronizado</Text>
+                  </View>
+                </View>
+
+                <View style={styles.providerUsageRow}>
+                  <Text style={styles.providerUsageValue}>
+                    {oneDriveService.formatBytes(odUsage)}
+                  </Text>
+                  <View style={styles.percentBadge}>
+                    <Text style={styles.percentBadgeText}>{odUsagePercent.toFixed(1)}%</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.providerLimitText}>
+                  de {oneDriveService.formatBytes(odLimit)}
+                </Text>
+
+                <View style={styles.providerProgressBarBg}>
+                  <View
+                    style={[
+                      styles.providerProgressBarFill,
+                      {
+                        width: `${Math.min(odUsagePercent, 100)}%`,
+                        backgroundColor: '#0078D4',
+                      },
+                    ]}
                   />
                 </View>
-                <View style={styles.providerMeta}>
-                  <Text style={styles.providerName}>OneDrive</Text>
-                  <Text style={styles.providerSubtext}>
-                    {isOneDriveConnected ? 'Sincronizado' : 'No conectado'}
-                  </Text>
-                </View>
               </View>
-
-              <View style={styles.providerUsageRow}>
-                <Text style={styles.providerUsageValue}>
-                  {oneDriveService.formatBytes(odUsage)}
-                </Text>
-                <View style={styles.percentBadge}>
-                  <Text style={styles.percentBadgeText}>{odUsagePercent.toFixed(1)}%</Text>
-                </View>
-              </View>
-
-              <Text style={styles.providerLimitText}>
-                de {oneDriveService.formatBytes(odLimit)}
-              </Text>
-
-              <View style={styles.providerProgressBarBg}>
-                <View
-                  style={[
-                    styles.providerProgressBarFill,
-                    {
-                      width: `${Math.min(odUsagePercent, 100)}%`,
-                      backgroundColor: '#0078D4',
-                    },
-                  ]}
-                />
-              </View>
-            </View>
+            )}
           </View>
 
           {/* Acciones rápidas */}
@@ -343,22 +329,6 @@ const HomeScreen = () => {
                 <Text style={styles.actionTitle}>Limpiar papelera</Text>
                 <Text style={styles.actionDescription} numberOfLines={1}>
                   {driveService.formatBytes(trashUsage)} recuperables
-                </Text>
-              </View>
-              <Text style={styles.actionArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionCard}
-              onPress={() => router.push('/(protected)/add-provider')}
-            >
-              <View style={[styles.actionIconContainer, { backgroundColor: '#E0F2FE' }]}>
-                <Text style={{ fontSize: 18 }}>🔗</Text>
-              </View>
-              <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>Agregar proveedor</Text>
-                <Text style={styles.actionDescription} numberOfLines={1}>
-                  Conecta OneDrive, Dropbox u otros servicios
                 </Text>
               </View>
               <Text style={styles.actionArrow}>›</Text>
@@ -411,29 +381,17 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 20,
   },
   headerInfo: {
     flex: 1,
     paddingRight: 10,
   },
-  dateText: {
-    color: '#FF6B35',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
   greetingText: {
     fontSize: 22,
     fontWeight: '800',
     color: '#0F172A',
-  },
-  subtitleText: {
-    fontSize: 13,
-    color: '#64748B',
-    marginTop: 2,
   },
   userControlsWrapper: {
     flexDirection: 'row',
