@@ -116,45 +116,36 @@ class GoogleAuthService implements AuthService {
     }
   }
 
+  // services/auth/google-auth.service.ts
+
   async refreshAccessToken(): Promise<string | null> {
     try {
       await this.initialize();
 
-      // Intentar obtener tokens frescos directamente del SDK nativo
-      const tokens = await GoogleSignin.getTokens();
-      let newAccessToken = tokens.accessToken;
+      // 1. Obtener el token actual para limpiar la caché si es necesario
+      const currentTokens = await GoogleSignin.getTokens();
+      if (currentTokens.accessToken) {
+        // Limpia el token de acceso de la caché local (efectivo en Android)
+        await GoogleSignin.clearCachedAccessToken(currentTokens.accessToken);
+      }
+
+      // 2. Ahora intenta obtener tokens frescos
+      const freshTokens = await GoogleSignin.getTokens();
+      let newAccessToken = freshTokens.accessToken;
 
       if (!newAccessToken) {
-        // Si el access token viene vacío, intentamos un silent sign-in para refrescar la sesión nativa
-        const currentUser = await GoogleSignin.signInSilently();
-        const freshTokens = await GoogleSignin.getTokens();
-        newAccessToken = freshTokens.accessToken;
+        // Si aún no hay token, intenta un inicio de sesión silencioso
+        await GoogleSignin.signInSilently();
+        const silentTokens = await GoogleSignin.getTokens();
+        newAccessToken = silentTokens.accessToken;
       }
 
       if (newAccessToken) {
         await saveAuthToken(newAccessToken);
       }
-
       return newAccessToken || null;
     } catch (error) {
-      console.warn(
-        "[GoogleAuth] Error refreshing native token, attempting silent sign-in...",
-        error,
-      );
-      try {
-        // Último intento mediante inicio de sesión silencioso
-        await GoogleSignin.signInSilently();
-        const freshTokens = await GoogleSignin.getTokens();
-        if (freshTokens.accessToken) {
-          await saveAuthToken(freshTokens.accessToken);
-          return freshTokens.accessToken;
-        }
-      } catch (silentError) {
-        console.error(
-          "[GoogleAuth] Silent sign-in refresh failed:",
-          silentError,
-        );
-      }
+      console.error("[GoogleAuth] Failed to refresh access token:", error);
       return null;
     }
   }
