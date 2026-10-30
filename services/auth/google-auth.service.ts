@@ -120,16 +120,41 @@ class GoogleAuthService implements AuthService {
     try {
       await this.initialize();
 
+      // Intentar obtener tokens frescos directamente del SDK nativo
       const tokens = await GoogleSignin.getTokens();
-      const newAccessToken = tokens.accessToken;
+      let newAccessToken = tokens.accessToken;
+
+      if (!newAccessToken) {
+        // Si el access token viene vacío, intentamos un silent sign-in para refrescar la sesión nativa
+        const currentUser = await GoogleSignin.signInSilently();
+        const freshTokens = await GoogleSignin.getTokens();
+        newAccessToken = freshTokens.accessToken;
+      }
 
       if (newAccessToken) {
         await saveAuthToken(newAccessToken);
       }
 
-      return newAccessToken;
+      return newAccessToken || null;
     } catch (error) {
-      console.error("[GoogleAuth] Error refreshing token:", error);
+      console.warn(
+        "[GoogleAuth] Error refreshing native token, attempting silent sign-in...",
+        error,
+      );
+      try {
+        // Último intento mediante inicio de sesión silencioso
+        await GoogleSignin.signInSilently();
+        const freshTokens = await GoogleSignin.getTokens();
+        if (freshTokens.accessToken) {
+          await saveAuthToken(freshTokens.accessToken);
+          return freshTokens.accessToken;
+        }
+      } catch (silentError) {
+        console.error(
+          "[GoogleAuth] Silent sign-in refresh failed:",
+          silentError,
+        );
+      }
       return null;
     }
   }
