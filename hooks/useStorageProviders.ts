@@ -11,7 +11,7 @@ import { clearQuota as clearDriveQuota } from '../store/slices/driveSlice';
 import { clearQuota as clearOneDriveQuota } from '../store/slices/onedriveSlice';
 import { saveSecureData, clearSecureData, getSecureData } from '../utils/secureStorage';
 import OneDriveAuthService from '../services/auth/onedrive-auth.service';
-import GoogleAuthService from '../services/auth/google-auth.service';
+import { authService as googleAuthService } from '../services/auth.service';
 
 export interface ProviderItem {
   id: string;
@@ -66,9 +66,8 @@ export const useStorageProviders = () => {
   const connectGoogleDrive = async () => {
     setIsGoogleConnecting(true);
     try {
-      const authService = new GoogleAuthService();
-      await authService.initialize();
-      const result = await authService.signIn();
+      await googleAuthService.initialize();
+      const result = await googleAuthService.signIn();
 
       if (result?.token) {
         dispatch(
@@ -90,8 +89,7 @@ export const useStorageProviders = () => {
 
   const disconnectGoogleDrive = async () => {
     try {
-      const authService = new GoogleAuthService();
-      await authService.signOut();
+      await googleAuthService.signOut();
     } catch (error) {
       console.error('Error al cerrar sesión en Google AuthService:', error);
     } finally {

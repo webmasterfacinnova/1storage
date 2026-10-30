@@ -1,11 +1,10 @@
-import { Platform } from "react-native";
-import * as WebBrowser from "expo-web-browser";
+// services/auth/google-auth.service.ts
+// Native (Android/iOS) Google authentication using @react-native-google-signin/google-signin
+
 import {
-  makeRedirectUri,
-  AuthRequest,
-  ResponseType,
-  exchangeCodeAsync,
-} from "expo-auth-session";
+  GoogleSignin,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
 import Constants from "expo-constants";
 import { AuthService, AuthResult, User } from "../auth.service";
 import {
@@ -13,27 +12,9 @@ import {
   getAuthToken,
   clearAuthToken,
   saveSecureData,
-  getSecureData,
   clearSecureData,
 } from "../../utils/secureStorage";
 import { userService } from "../user.service";
-
-WebBrowser.maybeCompleteAuthSession();
-
-const DISCOVERY = {
-  authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
-  tokenEndpoint: "https://oauth2.googleapis.com/token",
-  revocationEndpoint: "https://oauth2.googleapis.com/revoke",
-};
-
-const getGoogleSignin = (): any | null => {
-  if (Platform.OS === "web") return null;
-  try {
-    return require("@react-native-google-signin/google-signin").GoogleSignin;
-  } catch {
-    return null;
-  }
-};
 
 const SCOPES = [
   "openid",
@@ -48,7 +29,6 @@ class GoogleAuthService implements AuthService {
   private androidClientId: string = "";
 
   async initialize(): Promise<void> {
-    // Si ya está cargado, evitamos recargarlo innecesariamente
     if (this.clientId) return;
 
     this.clientId =
@@ -76,122 +56,48 @@ class GoogleAuthService implements AuthService {
     if (!this.androidClientId) {
       console.warn("Google Auth: GOOGLE_ANDROID_CLIENT_ID not found");
     }
-    // console.log("[GoogleAuth] data:", {
-    //   clientId: this.clientId,
-    //   clientSecret: this.clientSecret,
-    //   androidClientId: this.androidClientId,
-    // });
 
-    const GoogleSignin = getGoogleSignin();
-    if (!GoogleSignin) {
-      return;
-    }
-
-    try {
-      GoogleSignin.configure({
-        webClientId: this.clientId,
-        androidClientId: this.androidClientId || undefined,
-        offlineAccess: true,
-        forceCodeForRefreshToken: true,
-      });
-    } catch (error) {
-      console.error("Google Sign-In initialization error:", error);
-      throw new Error("Failed to initialize Google Sign-In");
-    }
+    GoogleSignin.configure({
+      webClientId: this.clientId,
+      // androidClientId: this.androidClientId || undefined,
+      scopes: SCOPES,
+      offlineAccess: true,
+      forceCodeForRefreshToken: true,
+    });
   }
 
   async signIn(): Promise<AuthResult> {
     try {
-      // Asegurar que las credenciales estén cargadas antes de usarlas
       await this.initialize();
 
-      const effectiveClientId = this.getEffectiveClientId();
+      await GoogleSignin.hasPlayServices();
 
-      if (!effectiveClientId) {
-        throw new Error(
-          "Google Client ID is missing. Check your app.json extra config or environment variables.",
-        );
-      }
+      const signInResult = await GoogleSignin.signIn();
 
-      // On Android, validate that the Android client ID is configured before building the redirect URI
-      if (Platform.OS === "android" && !this.androidClientId) {
-        throw new Error(
-          "Android Client ID is required for Android OAuth flow. Set EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID.",
-        );
-      }
-
-      const redirectUri = this.buildRedirectUri();
-      console.log("[GoogleAuth] redirectUri =", redirectUri);
-
-      const request = new AuthRequest({
-        clientId: effectiveClientId,
-        scopes: SCOPES,
-        redirectUri,
-        responseType: ResponseType.Code,
-        usePKCE: true,
-        extraParams: {
-          access_type: "offline",
-          prompt: "consent",
-        },
-      });
-
-      const result = await request.promptAsync(DISCOVERY);
-
-      if (result.type !== "success" || !result.params?.code) {
-        if (result.type === "cancel" || result.type === "dismiss") {
-          throw new Error("Google sign-in cancelled");
-        }
-        const errDesc =
-          (result as any)?.params?.error_description ||
-          (result as any)?.error?.message;
-        throw new Error(errDesc || "Google sign-in failed");
-      }
-
-      // Mobile apps are public clients — never send clientSecret in exchangeCodeAsync.
-      // PKCE (usePKCE: true) provides the required security proof.
-      const tokenResponse = await exchangeCodeAsync(
-        {
-          clientId: effectiveClientId,
-          clientSecret: Platform.OS === "web" ? this.clientSecret : undefined, // Only send clientSecret for web
-          code: result.params.code,
-          redirectUri,
-          extraParams: request.codeVerifier
-            ? { code_verifier: request.codeVerifier }
-            : {},
-        },
-        DISCOVERY,
-      );
-
-      const accessToken = tokenResponse.accessToken;
-      const refreshToken = tokenResponse.refreshToken ?? "";
-      const idToken = tokenResponse.idToken ?? "";
+      const tokens = await GoogleSignin.getTokens();
+      const accessToken = tokens.accessToken;
+      const idToken = tokens.idToken;
 
       if (!accessToken) {
         throw new Error("No access token received from Google");
       }
 
-      const userInfo = await this.getUserInfo(accessToken);
-
-      if (!userInfo) {
-        throw new Error("Failed to fetch user info from Google");
-      }
-
       const user: User = {
-        id: userInfo.sub ?? userInfo.id,
-        email: userInfo.email,
-        name: userInfo.name,
-        photoURL: userInfo.picture,
+        id: signInResult.user.id,
+        email: signInResult.user.email,
+        name: signInResult.user.name ?? undefined,
+        photoURL: signInResult.user.photo ?? undefined,
       };
 
       await saveAuthToken(accessToken);
-      if (refreshToken) {
-        await saveSecureData("google_refresh_token", refreshToken);
+      if (idToken) {
+        await saveSecureData("google_id_token", idToken);
       }
 
       try {
-        if (userInfo.sub) {
+        if (signInResult.user.id) {
           await userService.upsertUser({
-            googleId: userInfo.sub,
+            googleId: signInResult.user.id,
             email: user.email || "",
             name: user.name,
             photoURL: user.photoURL,
@@ -204,7 +110,7 @@ class GoogleAuthService implements AuthService {
       }
 
       return { user, token: accessToken, provider: "google" };
-    } catch (error) {
+    } catch (error: any) {
       console.error("Google sign-in error:", error);
       throw this.handleAuthError(error);
     }
@@ -213,34 +119,9 @@ class GoogleAuthService implements AuthService {
   async refreshAccessToken(): Promise<string | null> {
     try {
       await this.initialize();
-      const refreshToken = await getSecureData("google_refresh_token");
-      if (!refreshToken) return null;
 
-      const effectiveClientId = this.getEffectiveClientId();
-
-      const tokenBody = new URLSearchParams({
-        client_id: effectiveClientId,
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-      });
-
-      if (this.clientSecret) {
-        tokenBody.append("client_secret", this.clientSecret);
-      }
-
-      const response = await fetch(DISCOVERY.tokenEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: tokenBody.toString(),
-      });
-
-      if (!response.ok) {
-        console.warn("[GoogleAuth] Failed to refresh token:", response.status);
-        return null;
-      }
-
-      const tokenData = await response.json();
-      const newAccessToken = tokenData.access_token;
+      const tokens = await GoogleSignin.getTokens();
+      const newAccessToken = tokens.accessToken;
 
       if (newAccessToken) {
         await saveAuthToken(newAccessToken);
@@ -255,12 +136,9 @@ class GoogleAuthService implements AuthService {
 
   async signOut(): Promise<void> {
     try {
-      const GoogleSignin = getGoogleSignin();
-      if (GoogleSignin) {
-        await GoogleSignin.signOut();
-      }
+      await GoogleSignin.signOut();
       await clearAuthToken();
-      await clearSecureData("google_refresh_token");
+      await clearSecureData("google_id_token");
       await userService.clearCache();
     } catch (error) {
       console.error("Google sign-out error:", error);
@@ -270,38 +148,26 @@ class GoogleAuthService implements AuthService {
 
   async getCurrentUser(): Promise<User | null> {
     try {
-      let token = await getAuthToken();
-      if (!token) return null;
+      let currentUser = await GoogleSignin.getCurrentUser();
 
-      let userInfo = await this.getUserInfo(token);
-
-      if (!userInfo) {
-        console.log(
-          "[GoogleAuth] Token expirado o inválido. Intentando refrescar...",
-        );
-        await this.initialize();
-        token = await this.refreshAccessToken();
-
-        if (token) {
-          userInfo = await this.getUserInfo(token);
+      if (!currentUser) {
+        try {
+          currentUser = await GoogleSignin.signInSilently();
+        } catch {
+          return null;
         }
       }
 
-      if (!userInfo) {
-        console.warn("[GoogleAuth] No se pudo renovar la sesión del usuario");
-        await clearAuthToken();
-        await userService.clearCache();
-        return null;
-      }
+      if (!currentUser) return null;
 
       return {
-        id: userInfo.sub ?? userInfo.id,
-        email: userInfo.email,
-        name: userInfo.name,
-        photoURL: userInfo.picture,
+        id: currentUser.user.id,
+        email: currentUser.user.email,
+        name: currentUser.user.name ?? undefined,
+        photoURL: currentUser.user.photo ?? undefined,
       };
     } catch (error) {
-      console.error("[GoogleAuth] Error obteniendo usuario actual:", error);
+      console.error("[GoogleAuth] Error getting current user:", error);
       await clearAuthToken();
       await userService.clearCache();
       return null;
@@ -312,70 +178,27 @@ class GoogleAuthService implements AuthService {
     return getAuthToken();
   }
 
-  /**
-   * Returns the appropriate client ID based on the current platform.
-   * On Android, uses the Android client ID (if configured); otherwise falls back to the web client ID.
-   */
-  private getEffectiveClientId(): string {
-    if (Platform.OS === "android" && this.androidClientId) {
-      return this.androidClientId;
-    }
-    return this.clientId;
-  }
-
-  /**
-   * Builds the OAuth redirect URI according to the current platform.
-   *
-   * - Android: uses the app's custom scheme "onestorage" with path "/oauthredirect"
-   *   e.g. "onestorage:/oauthredirect"
-   * - Web: uses makeRedirectUri with preferLocalhost (works in browser)
-   * - iOS: uses standard makeRedirectUri
-   */
-  private buildRedirectUri(): string {
-    if (Platform.OS === "android") {
-      return makeRedirectUri({ scheme: "onestorage", path: "oauthredirect" });
-    }
-
-    if (Platform.OS === "web") {
-      return makeRedirectUri({ preferLocalhost: true });
-    }
-
-    // iOS — standard redirect URI
-    return makeRedirectUri();
-  }
-
-  private async getUserInfo(token: string): Promise<any> {
-    if (!token) return null;
-
-    try {
-      const response = await fetch(
-        "https://www.googleapis.com/userinfo/v2/me",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-
-      if (!response.ok) {
-        return null;
-      }
-
-      return await response.json();
-    } catch (error) {
-      return null;
-    }
-  }
-
   private handleAuthError(error: any): Error {
-    if (!error || !error.message) {
+    if (!error) {
       return new Error("Google authentication failed – please try again");
     }
-    const msg = error.message.toLowerCase();
+
+    if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+      return new Error("Sign-in cancelled");
+    }
+    if (error.code === statusCodes.IN_PROGRESS) {
+      return new Error("Sign-in already in progress");
+    }
+    if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+      return new Error("Google Play Services are not available");
+    }
+
+    const msg = error.message?.toLowerCase() ?? "";
     if (msg.includes("network"))
       return new Error("Network error – check your connection");
-    if (msg.includes("cancelled") || msg.includes("cancel"))
-      return new Error("Sign-in cancelled");
     if (msg.includes("timeout"))
       return new Error("Request timed out – please try again");
+
     return new Error(
       error.message || "Google authentication failed – please try again",
     );

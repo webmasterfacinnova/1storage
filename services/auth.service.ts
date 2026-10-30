@@ -2,12 +2,12 @@
 // Core authentication service interface and factory
 // Auth is handled via Google OAuth directly – no Firebase dependency.
 
-import GoogleAuthService from './auth/google-auth.service';
+import { Platform } from "react-native";
 
 export interface AuthCredentials {
   email?: string;
   password?: string;
-  provider?: 'google' | 'apple';
+  provider?: "google" | "apple";
   token?: string;
 }
 
@@ -30,12 +30,19 @@ export interface AuthService {
   signOut(): Promise<void>;
   getCurrentUser(): Promise<User | null>;
   getAuthToken(): Promise<string | null>;
+  refreshAccessToken(): Promise<string | null>;
 }
 
-// Only Google Auth is active for now.
-// Extend the factory when Apple / other providers are added.
+// Platform-aware factory: picks the correct Google Auth implementation
+// - Native (Android/iOS): uses @react-native-google-signin/google-signin
+// - Web: uses expo-auth-session (OAuth 2.0 code flow with PKCE)
+const GoogleAuthServiceCtor: { new (): AuthService } =
+  Platform.OS === "web"
+    ? require("./auth/google-auth.service.web").default
+    : require("./auth/google-auth.service").default;
+
 const createAuthService = (): AuthService => {
-  return new GoogleAuthService();
+  return new GoogleAuthServiceCtor();
 };
 
 export const authService = createAuthService();
