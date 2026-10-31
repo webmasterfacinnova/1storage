@@ -15,7 +15,7 @@ import { LogOut } from "lucide-react-native";
 import { ScreenContainer } from "../../components/common/ScreenContainer";
 import { selectCurrentUser, logout } from "../../store/slices/authSlice";
 import { authService } from "../../services/auth.service";
-import { driveService } from "../../services/drive.service";
+import { driveService } from "@/services/drive.service";
 import {
   setQuotaLoading,
   setQuota,

@@ -51,6 +51,9 @@ export default function ProtectedLayout() {
           name="add-provider"
           options={{ title: "Agregar Proveedor" }}
         />
+
+        {/* Redirect screen for handling OAuth redirects */}
+        <Stack.Screen name="redirect" options={{ headerShown: false }} />
       </Stack>
     </View>
   );
