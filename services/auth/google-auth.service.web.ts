@@ -1,0 +1,296 @@
+// services/auth/google-auth.service.web.ts
+// Web Google authentication using expo-auth-session (OAuth 2.0 code flow with PKCE)
+
+import * as WebBrowser from "expo-web-browser";
+import {
+  makeRedirectUri,
+  AuthRequest,
+  ResponseType,
+  exchangeCodeAsync,
+} from "expo-auth-session";
+import Constants from "expo-constants";
+import { AuthService, AuthResult, User } from "../auth.service";
+import {
+  saveAuthToken,
+  getAuthToken,
+  clearAuthToken,
+  saveSecureData,
+  getSecureData,
+  clearSecureData,
+} from "../../utils/secureStorage";
+import { userService } from "../user.service";
+
+WebBrowser.maybeCompleteAuthSession();
+
+const DISCOVERY = {
+  authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
+  tokenEndpoint: "https://oauth2.googleapis.com/token",
+  revocationEndpoint: "https://oauth2.googleapis.com/revoke",
+};
+
+const SCOPES = [
+  "openid",
+  "profile",
+  "email",
+  "https://www.googleapis.com/auth/drive",
+];
+
+class GoogleAuthServiceWeb implements AuthService {
+  private clientId: string = "";
+  private clientSecret: string = "";
+
+  async initialize(): Promise<void> {
+    if (this.clientId) return;
+
+    this.clientId =
+      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
+      Constants.expoConfig?.extra?.googleWebClientId ??
+      Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
+      "";
+    this.clientSecret =
+      process.env.EXPO_PUBLIC_GOOGLE_CLIENT_SECRET ??
+      Constants.expoConfig?.extra?.googleClientSecret ??
+      Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_CLIENT_SECRET ??
+      "";
+
+    if (!this.clientId) {
+      console.warn("Google Auth: GOOGLE_WEB_CLIENT_ID not found");
+    }
+    if (!this.clientSecret) {
+      console.warn("Google Auth: GOOGLE_CLIENT_SECRET not found");
+    }
+  }
+
+  async signIn(): Promise<AuthResult> {
+    try {
+      await this.initialize();
+
+      if (!this.clientId) {
+        throw new Error(
+          "Google Client ID is missing. Check your app.json extra config or environment variables.",
+        );
+      }
+
+      const redirectUri = makeRedirectUri({ preferLocalhost: true });
+
+      const request = new AuthRequest({
+        clientId: this.clientId,
+        scopes: SCOPES,
+        redirectUri,
+        responseType: ResponseType.Code,
+        usePKCE: true,
+        extraParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
+      });
+
+      const result = await request.promptAsync(DISCOVERY);
+
+      if (result.type !== "success" || !result.params?.code) {
+        if (result.type === "cancel" || result.type === "dismiss") {
+          throw new Error("Google sign-in cancelled");
+        }
+        const errDesc =
+          (result as any)?.params?.error_description ||
+          (result as any)?.error?.message;
+        throw new Error(errDesc || "Google sign-in failed");
+      }
+
+      // Web is a confidential client — send clientSecret in the exchange
+      const tokenResponse = await exchangeCodeAsync(
+        {
+          clientId: this.clientId,
+          clientSecret: this.clientSecret || undefined,
+          code: result.params.code,
+          redirectUri,
+          extraParams: request.codeVerifier
+            ? { code_verifier: request.codeVerifier }
+            : {},
+        },
+        DISCOVERY,
+      );
+
+      const accessToken = tokenResponse.accessToken;
+      const refreshToken = tokenResponse.refreshToken ?? "";
+      const idToken = tokenResponse.idToken ?? "";
+
+      if (!accessToken) {
+        throw new Error("No access token received from Google");
+      }
+
+      const userInfo = await this.getUserInfo(accessToken);
+
+      if (!userInfo) {
+        throw new Error("Failed to fetch user info from Google");
+      }
+
+      const user: User = {
+        id: userInfo.sub ?? userInfo.id,
+        email: userInfo.email,
+        name: userInfo.name,
+        photoURL: userInfo.picture,
+      };
+
+      await saveAuthToken(accessToken);
+      if (refreshToken) {
+        await saveSecureData("google_refresh_token", refreshToken);
+      }
+
+      try {
+        if (userInfo.sub) {
+          await userService.upsertUser({
+            googleId: userInfo.sub,
+            email: user.email || "",
+            name: user.name,
+            photoURL: user.photoURL,
+            idToken: idToken || "",
+            accessToken,
+          });
+        }
+      } catch (dbError) {
+        console.error("Failed to sync user to database:", dbError);
+      }
+
+      return { user, token: accessToken, provider: "google" };
+    } catch (error) {
+      console.error("Google sign-in error:", error);
+      throw this.handleAuthError(error);
+    }
+  }
+
+  async refreshAccessToken(): Promise<string | null> {
+    try {
+      await this.initialize();
+      const refreshToken = await getSecureData("google_refresh_token");
+      if (!refreshToken) return null;
+
+      const tokenBody = new URLSearchParams({
+        client_id: this.clientId,
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      });
+
+      if (this.clientSecret) {
+        tokenBody.append("client_secret", this.clientSecret);
+      }
+
+      const response = await fetch(DISCOVERY.tokenEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: tokenBody.toString(),
+      });
+
+      if (!response.ok) {
+        console.warn("[GoogleAuth] Failed to refresh token:", response.status);
+        return null;
+      }
+
+      const tokenData = await response.json();
+      const newAccessToken = tokenData.access_token;
+
+      if (newAccessToken) {
+        await saveAuthToken(newAccessToken);
+      }
+
+      return newAccessToken;
+    } catch (error) {
+      console.error("[GoogleAuth] Error refreshing token:", error);
+      return null;
+    }
+  }
+
+  async signOut(): Promise<void> {
+    try {
+      await clearAuthToken();
+      await clearSecureData("google_refresh_token");
+      await userService.clearCache();
+    } catch (error) {
+      console.error("Google sign-out error:", error);
+      throw this.handleAuthError(error);
+    }
+  }
+
+  async getCurrentUser(): Promise<User | null> {
+    try {
+      let token = await getAuthToken();
+      if (!token) return null;
+
+      let userInfo = await this.getUserInfo(token);
+
+      if (!userInfo) {
+        console.log(
+          "[GoogleAuth] Token expired or invalid. Attempting refresh...",
+        );
+        await this.initialize();
+        token = await this.refreshAccessToken();
+
+        if (token) {
+          userInfo = await this.getUserInfo(token);
+        }
+      }
+
+      if (!userInfo) {
+        console.warn("[GoogleAuth] Could not renew user session");
+        await clearAuthToken();
+        await userService.clearCache();
+        return null;
+      }
+
+      return {
+        id: userInfo.sub ?? userInfo.id,
+        email: userInfo.email,
+        name: userInfo.name,
+        photoURL: userInfo.picture,
+      };
+    } catch (error) {
+      console.error("[GoogleAuth] Error getting current user:", error);
+      await clearAuthToken();
+      await userService.clearCache();
+      return null;
+    }
+  }
+
+  async getAuthToken(): Promise<string | null> {
+    return getAuthToken();
+  }
+
+  private async getUserInfo(token: string): Promise<any> {
+    if (!token) return null;
+
+    try {
+      const response = await fetch(
+        "https://www.googleapis.com/userinfo/v2/me",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      if (!response.ok) {
+        return null;
+      }
+
+      return await response.json();
+    } catch (error) {
+      return null;
+    }
+  }
+
+  private handleAuthError(error: any): Error {
+    if (!error || !error.message) {
+      return new Error("Google authentication failed – please try again");
+    }
+    const msg = error.message.toLowerCase();
+    if (msg.includes("network"))
+      return new Error("Network error – check your connection");
+    if (msg.includes("cancelled") || msg.includes("cancel"))
+      return new Error("Sign-in cancelled");
+    if (msg.includes("timeout"))
+      return new Error("Request timed out – please try again");
+    return new Error(
+      error.message || "Google authentication failed – please try again",
+    );
+  }
+}
+
+export default GoogleAuthServiceWeb;
