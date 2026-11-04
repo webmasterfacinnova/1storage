@@ -19,9 +19,7 @@ import FileCard, { categorizeMimeType } from '../../components/storage/FileCard'
 import FileTypeTabs, { FILE_TYPE_TABS } from '../../components/storage/FileTypeTabs';
 import StorageSummaryBar from '../../components/storage/StorageSummaryBar';
 import ProviderSelector from '../../components/storage/ProviderSelector';
-import TypeSummaryScroll from '../../components/storage/TypeSummaryScroll';
 import SortBar, { SortOption } from '../../components/storage/SortBar';
-import HeaderBar from '../../components/storage/HeaderBar';
 import EmptyFilesView from '../../components/storage/EmptyFilesView';
 
 import { fetchProviderFilesPage } from '../../services/storage-registry.service';
@@ -81,7 +79,6 @@ const ManagerFilesScreen: React.FC = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { height: windowHeight } = useWindowDimensions();
-  const [headerH, setHeaderH] = useState(56);
   const [viewportH, setViewportH] = useState(0);
   const [contentH, setContentH] = useState(0);
   const [previews, setPreviews] = useState<UnifiedFile[]>([]);
@@ -370,17 +367,6 @@ const ManagerFilesScreen: React.FC = () => {
     if (notScrollableYet) onLoadMore();
   }, [hasMore, loadingMore, loading, viewportH, contentH, filtered.length, onLoadMore]);
 
-  const summary = useMemo(() => {
-    const map = new Map<string, { label: string; count: number; icon: string }>();
-    for (const f of previews) {
-      const k = getCategoryKey(f.mimeType, f.name);
-      const t = FILE_TYPE_TABS.find(x => x.key === k);
-      const e = map.get(k) || { label: t?.label || k, count: 0, icon: t?.icon || '📦' };
-      e.count += 1; map.set(k, e);
-    }
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
-  }, [previews]);
-
   if (loading && previews.length === 0) {
     return (
       <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -391,15 +377,8 @@ const ManagerFilesScreen: React.FC = () => {
 
   return (
     <View style={[s.container, { height: windowHeight }]}>
-      {/* Componente Header */}
-      <HeaderBar
-        title="Gestor de Archivos"
-        onBack={() => router.back()}
-        onLayout={e => setHeaderH(e.nativeEvent.layout.height)}
-      />
-
       <ScrollView
-        style={{ height: Math.max(windowHeight - headerH, 0) }}
+        style={{ flex: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1a237e" />}
         contentContainerStyle={{ paddingBottom: 60 }}
         onScroll={onScroll}
@@ -428,14 +407,6 @@ const ManagerFilesScreen: React.FC = () => {
           providerMetaMap={PROVIDER_META}
           connectedProviders={connectedProviders}
           onSelectProvider={setActiveProvider}
-        />
-
-        <TypeSummaryScroll
-          summaryItems={summary}
-          onSelectType={label => {
-            const t = FILE_TYPE_TABS.find(x => x.label === label || x.key === label.toLowerCase());
-            setTab(t?.key || 'other');
-          }}
         />
 
         <FileTypeTabs activeTab={tab} onTabChange={setTab} />
