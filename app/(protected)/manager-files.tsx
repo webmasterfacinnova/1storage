@@ -36,8 +36,8 @@ import { selectConnectedProviders } from '../../store/slices/connectedProvidersS
 import { removeDriveFile } from '../../store/slices/driveFilesSlice';
 import { removeOnedriveFile } from '../../store/slices/onedriveFilesSlice';
 
-const googleDriveIcon = require('../../assets/googledrive.png');
-const oneDriveIcon = require('../../assets/onedrive.png');
+const googleDriveIcon = require('../../assets/images/google_drive.png');
+const oneDriveIcon = require('../../assets/images/one_drive.png');
 
 const PROVIDER_ALL = 'all';
 

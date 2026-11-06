@@ -22,7 +22,7 @@ export default function ProtectedLayout() {
             headerLeft: () => {
               return (
                 <Image
-                  source={require("@/assets/images/1StorageIsoLogo_512.png")}
+                  source={require("@/assets/images/storage_iso_logo_512.png")}
                   style={{
                     width: 40,
                     height: 40,

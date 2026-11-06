@@ -26,7 +26,7 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       ) : (
         <>
           <Image
-            source={require('../../assets/google-logo.png')}
+            source={require('../../assets/images/google_logo.png')}
             style={styles.logo}
           />
           <Text style={styles.text}>Continue with Google</Text>

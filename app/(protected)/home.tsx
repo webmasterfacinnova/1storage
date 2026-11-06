@@ -244,7 +244,7 @@ const HomeScreen = () => {
             <View style={styles.providerCardHeader}>
               <View style={styles.providerIconWrapper}>
                 <Image
-                  source={require("../../assets/googledrive.png")}
+                  source={require("../../assets/images/google_drive.png")}
                   style={styles.providerImageIcon}
                   resizeMode="contain"
                 />
@@ -291,7 +291,7 @@ const HomeScreen = () => {
               <View style={styles.providerCardHeader}>
                 <View style={styles.providerIconWrapper}>
                   <Image
-                    source={require("../../assets/onedrive.png")}
+                    source={require("../../assets/images/one_drive.png")}
                     style={styles.providerImageIcon}
                     resizeMode="contain"
                   />

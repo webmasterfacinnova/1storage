@@ -29,10 +29,10 @@ const AddProviderScreen: React.FC = () => {
   // Función auxiliar para determinar el icono local según el proveedor
   const getProviderIconSource = (providerId: string) => {
     if (providerId.includes('google')) {
-      return require('../../assets/googledrive.png');
+      return require('../../assets/images/google_drive.png');
     }
     // Por defecto asume OneDrive o el icono alternativo
-    return require('../../assets/onedrive.png');
+    return require('../../assets/images/one_drive.png');
   };
 
   return (

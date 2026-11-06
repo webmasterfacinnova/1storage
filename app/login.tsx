@@ -61,7 +61,7 @@ export default function LoginRoute() {
     <View style={styles.container}>
       <View style={styles.logoContainer}>
         <Image
-          source={require('../assets/images/1StorageLogoTipoSlogan_512.png')}
+          source={require('../assets/images/storage_logo_slogan_512.png')}
           style={styles.logo}
           resizeMode="contain"
         />

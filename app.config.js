@@ -26,7 +26,7 @@ export default {
     icon: "./assets/images/icon.png",
     userInterfaceStyle: "light",
     splash: {
-      image: "./assets/images/splash-icon.png",
+      image: "./assets/images/splash_icon.png",
       resizeMode: "contain",
       backgroundColor: "#ffffff",
     },
@@ -49,7 +49,7 @@ export default {
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: "./assets/images/adaptive-icon.png",
+        foregroundImage: "./assets/images/adaptive_icon.png",
         backgroundColor: "#ffffff",
       },
       package: appPackage,
