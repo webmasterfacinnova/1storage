@@ -7,7 +7,6 @@ import {
   RefreshControl,
   Image,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector, useDispatch } from "react-redux";
 import { useRouter } from "expo-router";
 import { LogOut } from "lucide-react-native";
@@ -126,162 +125,196 @@ const HomeScreen = () => {
     (quota?.usageInDriveTrash || 0) + (odQuota?.usageInDriveTrash || 0);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-      <View style={styles.container}>
-        {/* Header superior con logo S1 storage */}
-        <View style={styles.topBar}>
-          <View style={styles.brandContainer}>
-            <View style={styles.logoBadge}>
-              <Text style={styles.logoBadgeText}>S1</Text>
-            </View>
-            <Text style={styles.brandTitle}>storage</Text>
+    <View style={styles.container}>
+      <ScreenContainer
+        refreshControl={
+          <RefreshControl
+            refreshing={quotaLoading || odQuotaLoading}
+            onRefresh={() => {
+              if (isGoogleDriveConnected) fetchStorageQuota();
+              if (isOneDriveConnected) fetchOneDriveQuota();
+            }}
+          />
+        }
+      >
+        {/* Encabezado del usuario */}
+        <View style={styles.headerRow}>
+          <View style={styles.headerInfo}>
+            <Text style={styles.greetingText} numberOfLines={1}>
+              Hola, {user?.name || "Mario Alejandro"}
+            </Text>
+          </View>
+
+          {/* Avatar limpio y botón de salir con Lucide */}
+          <View style={styles.userControlsWrapper}>
+            {user?.photoURL !== undefined && user?.photoURL !== null ? (
+              <Image
+                source={{ uri: user?.photoURL }}
+                style={{
+                  width: 40,
+                  height: 40,
+                  backgroundColor: "#FFF",
+                  borderRadius: 50,
+                }}
+              />
+            ) : (
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarInitial}>
+                  {(user?.name || user?.email || "MA")
+                    .substring(0, 2)
+                    .toUpperCase()}
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.headerLogoutBtn}
+              onPress={handleLogout}
+              accessibilityLabel="Cerrar sesión"
+            >
+              <LogOut size={18} color="#64748B" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        <ScreenContainer
-          refreshControl={
-            <RefreshControl
-              refreshing={quotaLoading || odQuotaLoading}
-              onRefresh={() => {
-                if (isGoogleDriveConnected) fetchStorageQuota();
-                if (isOneDriveConnected) fetchOneDriveQuota();
-              }}
-            />
-          }
-        >
-          {/* Encabezado del usuario */}
-          <View style={styles.headerRow}>
-            <View style={styles.headerInfo}>
-              <Text style={styles.greetingText} numberOfLines={1}>
-                Hola, {user?.name || "Mario Alejandro"}
+        {/* Tarjeta de Espacio Total Unificado */}
+        <View style={styles.summaryRow}>
+          <View style={styles.totalSpaceCard}>
+            <Text style={styles.totalSpaceLabel}>
+              Espacio total utilizado
+            </Text>
+            <View style={styles.totalSpaceValueRow}>
+              <Text style={styles.totalSpaceNumber}>
+                {(totalUsage / (1024 * 1024 * 1024)).toFixed(1)}
               </Text>
+              <Text style={styles.totalSpaceUnit}>GB utilizados</Text>
             </View>
 
-            {/* Avatar limpio y botón de salir con Lucide */}
-            <View style={styles.userControlsWrapper}>
-              {user?.photoURL !== undefined && user?.photoURL !== null ? (
-                <Image
-                  source={{ uri: user?.photoURL }}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    backgroundColor: "#FFF",
-                    borderRadius: 50,
-                  }}
+            <View style={styles.mainProgressBarBg}>
+              {isGoogleDriveConnected && (
+                <View
+                  style={[
+                    styles.mainProgressBarFill,
+                    {
+                      width: `${Math.min(drivePercentOfTotal, 100)}%`,
+                      backgroundColor: "#4285F4",
+                    },
+                  ]}
                 />
-              ) : (
-                <View style={styles.avatarCircle}>
-                  <Text style={styles.avatarInitial}>
-                    {(user?.name || user?.email || "MA")
-                      .substring(0, 2)
-                      .toUpperCase()}
-                  </Text>
-                </View>
               )}
-
-              <TouchableOpacity
-                style={styles.headerLogoutBtn}
-                onPress={handleLogout}
-                accessibilityLabel="Cerrar sesión"
-              >
-                <LogOut size={18} color="#64748B" />
-              </TouchableOpacity>
+              {isOneDriveConnected && (
+                <View
+                  style={[
+                    styles.mainProgressBarFill,
+                    {
+                      width: `${Math.min(odPercentOfTotal, 100)}%`,
+                      backgroundColor: "#0078D4",
+                    },
+                  ]}
+                />
+              )}
             </View>
-          </View>
 
-          {/* Tarjeta de Espacio Total Unificado */}
-          <View style={styles.summaryRow}>
-            <View style={styles.totalSpaceCard}>
-              <Text style={styles.totalSpaceLabel}>
-                Espacio total utilizado
+            <View style={styles.totalSpaceFooter}>
+              <Text style={styles.totalSpaceFooterText}>
+                {overallPercent.toFixed(1)}% usado
               </Text>
-              <View style={styles.totalSpaceValueRow}>
-                <Text style={styles.totalSpaceNumber}>
-                  {(totalUsage / (1024 * 1024 * 1024)).toFixed(1)}
-                </Text>
-                <Text style={styles.totalSpaceUnit}>GB utilizados</Text>
-              </View>
+              <Text style={styles.totalSpaceFooterText}>
+                {totalLimit > 0
+                  ? `${(totalLimit / (1024 * 1024 * 1024)).toFixed(0)} GB total`
+                  : "--"}
+              </Text>
+            </View>
+          </View>
+        </View>
 
-              <View style={styles.mainProgressBarBg}>
-                {isGoogleDriveConnected && (
-                  <View
-                    style={[
-                      styles.mainProgressBarFill,
-                      {
-                        width: `${Math.min(drivePercentOfTotal, 100)}%`,
-                        backgroundColor: "#4285F4",
-                      },
-                    ]}
-                  />
-                )}
-                {isOneDriveConnected && (
-                  <View
-                    style={[
-                      styles.mainProgressBarFill,
-                      {
-                        width: `${Math.min(odPercentOfTotal, 100)}%`,
-                        backgroundColor: "#0078D4",
-                      },
-                    ]}
-                  />
-                )}
-              </View>
+        {/* Sección de Conexiones */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Conexiones</Text>
+          <TouchableOpacity
+            onPress={() => router.push("/(protected)/add-provider")}
+          >
+            <Text style={styles.addProviderLink}>+ Agregar proveedores</Text>
+          </TouchableOpacity>
+        </View>
 
-              <View style={styles.totalSpaceFooter}>
-                <Text style={styles.totalSpaceFooterText}>
-                  {overallPercent.toFixed(1)}% usado
-                </Text>
-                <Text style={styles.totalSpaceFooterText}>
-                  {totalLimit > 0
-                    ? `${(totalLimit / (1024 * 1024 * 1024)).toFixed(0)} GB total`
-                    : "--"}
+        <View style={styles.connectionsRow}>
+          {/* Google Drive */}
+          <View style={styles.providerCard}>
+            <View style={styles.providerCardHeader}>
+              <View style={styles.providerIconWrapper}>
+                <Image
+                  source={require("../../assets/googledrive.png")}
+                  style={styles.providerImageIcon}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={styles.providerMeta}>
+                <Text style={styles.providerName}>Google Drive</Text>
+                <Text style={styles.providerSubtext}>
+                  {isGoogleDriveConnected ? "Sincronizado" : "No conectado"}
                 </Text>
               </View>
             </View>
+
+            <View style={styles.providerUsageRow}>
+              <Text style={styles.providerUsageValue}>
+                {driveService.formatBytes(driveUsage)}
+              </Text>
+              <View style={styles.percentBadge}>
+                <Text style={styles.percentBadgeText}>
+                  {driveUsagePercent.toFixed(1)}%
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.providerLimitText}>
+              de {driveService.formatBytes(driveLimit)}
+            </Text>
+
+            <View style={styles.providerProgressBarBg}>
+              <View
+                style={[
+                  styles.providerProgressBarFill,
+                  {
+                    width: `${Math.min(driveUsagePercent, 100)}%`,
+                    backgroundColor: "#4285F4",
+                  },
+                ]}
+              />
+            </View>
           </View>
 
-          {/* Sección de Conexiones */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Conexiones</Text>
-            <TouchableOpacity
-              onPress={() => router.push("/(protected)/add-provider")}
-            >
-              <Text style={styles.addProviderLink}>+ Agregar proveedores</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.connectionsRow}>
-            {/* Google Drive (Siempre visible como inicio de sesión principal) */}
+          {/* OneDrive */}
+          {isOneDriveConnected && (
             <View style={styles.providerCard}>
               <View style={styles.providerCardHeader}>
                 <View style={styles.providerIconWrapper}>
                   <Image
-                    source={require("../../assets/googledrive.png")}
+                    source={require("../../assets/onedrive.png")}
                     style={styles.providerImageIcon}
                     resizeMode="contain"
                   />
                 </View>
                 <View style={styles.providerMeta}>
-                  <Text style={styles.providerName}>Google Drive</Text>
-                  <Text style={styles.providerSubtext}>
-                    {isGoogleDriveConnected ? "Sincronizado" : "No conectado"}
-                  </Text>
+                  <Text style={styles.providerName}>OneDrive</Text>
+                  <Text style={styles.providerSubtext}>Sincronizado</Text>
                 </View>
               </View>
 
               <View style={styles.providerUsageRow}>
                 <Text style={styles.providerUsageValue}>
-                  {driveService.formatBytes(driveUsage)}
+                  {oneDriveService.formatBytes(odUsage)}
                 </Text>
                 <View style={styles.percentBadge}>
                   <Text style={styles.percentBadgeText}>
-                    {driveUsagePercent.toFixed(1)}%
+                    {odUsagePercent.toFixed(1)}%
                   </Text>
                 </View>
               </View>
 
               <Text style={styles.providerLimitText}>
-                de {driveService.formatBytes(driveLimit)}
+                de {oneDriveService.formatBytes(odLimit)}
               </Text>
 
               <View style={styles.providerProgressBarBg}>
@@ -289,152 +322,73 @@ const HomeScreen = () => {
                   style={[
                     styles.providerProgressBarFill,
                     {
-                      width: `${Math.min(driveUsagePercent, 100)}%`,
-                      backgroundColor: "#4285F4",
+                      width: `${Math.min(odUsagePercent, 100)}%`,
+                      backgroundColor: "#0078D4",
                     },
                   ]}
                 />
               </View>
             </View>
+          )}
+        </View>
 
-            {/* OneDrive (Solo aparece si está conectado) */}
-            {isOneDriveConnected && (
-              <View style={styles.providerCard}>
-                <View style={styles.providerCardHeader}>
-                  <View style={styles.providerIconWrapper}>
-                    <Image
-                      source={require("../../assets/onedrive.png")}
-                      style={styles.providerImageIcon}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <View style={styles.providerMeta}>
-                    <Text style={styles.providerName}>OneDrive</Text>
-                    <Text style={styles.providerSubtext}>Sincronizado</Text>
-                  </View>
-                </View>
+        {/* Acciones rápidas */}
+        <Text style={[styles.sectionTitle, { marginTop: 28 }]}>
+          ¿Qué necesitas hacer?
+        </Text>
 
-                <View style={styles.providerUsageRow}>
-                  <Text style={styles.providerUsageValue}>
-                    {oneDriveService.formatBytes(odUsage)}
-                  </Text>
-                  <View style={styles.percentBadge}>
-                    <Text style={styles.percentBadgeText}>
-                      {odUsagePercent.toFixed(1)}%
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={styles.providerLimitText}>
-                  de {oneDriveService.formatBytes(odLimit)}
-                </Text>
-
-                <View style={styles.providerProgressBarBg}>
-                  <View
-                    style={[
-                      styles.providerProgressBarFill,
-                      {
-                        width: `${Math.min(odUsagePercent, 100)}%`,
-                        backgroundColor: "#0078D4",
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
-            )}
-          </View>
-
-          {/* Acciones rápidas */}
-          <Text style={[styles.sectionTitle, { marginTop: 28 }]}>
-            ¿Qué necesitas hacer?
-          </Text>
-
-          <View style={styles.actionsColumn}>
-            <TouchableOpacity
-              style={styles.actionCard}
-              onPress={() => router.push("/(protected)/manager-files")}
+        <View style={styles.actionsColumn}>
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => router.push("/(protected)/manager-files")}
+          >
+            <View
+              style={[
+                styles.actionIconContainer,
+                { backgroundColor: "#FFF4E5" },
+              ]}
             >
-              <View
-                style={[
-                  styles.actionIconContainer,
-                  { backgroundColor: "#FFF4E5" },
-                ]}
-              >
-                <Text style={{ fontSize: 18 }}>📁</Text>
-              </View>
-              <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>Gestionar archivos</Text>
-                <Text style={styles.actionDescription} numberOfLines={1}>
-                  Explora tus archivos en todos los almacenes
-                </Text>
-              </View>
-              <Text style={styles.actionArrow}>›</Text>
-            </TouchableOpacity>
+              <Text style={{ fontSize: 18 }}>📁</Text>
+            </View>
+            <View style={styles.actionContent}>
+              <Text style={styles.actionTitle}>Gestionar archivos</Text>
+              <Text style={styles.actionDescription} numberOfLines={1}>
+                Explora tus archivos en todos los almacenes
+              </Text>
+            </View>
+            <Text style={styles.actionArrow}>›</Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.actionCard}
-              onPress={() => router.push("/(protected)/clean-trash")}
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => router.push("/(protected)/clean-trash")}
+          >
+            <View
+              style={[
+                styles.actionIconContainer,
+                { backgroundColor: "#FFF0F0" },
+              ]}
             >
-              <View
-                style={[
-                  styles.actionIconContainer,
-                  { backgroundColor: "#FFF0F0" },
-                ]}
-              >
-                <Text style={{ fontSize: 18 }}>🗑️</Text>
-              </View>
-              <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>Limpiar papelera</Text>
-                <Text style={styles.actionDescription} numberOfLines={1}>
-                  {driveService.formatBytes(trashUsage)} recuperables
-                </Text>
-              </View>
-              <Text style={styles.actionArrow}>›</Text>
-            </TouchableOpacity>
-          </View>
-        </ScreenContainer>
-      </View>
-    </SafeAreaView>
+              <Text style={{ fontSize: 18 }}>🗑️</Text>
+            </View>
+            <View style={styles.actionContent}>
+              <Text style={styles.actionTitle}>Limpiar papelera</Text>
+              <Text style={styles.actionDescription} numberOfLines={1}>
+                {driveService.formatBytes(trashUsage)} recuperables
+              </Text>
+            </View>
+            <Text style={styles.actionArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+      </ScreenContainer>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#FF6B35",
-  },
   container: {
     flex: 1,
     backgroundColor: "#FAF8F5",
-  },
-  topBar: {
-    height: 56,
-    backgroundColor: "#FF6B35",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-  },
-  brandContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  logoBadge: {
-    backgroundColor: "#1E293B",
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginRight: 6,
-  },
-  logoBadgeText: {
-    color: "#FF6B35",
-    fontWeight: "800",
-    fontSize: 14,
-  },
-  brandTitle: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 18,
   },
   headerRow: {
     flexDirection: "row",

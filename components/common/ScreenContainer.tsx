@@ -16,7 +16,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   refreshControl,
 }) => {
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       {scrollable ? (
         <ScrollView
           style={styles.scrollView}
@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 40, // Espacio para evitar que la barra inferior corte contenido en móviles
+    paddingBottom: 60, // Margen inferior amplio para evitar que la barra de gestos corte contenido
   },
   content: {
     flex: 1,

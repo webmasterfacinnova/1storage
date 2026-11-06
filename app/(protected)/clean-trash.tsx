@@ -9,22 +9,18 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
-  useWindowDimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'expo-router';
 import {
   Trash2,
-  HardDrive,
   FileText,
   Folder,
   CheckCircle2,
   Circle,
-  AlertTriangle,
-  RefreshCw,
 } from 'lucide-react-native';
 
-import HeaderBar from '../../components/storage/HeaderBar';
 import { driveFilesService } from '../../services/drive-files.service';
 import { driveService } from '../../services/drive.service';
 import {
@@ -41,13 +37,11 @@ import {
 const CleanTrashScreen = () => {
   const router = useRouter();
   const dispatch = useDispatch();
-  const { height: windowHeight } = useWindowDimensions();
 
   const trashedFiles = useSelector(selectTrashedFiles);
   const loading = useSelector(selectTrashedFilesLoading);
   const nextPageToken = useSelector(selectTrashedFilesNextPage);
 
-  const [headerH, setHeaderH] = useState(56);
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
@@ -170,181 +164,179 @@ const CleanTrashScreen = () => {
   );
 
   return (
-    <View style={[styles.container, { height: windowHeight }]}>
-      {/* Header bar modular idéntica a Manager Files */}
-      <HeaderBar
-        title="Papelera"
-        onBack={() => router.back()}
-        onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
-      />
-
-      <ScrollView
-        style={{ height: Math.max(windowHeight - headerH, 0) }}
-        refreshControl={
-          <RefreshControl
-            refreshing={loading && !isDeleting}
-            onRefresh={onRefresh}
-            tintColor="#1a237e"
-          />
-        }
-        contentContainerStyle={{ paddingBottom: 40 }}
-      >
-        {/* Tarjeta de Estadísticas de Papelera con estilo unificado */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryHeader}>
-            <View style={styles.iconCircle}>
-              <Trash2 size={20} color="#1a237e" />
+    <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
+      <View style={styles.container}>
+        <ScrollView
+          refreshControl={
+            <RefreshControl
+              refreshing={loading && !isDeleting}
+              onRefresh={onRefresh}
+              tintColor="#FF6B35"
+            />
+          }
+          contentContainerStyle={{ paddingBottom: 40 }}
+        >
+          {/* Tarjeta de Estadísticas de Papelera */}
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryHeader}>
+              <View style={styles.iconCircle}>
+                <Trash2 size={20} color="#FF6B35" />
+              </View>
+              <View style={styles.summaryTitleContainer}>
+                <Text style={styles.summaryTitle}>Espacio ocupado</Text>
+                <Text style={styles.summarySubtitle}>
+                  Los elementos aquí se eliminarán definitivamente al vaciarse
+                </Text>
+              </View>
             </View>
-            <View style={styles.summaryTitleContainer}>
-              <Text style={styles.summaryTitle}>Espacio ocupado</Text>
-              <Text style={styles.summarySubtitle}>
-                Los elementos aquí se eliminarán definitivamente al vaciarse
-              </Text>
-            </View>
-          </View>
 
-          <View style={styles.statsGrid}>
-            <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{trashedFiles.length}</Text>
-              <Text style={styles.statLabel}>Archivos</Text>
+            <View style={styles.statsGrid}>
+              <View style={styles.statBox}>
+                <Text style={styles.statNumber}>{trashedFiles.length}</Text>
+                <Text style={styles.statLabel}>Archivos</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.statBox}>
+                <Text style={styles.statNumber}>
+                  {driveService.formatBytes(totalTrashSize)}
+                </Text>
+                <Text style={styles.statLabel}>Tamaño total</Text>
+              </View>
             </View>
-            <View style={styles.divider} />
-            <View style={styles.statBox}>
-              <Text style={styles.statNumber}>
-                {driveService.formatBytes(totalTrashSize)}
-              </Text>
-              <Text style={styles.statLabel}>Tamaño total</Text>
-            </View>
-          </View>
 
-          <TouchableOpacity
-            style={[
-              styles.emptyButton,
-              (isDeleting || trashedFiles.length === 0) && styles.disabledButton,
-            ]}
-            onPress={handleEmptyTrash}
-            disabled={isDeleting || trashedFiles.length === 0}
-            activeOpacity={0.7}
-          >
-            <Trash2 size={16} color="#ffffff" style={{ marginRight: 6 }} />
-            <Text style={styles.emptyButtonText}>Vaciar papelera</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Barra de Acciones de Selección */}
-        {trashedFiles.length > 0 && (
-          <View style={styles.actionToolbar}>
             <TouchableOpacity
-              style={styles.selectAllBtn}
-              onPress={handleSelectAll}
+              style={[
+                styles.emptyButton,
+                (isDeleting || trashedFiles.length === 0) && styles.disabledButton,
+              ]}
+              onPress={handleEmptyTrash}
+              disabled={isDeleting || trashedFiles.length === 0}
+              activeOpacity={0.7}
             >
-              {selectedFiles.size === trashedFiles.length ? (
-                <CheckCircle2 size={18} color="#1a237e" />
-              ) : (
-                <Circle size={18} color="#757575" />
-              )}
-              <Text style={styles.selectAllText}>
-                {selectedFiles.size === trashedFiles.length
-                  ? 'Deseleccionar todos'
-                  : 'Seleccionar todos'}
-              </Text>
+              <Trash2 size={16} color="#ffffff" style={{ marginRight: 6 }} />
+              <Text style={styles.emptyButtonText}>Vaciar papelera</Text>
             </TouchableOpacity>
+          </View>
 
-            {selectedFiles.size > 0 && (
+          {/* Barra de Acciones de Selección */}
+          {trashedFiles.length > 0 && (
+            <View style={styles.actionToolbar}>
               <TouchableOpacity
-                style={styles.deleteSelectedBtn}
-                onPress={handleDeleteSelected}
-                disabled={isDeleting}
+                style={styles.selectAllBtn}
+                onPress={handleSelectAll}
               >
-                <Text style={styles.deleteSelectedText}>
-                  Eliminar ({selectedFiles.size})
+                {selectedFiles.size === trashedFiles.length ? (
+                  <CheckCircle2 size={18} color="#FF6B35" />
+                ) : (
+                  <Circle size={18} color="#757575" />
+                )}
+                <Text style={styles.selectAllText}>
+                  {selectedFiles.size === trashedFiles.length
+                    ? 'Deseleccionar todos'
+                    : 'Seleccionar todos'}
                 </Text>
               </TouchableOpacity>
-            )}
-          </View>
-        )}
 
-        {/* Cabecera de la Sección de Lista */}
-        <View style={styles.secHeader}>
-          <Text style={styles.secTitle}>Archivos en papelera</Text>
-          <Text style={styles.secCount}>
-            {trashedFiles.length} archivo{trashedFiles.length !== 1 ? 's' : ''}
-          </Text>
-        </View>
-
-        {/* Lista de Archivos */}
-        {loading && trashedFiles.length === 0 ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#1a237e" />
-            <Text style={styles.loadingText}>Cargando papelera...</Text>
-          </View>
-        ) : trashedFiles.length > 0 ? (
-          trashedFiles.map((file) => {
-            const isFolder = file.mimeType?.includes('folder');
-            const isSelected = selectedFiles.has(file.id);
-
-            return (
-              <TouchableOpacity
-                key={file.id}
-                style={[
-                  styles.fileCard,
-                  isSelected && styles.fileCardSelected,
-                ]}
-                onPress={() => handleSelectFile(file.id)}
-                activeOpacity={0.7}
-              >
-                <View
-                  style={[
-                    styles.fileIconContainer,
-                    isFolder ? styles.folderIconBg : styles.fileIconBg,
-                  ]}
+              {selectedFiles.size > 0 && (
+                <TouchableOpacity
+                  style={styles.deleteSelectedBtn}
+                  onPress={handleDeleteSelected}
+                  disabled={isDeleting}
                 >
-                  {isFolder ? (
-                    <Folder size={22} color="#f57c00" />
-                  ) : (
-                    <FileText size={22} color="#1a237e" />
-                  )}
-                </View>
-
-                <View style={styles.fileInfo}>
-                  <Text style={styles.fileName} numberOfLines={1}>
-                    {file.name}
+                  <Text style={styles.deleteSelectedText}>
+                    Eliminar ({selectedFiles.size})
                   </Text>
-                  <Text style={styles.fileSize}>
-                    {file.size ? driveService.formatBytes(file.size) : '—'}
-                  </Text>
-                </View>
-
-                <View style={styles.checkboxContainer}>
-                  {isSelected ? (
-                    <CheckCircle2 size={22} color="#1a237e" />
-                  ) : (
-                    <Circle size={22} color="#bdbdbd" />
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })
-        ) : (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconBg}>
-              <Trash2 size={40} color="#9e9e9e" />
+                </TouchableOpacity>
+              )}
             </View>
-            <Text style={styles.emptyTitle}>La papelera está vacía</Text>
-            <Text style={styles.emptySubtitle}>
-              Los archivos que elimines aparecerán aquí antes de borrarse permanentemente.
+          )}
+
+          {/* Cabecera de la Sección de Lista */}
+          <View style={styles.secHeader}>
+            <Text style={styles.secTitle}>Archivos en papelera</Text>
+            <Text style={styles.secCount}>
+              {trashedFiles.length} archivo{trashedFiles.length !== 1 ? 's' : ''}
             </Text>
           </View>
-        )}
-      </ScrollView>
-    </View>
+
+          {/* Lista de Archivos */}
+          {loading && trashedFiles.length === 0 ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FF6B35" />
+              <Text style={styles.loadingText}>Cargando papelera...</Text>
+            </View>
+          ) : trashedFiles.length > 0 ? (
+            trashedFiles.map((file) => {
+              const isFolder = file.mimeType?.includes('folder');
+              const isSelected = selectedFiles.has(file.id);
+
+              return (
+                <TouchableOpacity
+                  key={file.id}
+                  style={[
+                    styles.fileCard,
+                    isSelected && styles.fileCardSelected,
+                  ]}
+                  onPress={() => handleSelectFile(file.id)}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    style={[
+                      styles.fileIconContainer,
+                      isFolder ? styles.folderIconBg : styles.fileIconBg,
+                    ]}
+                  >
+                    {isFolder ? (
+                      <Folder size={22} color="#f57c00" />
+                    ) : (
+                      <FileText size={22} color="#FF6B35" />
+                    )}
+                  </View>
+
+                  <View style={styles.fileInfo}>
+                    <Text style={styles.fileName} numberOfLines={1}>
+                      {file.name}
+                    </Text>
+                    <Text style={styles.fileSize}>
+                      {file.size ? driveService.formatBytes(file.size) : '—'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.checkboxContainer}>
+                    {isSelected ? (
+                      <CheckCircle2 size={22} color="#FF6B35" />
+                    ) : (
+                      <Circle size={22} color="#bdbdbd" />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconBg}>
+                <Trash2 size={40} color="#9e9e9e" />
+              </View>
+              <Text style={styles.emptyTitle}>La papelera está vacía</Text>
+              <Text style={styles.emptySubtitle}>
+                Los archivos que elimines aparecerán aquí antes de borrarse permanentemente.
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FAF8F5',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FAF8F5',
   },
   summaryCard: {
     backgroundColor: '#ffffff',
@@ -370,7 +362,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#e8eaf6',
+    backgroundColor: '#FFF4E5',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -381,7 +373,7 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1a237e',
+    color: '#0F172A',
   },
   summarySubtitle: {
     fontSize: 12,
@@ -408,7 +400,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1a237e',
+    color: '#0F172A',
   },
   statLabel: {
     fontSize: 12,
@@ -494,8 +486,8 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   fileCardSelected: {
-    backgroundColor: '#e8eaf6',
-    borderColor: '#c5cae9',
+    backgroundColor: '#FFF4E5',
+    borderColor: '#FFD8BD',
   },
   fileIconContainer: {
     width: 42,
@@ -509,7 +501,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff3e0',
   },
   fileIconBg: {
-    backgroundColor: '#e8eaf6',
+    backgroundColor: '#FFF4E5',
   },
   fileInfo: {
     flex: 1,
