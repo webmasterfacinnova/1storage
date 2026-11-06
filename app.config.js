@@ -21,7 +21,7 @@ export default {
   expo: {
     name: appName,
     slug: "1storage",
-    version: "1.0.0",
+    version: "1.0.2",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     userInterfaceStyle: "light",
@@ -81,9 +81,12 @@ export default {
       appScheme: "onestorage",
       appName: appName,
       googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
-      googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? "",
-      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
-      EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? "",
+      googleAndroidClientId:
+        process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? "",
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID:
+        process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
+      EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID:
+        process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? "",
       eas: {
         projectId: "adac947d-77f4-4094-83f1-852835305ffe",
       },
