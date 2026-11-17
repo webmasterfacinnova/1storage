@@ -76,8 +76,8 @@ class GoogleAuthServiceWeb implements AuthService {
       // Verificamos si ya existe un token o sesión previa guardada
       const existingRefreshToken = await getSecureData("google_refresh_token");
 
-      // Si ya estás registrado, en lugar de forzar un consentimiento nuevo, 
-      // permitimos que el flujo maneje la sesión guardada de forma limpia o directa.
+      // Restauramos la lógica condicional: si ya existe un refresh token, 
+      // omitimos el prompt forzado para que el usuario ingrese de forma fluida/directa.
       const request = new AuthRequest({
         clientId: this.clientId,
         scopes: SCOPES,
@@ -86,7 +86,6 @@ class GoogleAuthServiceWeb implements AuthService {
         usePKCE: true,
         extraParams: {
           access_type: "offline",
-          // Si ya hay registro previo, omitimos el prompt forzado para que pase directo
           ...(existingRefreshToken ? {} : { prompt: "select_account" }),
         },
       });
@@ -103,7 +102,6 @@ class GoogleAuthServiceWeb implements AuthService {
         throw new Error(errDesc || "Google sign-in failed");
       }
 
-      // Web is a confidential client — send clientSecret in the exchange
       const tokenResponse = await exchangeCodeAsync(
         {
           clientId: this.clientId,
@@ -171,12 +169,12 @@ class GoogleAuthServiceWeb implements AuthService {
       const refreshToken = await getSecureData("google_refresh_token");
       
       if (!refreshToken) {
-        console.warn("[GoogleAuth] No refresh token found in secure storage.");
+        console.warn("[GoogleAuthWeb] No refresh token found in secure storage.");
         return null;
       }
 
       if (!this.clientId || !this.clientSecret) {
-        console.warn("[GoogleAuth] Client ID or Client Secret is missing for refresh.");
+        console.warn("[GoogleAuthWeb] Client ID or Client Secret is missing for refresh.");
         return null;
       }
 
@@ -195,9 +193,7 @@ class GoogleAuthServiceWeb implements AuthService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.warn("[GoogleAuth] Failed to refresh token:", response.status, errorText);
-        await clearAuthToken();
-        await clearSecureData("google_refresh_token");
+        console.warn("[GoogleAuthWeb] Failed to refresh token:", response.status, errorText);
         return null;
       }
 
@@ -210,7 +206,7 @@ class GoogleAuthServiceWeb implements AuthService {
 
       return newAccessToken || null;
     } catch (error) {
-      console.error("[GoogleAuth] Error refreshing token:", error);
+      console.error("[GoogleAuthWeb] Error refreshing token:", error);
       return null;
     }
   }
@@ -235,7 +231,7 @@ class GoogleAuthServiceWeb implements AuthService {
 
       if (!userInfo) {
         console.log(
-          "[GoogleAuth] Token expired or invalid. Attempting refresh...",
+          "[GoogleAuthWeb] Token expired or invalid. Attempting refresh...",
         );
         await this.initialize();
         token = await this.refreshAccessToken();
@@ -246,7 +242,7 @@ class GoogleAuthServiceWeb implements AuthService {
       }
 
       if (!userInfo) {
-        console.warn("[GoogleAuth] Could not renew user session");
+        console.warn("[GoogleAuthWeb] Could not renew user session");
         await clearAuthToken();
         await userService.clearCache();
         return null;
@@ -259,7 +255,7 @@ class GoogleAuthServiceWeb implements AuthService {
         photoURL: userInfo.picture,
       };
     } catch (error) {
-      console.error("[GoogleAuth] Error getting current user:", error);
+      console.error("[GoogleAuthWeb] Error getting current user:", error);
       await clearAuthToken();
       await userService.clearCache();
       return null;
