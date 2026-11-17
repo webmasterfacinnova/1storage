@@ -25,7 +25,7 @@ WebBrowser.maybeCompleteAuthSession();
 const DISCOVERY = {
   authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
   tokenEndpoint: "https://oauth2.googleapis.com/token",
-  revocationEndpoint: "https://oauth2.googleapis.com/revoke",
+  revocationEndpoint: "https://accounts.google.com/o/oauth2/v2/revoke",
 };
 
 const SCOPES = [
@@ -73,6 +73,11 @@ class GoogleAuthServiceWeb implements AuthService {
 
       const redirectUri = makeRedirectUri({ preferLocalhost: true });
 
+      // Verificamos si ya existe un token o sesión previa guardada
+      const existingRefreshToken = await getSecureData("google_refresh_token");
+
+      // Si ya estás registrado, en lugar de forzar un consentimiento nuevo, 
+      // permitimos que el flujo maneje la sesión guardada de forma limpia o directa.
       const request = new AuthRequest({
         clientId: this.clientId,
         scopes: SCOPES,
@@ -81,7 +86,8 @@ class GoogleAuthServiceWeb implements AuthService {
         usePKCE: true,
         extraParams: {
           access_type: "offline",
-          prompt: "consent",
+          // Si ya hay registro previo, omitimos el prompt forzado para que pase directo
+          ...(existingRefreshToken ? {} : { prompt: "select_account" }),
         },
       });
 
@@ -112,7 +118,7 @@ class GoogleAuthServiceWeb implements AuthService {
       );
 
       const accessToken = tokenResponse.accessToken;
-      const refreshToken = tokenResponse.refreshToken ?? "";
+      const refreshToken = tokenResponse.refreshToken ?? existingRefreshToken;
       const idToken = tokenResponse.idToken ?? "";
 
       if (!accessToken) {
@@ -163,17 +169,23 @@ class GoogleAuthServiceWeb implements AuthService {
     try {
       await this.initialize();
       const refreshToken = await getSecureData("google_refresh_token");
-      if (!refreshToken) return null;
+      
+      if (!refreshToken) {
+        console.warn("[GoogleAuth] No refresh token found in secure storage.");
+        return null;
+      }
+
+      if (!this.clientId || !this.clientSecret) {
+        console.warn("[GoogleAuth] Client ID or Client Secret is missing for refresh.");
+        return null;
+      }
 
       const tokenBody = new URLSearchParams({
         client_id: this.clientId,
+        client_secret: this.clientSecret,
         grant_type: "refresh_token",
         refresh_token: refreshToken,
       });
-
-      if (this.clientSecret) {
-        tokenBody.append("client_secret", this.clientSecret);
-      }
 
       const response = await fetch(DISCOVERY.tokenEndpoint, {
         method: "POST",
@@ -182,7 +194,10 @@ class GoogleAuthServiceWeb implements AuthService {
       });
 
       if (!response.ok) {
-        console.warn("[GoogleAuth] Failed to refresh token:", response.status);
+        const errorText = await response.text();
+        console.warn("[GoogleAuth] Failed to refresh token:", response.status, errorText);
+        await clearAuthToken();
+        await clearSecureData("google_refresh_token");
         return null;
       }
 
@@ -193,7 +208,7 @@ class GoogleAuthServiceWeb implements AuthService {
         await saveAuthToken(newAccessToken);
       }
 
-      return newAccessToken;
+      return newAccessToken || null;
     } catch (error) {
       console.error("[GoogleAuth] Error refreshing token:", error);
       return null;
