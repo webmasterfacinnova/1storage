@@ -46,10 +46,6 @@ class OneDriveAuthService implements AuthService {
     }
   }
 
-  /**
-   * Resolves the custom URL scheme from the Expo config.
-   * Priority: expoConfig.scheme → extra.scheme → extra.appScheme → fallback with warning.
-   */
   private getScheme(): string {
     const scheme =
       Constants.expoConfig?.scheme ??
@@ -196,8 +192,7 @@ class OneDriveAuthService implements AuthService {
       const refreshToken = await getSecureData("onedrive_refresh_token");
       if (!refreshToken) {
         console.warn("[OneDriveAuth] No refresh token available in storage");
-        store.dispatch(removeProvider("onedrive"));
-        return null;
+        return null; // Mantenemos estado seguro sin desvincular forzosamente por ausencia momentánea
       }
 
       const tokenBody = new URLSearchParams({
@@ -220,7 +215,13 @@ class OneDriveAuthService implements AuthService {
           response.status,
           errorText,
         );
-        await this.signOut();
+
+        // SOLO se desvincula si el token fue revocado o expiró definitivamente por Microsoft
+        if (errorText.includes("invalid_grant") || errorText.includes("AADSTS70000")) {
+          console.error("[OneDriveAuth] Refresh token expired or revoked. Forcing sign-out.");
+          await this.signOut();
+        }
+        
         return null;
       }
 
@@ -238,8 +239,8 @@ class OneDriveAuthService implements AuthService {
       console.log("[OneDriveAuth] Access token refreshed successfully");
       return newAccessToken;
     } catch (error) {
-      console.error("[OneDriveAuth] Error refreshing token:", error);
-      store.dispatch(removeProvider("onedrive"));
+      console.error("[OneDriveAuth] Error refreshing token (network/timeout):", error);
+      // Errores de red no destruyen la sesión para permitir reintentos posteriores de forma silenciosa
       return null;
     }
   }

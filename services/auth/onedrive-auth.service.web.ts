@@ -166,7 +166,6 @@ class OneDriveAuthService implements AuthService {
       const refreshToken = await getSecureData("onedrive_refresh_token");
       if (!refreshToken) {
         console.warn("[OneDriveAuth] No refresh token available in storage");
-        store.dispatch(removeProvider("onedrive"));
         return null;
       }
 
@@ -190,7 +189,13 @@ class OneDriveAuthService implements AuthService {
           response.status,
           errorText,
         );
-        await this.signOut();
+
+        // SOLO se desvincula si Microsoft rechaza explícitamente el token con invalid_grant
+        if (errorText.includes("invalid_grant") || errorText.includes("AADSTS70000")) {
+          console.error("[OneDriveAuth] Refresh token expired or revoked. Forcing sign-out.");
+          await this.signOut();
+        }
+        
         return null;
       }
 
@@ -208,8 +213,7 @@ class OneDriveAuthService implements AuthService {
       console.log("[OneDriveAuth] Access token refreshed successfully");
       return newAccessToken;
     } catch (error) {
-      console.error("[OneDriveAuth] Error refreshing token:", error);
-      store.dispatch(removeProvider("onedrive"));
+      console.error("[OneDriveAuth] Error refreshing token (network/timeout):", error);
       return null;
     }
   }

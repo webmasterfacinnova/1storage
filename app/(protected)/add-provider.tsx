@@ -16,6 +16,14 @@ const AddProviderScreen: React.FC = () => {
   const router = useRouter();
   const { providers } = useStorageProviders();
 
+  const handleGoBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(protected)/home');
+    }
+  };
+
   const getStatusBadge = (isConnecting: boolean, isConnected: boolean) => {
     if (isConnecting) {
       return <ActivityIndicator size="small" color="#0078D4" />;
@@ -26,12 +34,10 @@ const AddProviderScreen: React.FC = () => {
     return <Text style={styles.statusAvailable}>Disponible</Text>;
   };
 
-  // Función auxiliar para determinar el icono local según el proveedor
   const getProviderIconSource = (providerId: string) => {
     if (providerId.includes('google')) {
       return require('../../assets/images/google_drive.png');
     }
-    // Por defecto asume OneDrive o el icono alternativo
     return require('../../assets/images/one_drive.png');
   };
 
@@ -39,7 +45,7 @@ const AddProviderScreen: React.FC = () => {
     <ScreenContainer>
       {/* Encabezado */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <Text style={styles.backText}>← Volver</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Conectar proveedores</Text>
