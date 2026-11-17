@@ -1,3 +1,4 @@
+// components/storage/ProviderSelector.tsx
 import React from 'react';
 import { View, TouchableOpacity, Text, Image, StyleSheet } from 'react-native';
 import { ProviderMeta } from '../../types/storage';
@@ -27,10 +28,10 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         const isActive = pid === activeProvider;
         const meta =
           pid === providerAllId
-            ? { name: 'All', color: '#1a237e', icon: undefined }
+            ? { name: 'All', color: '#FF6600', icon: undefined }
             : providerMetaMap[pid] || {
                 name: connectedProviders?.[pid]?.name || pid,
-                color: '#1a237e',
+                color: '#FF6600',
                 icon: undefined,
               };
         const isSingleProvider = providerKeys.length <= 1;
@@ -42,7 +43,7 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
             key={pid}
             style={[
               styles.providerBtn,
-              isActive && { backgroundColor: meta.color, borderColor: meta.color },
+              isActive && { backgroundColor: '#FF6600', borderColor: '#FF6600' },
             ]}
             onPress={() => !isSingleProvider && onSelectProvider(pid)}
             activeOpacity={isSingleProvider ? 1 : 0.7}

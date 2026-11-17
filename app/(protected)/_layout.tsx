@@ -45,7 +45,7 @@ export default function ProtectedLayout() {
         <Stack.Screen name="clean-trash" options={{ title: "Papelera" }} />
         <Stack.Screen
           name="manager-files"
-          options={{ title: "Gestior de Archivos" }}
+          options={{ title: "Gestor de Archivos" }}
         />
         <Stack.Screen
           name="add-provider"

@@ -1,6 +1,4 @@
 // components/storage/FileTypeTabs.tsx
-// Pestañas horizontales para filtrar archivos por categoría de tipo
-
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 
@@ -60,9 +58,9 @@ const FileTypeTabs: React.FC<FileTypeTabsProps> = ({ activeTab, onTabChange }) =
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#d7eefb',
+    backgroundColor: '#fff3ed',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0ecf5',
+    borderBottomColor: '#ffe5d9',
   },
   scrollContent: {
     paddingHorizontal: 12,
@@ -79,7 +77,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   tabActive: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#FF6600',
   },
   tabIcon: {
     fontSize: 14,

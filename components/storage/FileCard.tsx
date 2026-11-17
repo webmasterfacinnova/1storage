@@ -1,6 +1,7 @@
+// components/storage/FileCard.tsx
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { ArrowUpDown } from 'lucide-react-native';
+import { ArrowUpDown, MoreVertical, Trash2 } from 'lucide-react-native';
 import { UnifiedFile } from '../../types/storage';
 import { getAuthToken } from '../../utils/secureStorage';
 import OneDriveAuthService from '../../services/auth/onedrive-auth.service';
@@ -30,11 +31,18 @@ export const categorizeMimeType = (
 interface FileCardProps {
   file: UnifiedFile;
   onPress?: (file: UnifiedFile) => void;
+  onOpenMenu?: (file: UnifiedFile) => void;
   onDelete?: (file: UnifiedFile) => void;
   onTransfer?: (file: UnifiedFile) => void;
 }
 
-const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete, onTransfer }) => {
+const FileCard: React.FC<FileCardProps> = ({
+  file,
+  onPress,
+  onOpenMenu,
+  onDelete,
+  onTransfer,
+}) => {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
 
@@ -139,23 +147,36 @@ const FileCard: React.FC<FileCardProps> = ({ file, onPress, onDelete, onTransfer
         <Text style={styles.arrow}>›</Text>
       ) : (
         <View style={styles.actionsContainer}>
-          {onTransfer && (
+          {onOpenMenu ? (
             <TouchableOpacity
-              style={styles.transferButton}
-              onPress={() => onTransfer(file)}
+              style={styles.menuButton}
+              onPress={() => onOpenMenu(file)}
               activeOpacity={0.6}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <ArrowUpDown size={18} color="#0066CC" />
+              <MoreVertical size={20} color="#555555" />
             </TouchableOpacity>
-          )}
+          ) : (
+            <>
+              {onTransfer && (
+                <TouchableOpacity
+                  style={styles.transferButton}
+                  onPress={() => onTransfer(file)}
+                  activeOpacity={0.6}
+                >
+                  <ArrowUpDown size={18} color="#0066CC" />
+                </TouchableOpacity>
+              )}
 
-          {onDelete && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => onDelete(file)}
-            >
-              <Text style={styles.actionText}>🗑️</Text>
-            </TouchableOpacity>
+              {onDelete && (
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => onDelete(file)}
+                >
+                  <Trash2 size={18} color="#d32f2f" />
+                </TouchableOpacity>
+              )}
+            </>
           )}
         </View>
       )}
@@ -227,6 +248,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  menuButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f4f6f8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
   actionButton: {
     padding: 8,
     marginLeft: 4,
@@ -239,9 +269,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 4,
-  },
-  actionText: {
-    fontSize: 16,
   },
 });
 

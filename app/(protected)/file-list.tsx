@@ -1,13 +1,15 @@
 // app/(protected)/file-list.tsx
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { ArrowLeftRight, Trash2 } from 'lucide-react-native';
 import { driveFilesService } from '../../services/drive-files.service';
 import { oneDriveFilesService } from '../../services/onedrive-files.service';
 import { transferService, ProviderType } from '../../services/transfer.service';
 import FileCard from '../../components/storage/FileCard';
 import { TransferConfirmDialog, DialogStep } from '../../components/modals/TransferConfirmDialog';
+import { FileActionsModal, FileActionOption } from '../../components/modals/FileActionsModal';
 import { UnifiedFile } from '../../types/storage';
 import { selectConnectedProviders } from '../../store/slices/connectedProvidersSlice';
 import {
@@ -57,6 +59,9 @@ const FileListScreen = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'size' | 'name' | 'date'>('size');
+
+  // Menu de tres puntos State
+  const [menuFile, setMenuFile] = useState<UnifiedFile | null>(null);
 
   // Modal State
   const [modalVisible, setModalVisible] = useState(false);
@@ -152,7 +157,7 @@ const FileListScreen = () => {
   };
 
   // Manejo de la transferencia con verificación de cuentas conectadas
-  const handleStartTransfer = (file: UnifiedFile) => {
+  const handleStartTransfer = useCallback((file: UnifiedFile) => {
     const connectedCount = Object.keys(connectedProviders || {}).length;
 
     if (connectedCount < 2) {
@@ -176,7 +181,7 @@ const FileListScreen = () => {
     setSelectedFile(file);
     setModalStep('SELECT_PROVIDER');
     setModalVisible(true);
-  };
+  }, [connectedProviders, router]);
 
   const handleSelectDestination = async (destination: ProviderType) => {
     if (!selectedFile) return;
@@ -232,17 +237,37 @@ const FileListScreen = () => {
     }
   };
 
-  const handleDeleteFile = async (file: UnifiedFile) => {
+  const handleDeleteFile = useCallback(async (file: UnifiedFile) => {
     const success = await transferService.deleteFromSource(file.id, file.provider as ProviderType);
     if (success) {
       onRefresh();
     } else {
       Alert.alert('Error', 'No se pudo eliminar el archivo.');
     }
-  };
+  }, [onRefresh]);
 
   const providerColor = isOneDrive ? '#0078d4' : '#1a73e8';
   const providerLabel = isOneDrive ? 'OneDrive' : 'Google Drive';
+
+  const fileMenuActions: FileActionOption[] = useMemo(() => {
+    if (!menuFile) return [];
+    return [
+      {
+        id: 'transfer',
+        label: 'Transferir archivo',
+        icon: ArrowLeftRight,
+        color: '#1a237e',
+        onPress: () => handleStartTransfer(menuFile),
+      },
+      {
+        id: 'delete',
+        label: 'Eliminar archivo',
+        icon: Trash2,
+        destructive: true,
+        onPress: () => handleDeleteFile(menuFile),
+      },
+    ];
+  }, [menuFile, handleStartTransfer, handleDeleteFile]);
 
   return (
     <View style={styles.container}>
@@ -320,8 +345,7 @@ const FileListScreen = () => {
                       handleFolderPress(f);
                     }
                   }}
-                  onTransfer={handleStartTransfer}
-                  onDelete={handleDeleteFile}
+                  onOpenMenu={setMenuFile}
                 />
               );
             })
@@ -329,6 +353,14 @@ const FileListScreen = () => {
           <Text style={styles.loadingText}>No se encontraron archivos</Text>
         )}
       </ScrollView>
+
+      <FileActionsModal
+        visible={!!menuFile}
+        title={menuFile?.name || 'Opciones del archivo'}
+        subtitle={`Proveedor: ${providerLabel}`}
+        actions={fileMenuActions}
+        onClose={() => setMenuFile(null)}
+      />
 
       <TransferConfirmDialog
         visible={modalVisible}

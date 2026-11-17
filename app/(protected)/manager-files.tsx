@@ -12,7 +12,8 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
+import { ArrowLeftRight, Trash2 } from 'lucide-react-native';
 
 // Componentes modulares
 import FileCard, { categorizeMimeType } from '../../components/storage/FileCard';
@@ -29,6 +30,7 @@ import { UnifiedFile, ProviderMeta } from '../../types/storage';
 // Modales
 import { TransferConfirmDialog, DialogStep } from '../../components/modals/TransferConfirmDialog';
 import { TransferLoadingModal } from '../../components/modals/TransferLoadingModal';
+import { FileActionsModal, FileActionOption } from '../../components/modals/FileActionsModal';
 
 // Redux hooks
 import { useAppDispatch, useAppSelector } from '../../hooks/store';
@@ -63,14 +65,13 @@ const fileKey = (f: UnifiedFile) => `${f.provider}:${f.id}`;
 const getCategoryKey = (mimeType?: string, fileName?: string): string => {
   const { label } = categorizeMimeType(mimeType, fileName);
   switch (label) {
-    case 'Image': return 'images';
+    case 'Imagen': return 'images';
     case 'Video': return 'videos';
     case 'Audio': return 'audio';
     case 'PDF': return 'pdfs';
     case 'Doc': return 'docs';
-    case 'Archive': return 'archives';
-    case 'Text': return 'text';
-    case 'Folder': return 'folders';
+    case 'Archivo comprimido': return 'archives';
+    case 'Carpeta': return 'folders';
     default: return 'other';
   }
 };
@@ -95,6 +96,9 @@ const ManagerFilesScreen: React.FC = () => {
 
   const [isProcessingDestination, setIsProcessingDestination] = useState(false);
   const [transferringFile, setTransferringFile] = useState<UnifiedFile | null>(null);
+
+  // Estado del menú de opciones por archivo (Tres puntos)
+  const [menuFile, setMenuFile] = useState<UnifiedFile | null>(null);
 
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogStep, setDialogStep] = useState<DialogStep>('SELECT_PROVIDER');
@@ -213,7 +217,7 @@ const ManagerFilesScreen: React.FC = () => {
     }
   }, [router]);
 
-  const handleTransferFile = (file: UnifiedFile) => {
+  const handleTransferFile = useCallback((file: UnifiedFile) => {
     const connectedCount = Object.keys(connectedProviders || {}).length;
 
     if (connectedCount < 2) {
@@ -227,7 +231,52 @@ const ManagerFilesScreen: React.FC = () => {
     setTargetName('');
     setDialogStep('SELECT_PROVIDER');
     setDialogVisible(true);
-  };
+  }, [connectedProviders]);
+
+  const handleDeleteDirect = useCallback(async (file: UnifiedFile) => {
+    try {
+      setLoading(true);
+      const deleted = await transferService.deleteFromSource(
+        file.id,
+        file.provider as ProviderType
+      );
+
+      if (deleted) {
+        setPreviews(prev => prev.filter(f => f.id !== file.id));
+        if (file.provider === 'google-drive') {
+          dispatch(removeDriveFile(file.id));
+        } else {
+          dispatch(removeOnedriveFile(file.id));
+        }
+      } else {
+        Alert.alert('Error', 'No se pudo eliminar el archivo.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Ocurrió un problema al intentar eliminar el archivo.');
+    } finally {
+      setLoading(false);
+    }
+  }, [dispatch]);
+
+  const fileMenuActions: FileActionOption[] = useMemo(() => {
+    if (!menuFile) return [];
+    return [
+      {
+        id: 'transfer',
+        label: 'Transferir archivo',
+        icon: ArrowLeftRight,
+        color: '#1a237e',
+        onPress: () => handleTransferFile(menuFile),
+      },
+      {
+        id: 'delete',
+        label: 'Eliminar archivo',
+        icon: Trash2,
+        destructive: true,
+        onPress: () => handleDeleteDirect(menuFile),
+      },
+    ];
+  }, [menuFile, handleTransferFile, handleDeleteDirect]);
 
   const handleSelectDestination = async (destination: ProviderType) => {
     if (!dialogFile) return;
@@ -377,6 +426,16 @@ const ManagerFilesScreen: React.FC = () => {
 
   return (
     <View style={[s.container, { height: windowHeight }]}>
+      {/* Forzamos las opciones de la cabecera nativa aquí mismo para que al recargar no se pierda el header */}
+      <Stack.Screen 
+        options={{ 
+          title: "Gestor de Archivos",
+          headerShown: true,
+          headerStyle: { backgroundColor: "#FF6600" },
+          headerTintColor: "#FFFFFF",
+        }} 
+      />
+
       <ScrollView
         style={{ flex: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1a237e" />}
@@ -441,7 +500,7 @@ const ManagerFilesScreen: React.FC = () => {
             key={fileKey(f)} 
             file={f} 
             onPress={handleFilePress}
-            onTransfer={handleTransferFile}
+            onOpenMenu={setMenuFile}
           />
         ))}
 
@@ -458,6 +517,18 @@ const ManagerFilesScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
+
+      <FileActionsModal
+        visible={!!menuFile}
+        title={menuFile?.name || 'Opciones del archivo'}
+        subtitle={
+          menuFile
+            ? `Proveedor: ${PROVIDER_META[menuFile.provider]?.name || menuFile.provider}`
+            : undefined
+        }
+        actions={fileMenuActions}
+        onClose={() => setMenuFile(null)}
+      />
 
       <TransferLoadingModal
         visible={!!transferringFile}

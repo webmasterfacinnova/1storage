@@ -1,6 +1,7 @@
+// components/storage/SortBar.tsx
 import React from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
-import { Button } from '../common/Button'; // Importas tu botón genérico
+import { Button } from '../common/Button';
 
 export type SortOption = 'name' | 'date' | 'size';
 
@@ -32,7 +33,7 @@ export const SortBar: React.FC<SortBarProps> = ({
       {showSearch ? (
         <TextInput
           style={styles.si}
-          placeholder="Search files…"
+          placeholder="Buscar archivos…"
           placeholderTextColor="#999"
           value={searchQuery}
           onChangeText={onSearchChange}
@@ -40,7 +41,7 @@ export const SortBar: React.FC<SortBarProps> = ({
         />
       ) : (
         <View style={styles.sortGroup}>
-          <Text style={styles.sortLbl}>Sort:</Text>
+          <Text style={styles.sortLbl}>Ordenar:</Text>
           {sortOptions.map(option => {
             const isActive = sortBy === option;
             const label = option[0].toUpperCase() + option.slice(1);
@@ -50,8 +51,8 @@ export const SortBar: React.FC<SortBarProps> = ({
                 title={label}
                 onPress={() => onSelectSort(option)}
                 variant={isActive ? 'solid' : 'ghost'}
-                color={isActive ? '#1a237e' : 'transparent'}
-                textColor={isActive ? '#ffffff' : '#1a237e'}
+                color={isActive ? '#FF6600' : 'transparent'}
+                textColor={isActive ? '#ffffff' : '#FF6600'}
                 style={styles.customBtnStyle}
               />
             );
@@ -77,7 +78,7 @@ const styles = StyleSheet.create({
   si: {
     flex: 1,
     height: 36,
-    backgroundColor: '#f0f4ff',
+    backgroundColor: '#fff3ed',
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 14,
