@@ -1,37 +1,57 @@
-import React, { useEffect, useCallback, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, TextInput, Alert } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeftRight, Trash2 } from 'lucide-react-native';
-import { driveFilesService } from '../../services/drive-files.service';
-import { oneDriveFilesService } from '../../services/onedrive-files.service';
-import { transferService, ProviderType } from '../../services/transfer.service';
-import { Colors } from '../../components/theme/colors';
-import FileCard from '../../components/storage/FileCard';
-import { TransferConfirmDialog, DialogStep } from '../../components/modals/TransferConfirmDialog';
-import { FileActionsModal, FileActionOption } from '../../components/modals/FileActionsModal';
-import { UnifiedFile } from '../../types/storage';
-import { selectConnectedProviders } from '../../store/slices/connectedProvidersSlice';
+import React, { useEffect, useCallback, useState, useMemo } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import { useSelector, useDispatch } from "react-redux";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { ArrowLeftRight, Trash2 } from "lucide-react-native";
+
+import { driveFilesService } from "../../services/drive-files.service";
+import { oneDriveFilesService } from "../../services/onedrive-files.service";
+import { transferService, ProviderType } from "../../services/transfer.service";
+import { Colors } from "../../components/theme/colors";
+import FileCard from "../../components/storage/FileCard";
+import { FileListHeader } from "../../components/storage/FileListHeader";
+import {
+  FileSearchAndSortBar,
+  FileSortOption,
+} from "../../components/storage/FileSearchAndSortBar";
+import {
+  TransferConfirmDialog,
+  DialogStep,
+} from "../../components/modals/TransferConfirmDialog";
+import {
+  FileActionsModal,
+  FileActionOption,
+} from "../../components/modals/FileActionsModal";
+import { UnifiedFile } from "../../types/storage";
+import { selectConnectedProviders } from "../../store/slices/connectedProvidersSlice";
 import {
   setFolderFilesLoading,
   setFolderFiles,
   setFolderFilesError,
   selectCurrentFolderFiles,
-  selectCurrentFolderId,
   selectCurrentFolderName,
   selectFolderFilesLoading,
   selectFolderFilesNextPage,
-} from '../../store/slices/driveFilesSlice';
+} from "../../store/slices/driveFilesSlice";
 import {
   setFolderFilesLoading as setODFolderFilesLoading,
   setFolderFiles as setODFolderFiles,
   setFolderFilesError as setODFolderFilesError,
   selectOnedriveCurrentFolderFiles,
-  selectOnedriveCurrentFolderId,
   selectOnedriveCurrentFolderName,
   selectOnedriveFolderFilesLoading,
   selectOnedriveFolderFilesNextPage,
-} from '../../store/slices/onedriveFilesSlice';
+} from "../../store/slices/onedriveFilesSlice";
+
+const FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
 
 const FileListScreen = () => {
   const router = useRouter();
@@ -39,87 +59,110 @@ const FileListScreen = () => {
     folderId?: string;
     folderName?: string;
     typeFilter?: string;
-    sort?: 'size' | 'name' | 'date';
+    sort?: FileSortOption;
     fileId?: string;
-    provider?: 'google-drive' | 'onedrive';
+    provider?: "google-drive" | "onedrive";
   }>();
-  
+
   const dispatch = useDispatch();
 
-  const provider = params.provider || 'google-drive';
-  const isOneDrive = provider === 'onedrive';
+  const provider = params.provider || "google-drive";
+  const isOneDrive = provider === "onedrive";
 
   const connectedProviders = useSelector(selectConnectedProviders);
 
-  const files = useSelector((state: any) => isOneDrive ? selectOnedriveCurrentFolderFiles(state) : selectCurrentFolderFiles(state));
-  const folderId = useSelector((state: any) => isOneDrive ? selectOnedriveCurrentFolderId(state) : selectCurrentFolderId(state));
-  const folderName = useSelector((state: any) => isOneDrive ? selectOnedriveCurrentFolderName(state) : selectCurrentFolderName(state));
-  const loading = useSelector((state: any) => isOneDrive ? selectOnedriveFolderFilesLoading(state) : selectFolderFilesLoading(state));
-  const nextPageToken = useSelector((state: any) => isOneDrive ? selectOnedriveFolderFilesNextPage(state) : selectFolderFilesNextPage(state));
+  const files = useSelector((state: any) =>
+    isOneDrive
+      ? selectOnedriveCurrentFolderFiles(state)
+      : selectCurrentFolderFiles(state),
+  );
+  const folderName = useSelector((state: any) =>
+    isOneDrive
+      ? selectOnedriveCurrentFolderName(state)
+      : selectCurrentFolderName(state),
+  );
+  const loading = useSelector((state: any) =>
+    isOneDrive
+      ? selectOnedriveFolderFilesLoading(state)
+      : selectFolderFilesLoading(state),
+  );
+  const nextPageToken = useSelector((state: any) =>
+    isOneDrive
+      ? selectOnedriveFolderFilesNextPage(state)
+      : selectFolderFilesNextPage(state),
+  );
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'size' | 'name' | 'date'>('size');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<FileSortOption>(params.sort || "size");
 
-  // Menu de tres puntos State
   const [menuFile, setMenuFile] = useState<UnifiedFile | null>(null);
 
-  // Modal State
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalStep, setModalStep] = useState<DialogStep>('SELECT_PROVIDER');
+  const [modalStep, setModalStep] = useState<DialogStep>("SELECT_PROVIDER");
   const [selectedFile, setSelectedFile] = useState<UnifiedFile | null>(null);
-  const [targetProvider, setTargetProvider] = useState<ProviderType>('onedrive');
+  const [targetProvider, setTargetProvider] = useState<ProviderType>("onedrive");
 
   const lastLoadedFolderRef = React.useRef<string | null>(null);
   const nextPageTokenRef = React.useRef(nextPageToken);
   nextPageTokenRef.current = nextPageToken;
 
-  const fetchFiles = useCallback(async (append = false) => {
-    const targetFolderId = params.folderId || 'root';
-    const targetFolderName = params.folderName || (isOneDrive ? 'OneDrive' : 'Mi unidad');
+  const fetchFiles = useCallback(
+    async (append = false) => {
+      const targetFolderId = params.folderId || "root";
+      const targetFolderName =
+        params.folderName || (isOneDrive ? "OneDrive" : "Mi unidad");
 
-    if (!append && lastLoadedFolderRef.current === targetFolderId) return;
-    if (!append) lastLoadedFolderRef.current = targetFolderId;
+      if (!append && lastLoadedFolderRef.current === targetFolderId) return;
+      if (!append) lastLoadedFolderRef.current = targetFolderId;
 
-    if (isOneDrive) {
-      dispatch(setODFolderFilesLoading(true));
-      const result = await oneDriveFilesService.getFilesInFolder(
-        targetFolderId,
-        50,
-        append ? nextPageTokenRef.current || undefined : undefined,
-      );
-      if (result) {
-        dispatch(setODFolderFiles({
-          files: result.files,
-          nextPageToken: result.nextPageToken,
-          folderId: targetFolderId,
-          folderName: targetFolderName,
-          append,
-        }));
+      if (isOneDrive) {
+        dispatch(setODFolderFilesLoading(true));
+        const result = await oneDriveFilesService.getFilesInFolder(
+          targetFolderId,
+          50,
+          append ? nextPageTokenRef.current || undefined : undefined,
+        );
+        if (result) {
+          dispatch(
+            setODFolderFiles({
+              files: result.files,
+              nextPageToken: result.nextPageToken,
+              folderId: targetFolderId,
+              folderName: targetFolderName,
+              append,
+            }),
+          );
+        } else {
+          lastLoadedFolderRef.current = null;
+          dispatch(
+            setODFolderFilesError("No se pudieron obtener los archivos"),
+          );
+        }
       } else {
-        lastLoadedFolderRef.current = null;
-        dispatch(setODFolderFilesError('No se pudieron obtener los archivos'));
+        dispatch(setFolderFilesLoading(true));
+        const result = await driveFilesService.getFilesInFolder(
+          targetFolderId,
+          50,
+          append ? nextPageTokenRef.current || undefined : undefined,
+        );
+        if (result) {
+          dispatch(
+            setFolderFiles({
+              files: result.files,
+              nextPageToken: result.nextPageToken,
+              folderId: targetFolderId,
+              folderName: targetFolderName,
+              append,
+            }),
+          );
+        } else {
+          lastLoadedFolderRef.current = null;
+          dispatch(setFolderFilesError("No se pudieron obtener los archivos"));
+        }
       }
-    } else {
-      dispatch(setFolderFilesLoading(true));
-      const result = await driveFilesService.getFilesInFolder(
-        targetFolderId,
-        50,
-        append ? nextPageTokenRef.current || undefined : undefined,
-      );
-      if (result) {
-        dispatch(setFolderFiles({
-          files: result.files,
-          nextPageToken: result.nextPageToken,
-          folderId: targetFolderId,
-          folderName: targetFolderName,
-          append,
-        }));
-      } else {
-        lastLoadedFolderRef.current = null;
-        dispatch(setFolderFilesError('No se pudieron obtener los archivos'));
-      }
-    }
-  }, [dispatch, isOneDrive, params.folderId, params.folderName]);
+    },
+    [dispatch, isOneDrive, params.folderId, params.folderName],
+  );
 
   const onRefresh = useCallback(() => {
     lastLoadedFolderRef.current = null;
@@ -130,138 +173,186 @@ const FileListScreen = () => {
     fetchFiles(false);
   }, [fetchFiles, params.folderId]);
 
-  const isFolder = (file: any): boolean => {
-    if (isOneDrive) {
-      return file.mimeType === 'application/vnd.google-apps.folder' || file.folder !== undefined;
-    }
-    return file.mimeType === 'application/vnd.google-apps.folder';
-  };
+  const isFolder = useCallback(
+    (file: any): boolean => {
+      if (isOneDrive) {
+        return file.mimeType === FOLDER_MIME_TYPE || file.folder !== undefined;
+      }
+      return file.mimeType === FOLDER_MIME_TYPE;
+    },
+    [isOneDrive],
+  );
 
-  const handleFolderPress = (file: any) => {
-    router.push({
-      pathname: '/(protected)/file-list',
-      params: {
-        folderId: file.id,
-        folderName: file.name,
-        provider,
-      },
-    });
-  };
+  const handleFolderPress = useCallback(
+    (file: any) => {
+      router.push({
+        pathname: "/(protected)/file-list",
+        params: {
+          folderId: file.id,
+          folderName: file.name,
+          provider,
+        },
+      });
+    },
+    [provider, router],
+  );
 
-  const handleBackPress = () => {
+  const handleBackPress = useCallback(() => {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/(protected)/storage-breakdown');
+      router.replace("/(protected)/storage-breakdown");
     }
-  };
+  }, [router]);
 
-  // Manejo de la transferencia con verificación de cuentas conectadas
-  const handleStartTransfer = useCallback((file: UnifiedFile) => {
-    const connectedCount = Object.keys(connectedProviders || {}).length;
+  const handleStartTransfer = useCallback(
+    (file: UnifiedFile) => {
+      const connectedCount = Object.keys(connectedProviders || {}).length;
 
-    if (connectedCount < 2) {
-      Alert.alert(
-        'Conecta otra cuenta de almacenamiento',
-        'Para transferir archivos entre servicios necesitas tener al menos 2 nubes vinculadas (por ejemplo, Google Drive y OneDrive). Agrega otra cuenta para empezar a mover tus archivos fácilmente.',
-        [
-          {
-            text: 'Cancelar',
-            style: 'cancel',
-          },
-          {
-            text: 'Conectar nube',
-            onPress: () => router.push('/(protected)/add-provider'),
-          },
-        ]
-      );
-      return;
-    }
+      if (connectedCount < 2) {
+        Alert.alert(
+          "Conecta otra cuenta de almacenamiento",
+          "Para transferir archivos entre servicios necesitas tener al menos 2 nubes vinculadas (por ejemplo, Google Drive y OneDrive). Agrega otra cuenta para empezar a mover tus archivos fácilmente.",
+          [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "Conectar nube",
+              onPress: () => router.push("/(protected)/add-provider"),
+            },
+          ],
+        );
+        return;
+      }
 
-    setSelectedFile(file);
-    setModalStep('SELECT_PROVIDER');
-    setModalVisible(true);
-  }, [connectedProviders, router]);
+      setSelectedFile(file);
+      setModalStep("SELECT_PROVIDER");
+      setModalVisible(true);
+    },
+    [connectedProviders, router],
+  );
 
   const handleSelectDestination = async (destination: ProviderType) => {
     if (!selectedFile) return;
     setTargetProvider(destination);
 
-    const hasConflict = await transferService.checkDestinationConflict(selectedFile.name, destination);
+    const hasConflict = await transferService.checkDestinationConflict(
+      selectedFile.name,
+      destination,
+    );
     if (hasConflict) {
-      setModalStep('CONFLICT_RESOLUTION');
+      setModalStep("CONFLICT_RESOLUTION");
     } else {
-      await executeTransfer(selectedFile, destination, 'replace');
+      await executeTransfer(selectedFile, destination, "replace");
     }
   };
 
-  const handleResolveConflict = async (strategy: 'replace' | 'rename' | 'cancel') => {
-    if (strategy === 'cancel' || !selectedFile) {
+  const handleResolveConflict = async (
+    strategy: "replace" | "rename" | "cancel",
+  ) => {
+    if (strategy === "cancel" || !selectedFile) {
       setModalVisible(false);
       return;
     }
     await executeTransfer(selectedFile, targetProvider, strategy);
   };
 
-  const executeTransfer = async (file: UnifiedFile, toProvider: ProviderType, conflictStrategy: 'replace' | 'rename' | 'cancel') => {
+  const executeTransfer = async (
+    file: UnifiedFile,
+    toProvider: ProviderType,
+    conflictStrategy: "replace" | "rename" | "cancel",
+  ) => {
     try {
       const success = await transferService.transferToDestination({
         fileId: file.id,
         fileName: file.name,
-        mimeType: file.mimeType || '',
+        mimeType: file.mimeType || "",
         fromProvider: file.provider as ProviderType,
         toProvider,
         conflictStrategy,
       });
 
       if (success) {
-        setModalStep('DELETE_SOURCE');
+        setModalStep("DELETE_SOURCE");
       } else {
         setModalVisible(false);
-        Alert.alert('Error', 'La transferencia falló.');
+        Alert.alert("Error", "La transferencia falló.");
       }
     } catch (err: any) {
       setModalVisible(false);
-      Alert.alert('Error', err?.message || 'Error durante la transferencia');
+      Alert.alert("Error", err?.message || "Error durante la transferencia");
     }
   };
 
   const handleDeleteSource = async () => {
     if (!selectedFile) return;
-    const success = await transferService.deleteFromSource(selectedFile.id, selectedFile.provider as ProviderType);
+    const success = await transferService.deleteFromSource(
+      selectedFile.id,
+      selectedFile.provider as ProviderType,
+    );
     setModalVisible(false);
     if (success) {
       onRefresh();
     } else {
-      Alert.alert('Aviso', 'El archivo se transfirió pero no se pudo eliminar el original.');
+      Alert.alert(
+        "Aviso",
+        "El archivo se transfirió pero no se pudo eliminar el original.",
+      );
     }
   };
 
-  const handleDeleteFile = useCallback(async (file: UnifiedFile) => {
-    const success = await transferService.deleteFromSource(file.id, file.provider as ProviderType);
-    if (success) {
-      onRefresh();
-    } else {
-      Alert.alert('Error', 'No se pudo eliminar el archivo.');
-    }
-  }, [onRefresh]);
+  const handleDeleteFile = useCallback(
+    async (file: UnifiedFile) => {
+      const success = await transferService.deleteFromSource(
+        file.id,
+        file.provider as ProviderType,
+      );
+      if (success) {
+        onRefresh();
+      } else {
+        Alert.alert("Error", "No se pudo eliminar el archivo.");
+      }
+    },
+    [onRefresh],
+  );
 
-  const providerColor = isOneDrive ? Colors.providers.oneDriveAlt : Colors.providers.googleDriveAlt;
-  const providerLabel = isOneDrive ? 'OneDrive' : 'Google Drive';
+  const visibleFiles = useMemo(() => {
+    const normalizedQuery = searchQuery.toLowerCase();
+    return [...(files || [])]
+      .filter((file: any) =>
+        (file.name || "").toLowerCase().includes(normalizedQuery),
+      )
+      .sort((a: any, b: any) => {
+        if (sortBy === "size") {
+          return (b.size || 0) - (a.size || 0);
+        }
+        if (sortBy === "name") {
+          return (a.name || "").localeCompare(b.name || "");
+        }
+        return (
+          new Date(b.modifiedTime || 0).getTime() -
+          new Date(a.modifiedTime || 0).getTime()
+        );
+      });
+  }, [files, searchQuery, sortBy]);
+
+  const providerColor = isOneDrive
+    ? Colors.providers.oneDriveAlt
+    : Colors.providers.googleDriveAlt;
+  const providerLabel = isOneDrive ? "OneDrive" : "Google Drive";
 
   const fileMenuActions: FileActionOption[] = useMemo(() => {
     if (!menuFile) return [];
     return [
       {
-        id: 'transfer',
-        label: 'Transferir archivo',
+        id: "transfer",
+        label: "Transferir archivo",
         icon: ArrowLeftRight,
         color: Colors.text.navy,
         onPress: () => handleStartTransfer(menuFile),
       },
       {
-        id: 'delete',
-        label: 'Eliminar archivo',
+        id: "delete",
+        label: "Eliminar archivo",
         icon: Trash2,
         destructive: true,
         onPress: () => handleDeleteFile(menuFile),
@@ -271,84 +362,48 @@ const FileListScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress}>
-          <Text style={styles.backButton}>←</Text>
-        </TouchableOpacity>
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>{folderName}</Text>
-          <Text style={[styles.providerLabel, { color: providerColor }]}>{providerLabel}</Text>
-        </View>
-        <View style={{ width: 40 }} />
-      </View>
+      <FileListHeader
+        title={folderName || (isOneDrive ? "OneDrive" : "Mi unidad")}
+        providerLabel={providerLabel}
+        providerColor={providerColor}
+        onBack={handleBackPress}
+      />
 
-      <View style={styles.controls}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar archivos..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoCapitalize="none"
-        />
-        <View style={styles.sortButtons}>
-          <TouchableOpacity
-            style={[styles.sortButton, sortBy === 'size' && styles.sortButtonActive]}
-            onPress={() => setSortBy('size')}
-          >
-            <Text style={[styles.sortButtonText, sortBy === 'size' && styles.sortButtonTextActive]}>Tamaño</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sortButton, sortBy === 'name' && styles.sortButtonActive]}
-            onPress={() => setSortBy('name')}
-          >
-            <Text style={[styles.sortButtonText, sortBy === 'name' && styles.sortButtonTextActive]}>Nombre</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sortButton, sortBy === 'date' && styles.sortButtonActive]}
-            onPress={() => setSortBy('date')}
-          >
-            <Text style={[styles.sortButtonText, sortBy === 'date' && styles.sortButtonTextActive]}>Fecha</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <FileSearchAndSortBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+      />
 
       <ScrollView
         style={styles.content}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={onRefresh} />
+        }
       >
         {loading && files.length === 0 ? (
           <ActivityIndicator size="large" color={providerColor} />
-        ) : files.length > 0 ? (
-          files
-            .filter((file: any) => file.name.toLowerCase().includes(searchQuery.toLowerCase()))
-            .sort((a: any, b: any) => {
-              if (sortBy === 'size') {
-                return (b.size || 0) - (a.size || 0);
-              } else if (sortBy === 'name') {
-                return a.name.localeCompare(b.name);
-              } else {
-                return new Date(b.modifiedTime).getTime() - new Date(a.modifiedTime).getTime();
-              }
-            })
-            .map((file: any) => {
-              const unifiedFile: UnifiedFile = {
-                ...file,
-                provider: file.provider || provider,
-              };
+        ) : visibleFiles.length > 0 ? (
+          visibleFiles.map((file: any) => {
+            const unifiedFile: UnifiedFile = {
+              ...file,
+              provider: file.provider || provider,
+            };
 
-              return (
-                <FileCard
-                  key={file.id}
-                  file={unifiedFile}
-                  onPress={(f) => {
-                    if (isFolder(f)) {
-                      handleFolderPress(f);
-                    }
-                  }}
-                  onOpenMenu={setMenuFile}
-                />
-              );
-            })
+            return (
+              <FileCard
+                key={file.id}
+                file={unifiedFile}
+                onPress={(f) => {
+                  if (isFolder(f)) {
+                    handleFolderPress(f);
+                  }
+                }}
+                onOpenMenu={setMenuFile}
+              />
+            );
+          })
         ) : (
           <Text style={styles.loadingText}>No se encontraron archivos</Text>
         )}
@@ -356,7 +411,7 @@ const FileListScreen = () => {
 
       <FileActionsModal
         visible={!!menuFile}
-        title={menuFile?.name || 'Opciones del archivo'}
+        title={menuFile?.name || "Opciones del archivo"}
         subtitle={`Proveedor: ${providerLabel}`}
         actions={fileMenuActions}
         onClose={() => setMenuFile(null)}
@@ -366,7 +421,9 @@ const FileListScreen = () => {
         visible={modalVisible}
         step={modalStep}
         fileName={selectedFile?.name}
-        targetProvider={targetProvider === 'google-drive' ? 'Google Drive' : 'OneDrive'}
+        targetProvider={
+          targetProvider === "google-drive" ? "Google Drive" : "OneDrive"
+        }
         onSelectDestination={handleSelectDestination}
         onResolveConflict={handleResolveConflict}
         onKeepSource={() => setModalVisible(false)}
@@ -381,68 +438,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background.login,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: Colors.background.headerSoft,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.headerSoft,
-  },
-  backButton: {
-    fontSize: 24,
-    color: Colors.providers.googleDriveAlt,
-  },
-  titleRow: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.text.navy,
-  },
-  providerLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  controls: {
-    padding: 12,
-    backgroundColor: Colors.background.headerSoft,
-  },
-  searchInput: {
-    backgroundColor: Colors.background.card,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    fontSize: 16,
-  },
-  sortButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 12,
-  },
-  sortButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    backgroundColor: Colors.background.card,
-    borderWidth: 1,
-    borderColor: Colors.border.headerSoft,
-  },
-  sortButtonActive: {
-    backgroundColor: Colors.providers.googleDriveAlt,
-    borderColor: Colors.providers.googleDriveAlt,
-  },
-  sortButtonText: {
-    color: Colors.providers.googleDriveAlt,
-    fontSize: 14,
-  },
-  sortButtonTextActive: {
-    color: Colors.text.inverse,
   },
   content: {
     flex: 1,
