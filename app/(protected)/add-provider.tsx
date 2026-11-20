@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { useStorageProviders } from '../../hooks/useStorageProviders';
 import { ProviderActionButton } from '../../components/common/ProviderActionButton';
 import { ScreenContainer } from '../../components/common/ScreenContainer';
+import { Colors } from '../../components/theme/colors';
 
 const AddProviderScreen: React.FC = () => {
   const router = useRouter();
@@ -26,7 +27,7 @@ const AddProviderScreen: React.FC = () => {
 
   const getStatusBadge = (isConnecting: boolean, isConnected: boolean) => {
     if (isConnecting) {
-      return <ActivityIndicator size="small" color="#0078D4" />;
+      return <ActivityIndicator size="small" color={Colors.providers.oneDrive} />;
     }
     if (isConnected) {
       return <Text style={styles.statusConnected}>Conectado</Text>;
@@ -110,32 +111,32 @@ const styles = StyleSheet.create({
   },
   backText: {
     fontSize: 15,
-    color: '#FF6B35',
+    color: Colors.brand.primary,
     fontWeight: '600',
   },
   title: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.text.primary,
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: Colors.text.muted,
     lineHeight: 20,
   },
   providersContainer: {
     gap: 12,
   },
   providerCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.background.card,
     borderRadius: 14,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: Colors.border.light,
   },
   providerInfo: {
     flexDirection: 'row',
@@ -147,7 +148,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background.subtle,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -163,28 +164,28 @@ const styles = StyleSheet.create({
   providerName: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.text.primary,
   },
   providerDescription: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: Colors.text.subtle,
     marginTop: 2,
   },
   providerAccount: {
     fontSize: 11,
-    color: '#0F172A',
+    color: Colors.text.primary,
     fontWeight: '600',
     marginTop: 4,
   },
   statusConnected: {
     fontSize: 11,
-    color: '#10B981',
+    color: Colors.status.connected,
     fontWeight: '600',
     marginTop: 4,
   },
   statusAvailable: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: Colors.text.subtle,
     marginTop: 4,
   },
   footer: {
@@ -194,7 +195,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: Colors.text.subtle,
     textAlign: 'center',
     lineHeight: 16,
   },

@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { LogOut } from "lucide-react-native";
 
 import { ScreenContainer } from "../../components/common/ScreenContainer";
+import { Colors } from "../../components/theme/colors";
 import { selectCurrentUser, logout } from "../../store/slices/authSlice";
 import { authService } from "../../services/auth.service";
 import { driveService } from "@/services/drive.service";
@@ -98,7 +99,6 @@ const HomeScreen = () => {
     }
   };
 
-  // Cálculos de almacenamiento unificado
   const driveUsage = isGoogleDriveConnected ? quota?.usage || 0 : 0;
   const driveLimit = isGoogleDriveConnected
     ? quota?.limit || 15 * 1024 * 1024 * 1024
@@ -137,7 +137,6 @@ const HomeScreen = () => {
           />
         }
       >
-        {/* Encabezado del usuario */}
         <View style={styles.headerRow}>
           <View style={styles.headerInfo}>
             <Text style={styles.greetingText} numberOfLines={1}>
@@ -145,7 +144,6 @@ const HomeScreen = () => {
             </Text>
           </View>
 
-          {/* Avatar limpio y botón de salir con Lucide */}
           <View style={styles.userControlsWrapper}>
             {user?.photoURL !== undefined && user?.photoURL !== null ? (
               <Image
@@ -153,7 +151,7 @@ const HomeScreen = () => {
                 style={{
                   width: 40,
                   height: 40,
-                  backgroundColor: "#FFF",
+                  backgroundColor: Colors.background.card,
                   borderRadius: 50,
                 }}
               />
@@ -172,12 +170,11 @@ const HomeScreen = () => {
               onPress={handleLogout}
               accessibilityLabel="Cerrar sesión"
             >
-              <LogOut size={18} color="#64748B" />
+              <LogOut size={18} color={Colors.text.muted} />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Tarjeta de Espacio Total Unificado */}
         <View style={styles.summaryRow}>
           <View style={styles.totalSpaceCard}>
             <Text style={styles.totalSpaceLabel}>
@@ -197,7 +194,7 @@ const HomeScreen = () => {
                     styles.mainProgressBarFill,
                     {
                       width: `${Math.min(drivePercentOfTotal, 100)}%`,
-                      backgroundColor: "#4285F4",
+                      backgroundColor: Colors.providers.googleDrive,
                     },
                   ]}
                 />
@@ -208,7 +205,7 @@ const HomeScreen = () => {
                     styles.mainProgressBarFill,
                     {
                       width: `${Math.min(odPercentOfTotal, 100)}%`,
-                      backgroundColor: "#0078D4",
+                      backgroundColor: Colors.providers.oneDrive,
                     },
                   ]}
                 />
@@ -228,7 +225,6 @@ const HomeScreen = () => {
           </View>
         </View>
 
-        {/* Sección de Conexiones */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Conexiones</Text>
           <TouchableOpacity
@@ -239,7 +235,6 @@ const HomeScreen = () => {
         </View>
 
         <View style={styles.connectionsRow}>
-          {/* Google Drive */}
           <View style={styles.providerCard}>
             <View style={styles.providerCardHeader}>
               <View style={styles.providerIconWrapper}>
@@ -278,14 +273,13 @@ const HomeScreen = () => {
                   styles.providerProgressBarFill,
                   {
                     width: `${Math.min(driveUsagePercent, 100)}%`,
-                    backgroundColor: "#4285F4",
+                    backgroundColor: Colors.providers.googleDrive,
                   },
                 ]}
               />
             </View>
           </View>
 
-          {/* OneDrive */}
           {isOneDriveConnected && (
             <View style={styles.providerCard}>
               <View style={styles.providerCardHeader}>
@@ -323,7 +317,7 @@ const HomeScreen = () => {
                     styles.providerProgressBarFill,
                     {
                       width: `${Math.min(odUsagePercent, 100)}%`,
-                      backgroundColor: "#0078D4",
+                      backgroundColor: Colors.providers.oneDrive,
                     },
                   ]}
                 />
@@ -332,7 +326,6 @@ const HomeScreen = () => {
           )}
         </View>
 
-        {/* Acciones rápidas */}
         <Text style={[styles.sectionTitle, { marginTop: 28 }]}>
           ¿Qué necesitas hacer?
         </Text>
@@ -345,7 +338,7 @@ const HomeScreen = () => {
             <View
               style={[
                 styles.actionIconContainer,
-                { backgroundColor: "#FFF4E5" },
+                { backgroundColor: Colors.actions.folderBg },
               ]}
             >
               <Text style={{ fontSize: 18 }}>📁</Text>
@@ -366,7 +359,7 @@ const HomeScreen = () => {
             <View
               style={[
                 styles.actionIconContainer,
-                { backgroundColor: "#FFF0F0" },
+                { backgroundColor: Colors.actions.trashBg },
               ]}
             >
               <Text style={{ fontSize: 18 }}>🗑️</Text>
@@ -388,7 +381,7 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAF8F5",
+    backgroundColor: Colors.background.primary,
   },
   headerRow: {
     flexDirection: "row",
@@ -403,7 +396,7 @@ const styles = StyleSheet.create({
   greetingText: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#0F172A",
+    color: Colors.text.primary,
   },
   userControlsWrapper: {
     flexDirection: "row",
@@ -414,36 +407,36 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#FED7AA",
+    backgroundColor: Colors.brand.accentLight,
     justifyContent: "center",
     alignItems: "center",
   },
   avatarInitial: {
-    color: "#C2410C",
+    color: Colors.brand.accentDark,
     fontWeight: "700",
     fontSize: 13,
   },
   headerLogoutBtn: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Colors.background.card,
     width: 36,
     height: 36,
     borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: Colors.border.default,
   },
   summaryRow: {
     marginBottom: 24,
   },
   totalSpaceCard: {
     width: "100%",
-    backgroundColor: "#0F172A",
+    backgroundColor: Colors.background.cardDark,
     borderRadius: 16,
     padding: 18,
   },
   totalSpaceLabel: {
-    color: "#94A3B8",
+    color: Colors.text.subtle,
     fontSize: 12,
   },
   totalSpaceValueRow: {
@@ -452,18 +445,18 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   totalSpaceNumber: {
-    color: "#FFFFFF",
+    color: Colors.text.inverse,
     fontSize: 32,
     fontWeight: "800",
     marginRight: 6,
   },
   totalSpaceUnit: {
-    color: "#94A3B8",
+    color: Colors.text.subtle,
     fontSize: 13,
   },
   mainProgressBarBg: {
     height: 8,
-    backgroundColor: "#334155",
+    backgroundColor: Colors.border.dark,
     borderRadius: 4,
     overflow: "hidden",
     marginBottom: 10,
@@ -477,7 +470,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   totalSpaceFooterText: {
-    color: "#94A3B8",
+    color: Colors.text.subtle,
     fontSize: 11,
     fontWeight: "500",
   },
@@ -490,10 +483,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#0F172A",
+    color: Colors.text.primary,
   },
   addProviderLink: {
-    color: "#FF6B35",
+    color: Colors.brand.primary,
     fontWeight: "700",
     fontSize: 14,
   },
@@ -503,11 +496,11 @@ const styles = StyleSheet.create({
   },
   providerCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Colors.background.card,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: Colors.border.light,
   },
   providerCardHeader: {
     flexDirection: "row",
@@ -518,7 +511,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: Colors.background.subtle,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 6,
@@ -533,11 +526,11 @@ const styles = StyleSheet.create({
   providerName: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#0F172A",
+    color: Colors.text.primary,
   },
   providerSubtext: {
     fontSize: 9,
-    color: "#94A3B8",
+    color: Colors.text.subtle,
   },
   providerUsageRow: {
     flexDirection: "row",
@@ -547,28 +540,28 @@ const styles = StyleSheet.create({
   providerUsageValue: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#0F172A",
+    color: Colors.text.primary,
   },
   percentBadge: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: Colors.background.muted,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
   },
   percentBadgeText: {
     fontSize: 9,
-    color: "#475569",
+    color: Colors.text.secondary,
     fontWeight: "600",
   },
   providerLimitText: {
     fontSize: 10,
-    color: "#94A3B8",
+    color: Colors.text.subtle,
     marginTop: 2,
     marginBottom: 8,
   },
   providerProgressBarBg: {
     height: 4,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: Colors.background.muted,
     borderRadius: 2,
     overflow: "hidden",
   },
@@ -583,13 +576,13 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     width: "100%",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Colors.background.card,
     borderRadius: 14,
     padding: 12,
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: Colors.border.light,
   },
   actionIconContainer: {
     width: 36,
@@ -605,16 +598,16 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#0F172A",
+    color: Colors.text.primary,
   },
   actionDescription: {
     fontSize: 11,
-    color: "#94A3B8",
+    color: Colors.text.subtle,
     marginTop: 2,
   },
   actionArrow: {
     fontSize: 18,
-    color: "#CBD5E1",
+    color: Colors.border.arrow,
     marginLeft: 4,
   },
 });

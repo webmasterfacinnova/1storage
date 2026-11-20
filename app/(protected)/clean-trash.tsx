@@ -1,4 +1,3 @@
-// app/(protected)/clean-trash.tsx
 import React, { useEffect, useCallback, useState, useMemo } from 'react';
 import {
   View,
@@ -23,6 +22,7 @@ import {
 
 import { driveFilesService } from '../../services/drive-files.service';
 import { driveService } from '../../services/drive.service';
+import { Colors } from '../../components/theme/colors';
 import {
   setTrashedFilesLoading,
   setTrashedFiles,
@@ -171,7 +171,7 @@ const CleanTrashScreen = () => {
             <RefreshControl
               refreshing={loading && !isDeleting}
               onRefresh={onRefresh}
-              tintColor="#FF6B35"
+              tintColor={Colors.brand.primary}
             />
           }
           contentContainerStyle={{ paddingBottom: 40 }}
@@ -180,7 +180,7 @@ const CleanTrashScreen = () => {
           <View style={styles.summaryCard}>
             <View style={styles.summaryHeader}>
               <View style={styles.iconCircle}>
-                <Trash2 size={20} color="#FF6B35" />
+                <Trash2 size={20} color={Colors.brand.primary} />
               </View>
               <View style={styles.summaryTitleContainer}>
                 <Text style={styles.summaryTitle}>Espacio ocupado</Text>
@@ -213,7 +213,11 @@ const CleanTrashScreen = () => {
               disabled={isDeleting || trashedFiles.length === 0}
               activeOpacity={0.7}
             >
-              <Trash2 size={16} color="#ffffff" style={{ marginRight: 6 }} />
+              <Trash2
+                size={16}
+                color={Colors.text.inverse}
+                style={{ marginRight: 6 }}
+              />
               <Text style={styles.emptyButtonText}>Vaciar papelera</Text>
             </TouchableOpacity>
           </View>
@@ -226,9 +230,9 @@ const CleanTrashScreen = () => {
                 onPress={handleSelectAll}
               >
                 {selectedFiles.size === trashedFiles.length ? (
-                  <CheckCircle2 size={18} color="#FF6B35" />
+                  <CheckCircle2 size={18} color={Colors.brand.primary} />
                 ) : (
-                  <Circle size={18} color="#757575" />
+                  <Circle size={18} color={Colors.text.iconMuted} />
                 )}
                 <Text style={styles.selectAllText}>
                   {selectedFiles.size === trashedFiles.length
@@ -262,7 +266,7 @@ const CleanTrashScreen = () => {
           {/* Lista de Archivos */}
           {loading && trashedFiles.length === 0 ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#FF6B35" />
+              <ActivityIndicator size="large" color={Colors.brand.primary} />
               <Text style={styles.loadingText}>Cargando papelera...</Text>
             </View>
           ) : trashedFiles.length > 0 ? (
@@ -287,9 +291,9 @@ const CleanTrashScreen = () => {
                     ]}
                   >
                     {isFolder ? (
-                      <Folder size={22} color="#f57c00" />
+                      <Folder size={22} color={Colors.brand.folderOrange} />
                     ) : (
-                      <FileText size={22} color="#FF6B35" />
+                      <FileText size={22} color={Colors.brand.primary} />
                     )}
                   </View>
 
@@ -304,9 +308,9 @@ const CleanTrashScreen = () => {
 
                   <View style={styles.checkboxContainer}>
                     {isSelected ? (
-                      <CheckCircle2 size={22} color="#FF6B35" />
+                      <CheckCircle2 size={22} color={Colors.brand.primary} />
                     ) : (
-                      <Circle size={22} color="#bdbdbd" />
+                      <Circle size={22} color={Colors.text.checkboxIdle} />
                     )}
                   </View>
                 </TouchableOpacity>
@@ -315,7 +319,7 @@ const CleanTrashScreen = () => {
           ) : (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconBg}>
-                <Trash2 size={40} color="#9e9e9e" />
+                <Trash2 size={40} color={Colors.text.neutral} />
               </View>
               <Text style={styles.emptyTitle}>La papelera está vacía</Text>
               <Text style={styles.emptySubtitle}>
@@ -332,26 +336,26 @@ const CleanTrashScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAF8F5',
+    backgroundColor: Colors.background.primary,
   },
   container: {
     flex: 1,
-    backgroundColor: '#FAF8F5',
+    backgroundColor: Colors.background.primary,
   },
   summaryCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background.card,
     borderRadius: 16,
     padding: 16,
     marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 8,
-    shadowColor: '#000',
+    shadowColor: Colors.shadow.color,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#edf2f7',
+    borderColor: Colors.border.cardSoft,
   },
   summaryHeader: {
     flexDirection: 'row',
@@ -362,7 +366,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFF4E5',
+    backgroundColor: Colors.actions.folderBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -373,16 +377,16 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.text.primary,
   },
   summarySubtitle: {
     fontSize: 12,
-    color: '#757575',
+    color: Colors.text.iconMuted,
     marginTop: 2,
   },
   statsGrid: {
     flexDirection: 'row',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: Colors.background.statsBox,
     borderRadius: 12,
     paddingVertical: 12,
     marginBottom: 16,
@@ -395,20 +399,20 @@ const styles = StyleSheet.create({
   divider: {
     width: 1,
     height: '60%',
-    backgroundColor: '#e0e0e0',
+    backgroundColor: Colors.border.divider,
   },
   statNumber: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.text.primary,
   },
   statLabel: {
     fontSize: 12,
-    color: '#616161',
+    color: Colors.text.statLabel,
     marginTop: 2,
   },
   emptyButton: {
-    backgroundColor: '#d32f2f',
+    backgroundColor: Colors.actions.danger,
     borderRadius: 10,
     paddingVertical: 12,
     flexDirection: 'row',
@@ -416,10 +420,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   disabledButton: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: Colors.background.disabled,
   },
   emptyButtonText: {
-    color: '#ffffff',
+    color: Colors.text.inverse,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -438,17 +442,17 @@ const styles = StyleSheet.create({
   selectAllText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#333333',
+    color: Colors.text.heading,
     marginLeft: 8,
   },
   deleteSelectedBtn: {
-    backgroundColor: '#ffebee',
+    backgroundColor: Colors.background.dangerSoft,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
   },
   deleteSelectedText: {
-    color: '#c62828',
+    color: Colors.text.dangerDark,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -463,14 +467,14 @@ const styles = StyleSheet.create({
   secTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#333333',
+    color: Colors.text.heading,
   },
   secCount: {
     fontSize: 12,
-    color: '#9e9e9e',
+    color: Colors.text.neutral,
   },
   fileCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background.card,
     borderRadius: 12,
     padding: 12,
     marginHorizontal: 16,
@@ -478,16 +482,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#f0f0f0',
-    shadowColor: '#000',
+    borderColor: Colors.border.itemSoft,
+    shadowColor: Colors.shadow.color,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
     shadowRadius: 3,
     elevation: 1,
   },
   fileCardSelected: {
-    backgroundColor: '#FFF4E5',
-    borderColor: '#FFD8BD',
+    backgroundColor: Colors.background.selected,
+    borderColor: Colors.border.selected,
   },
   fileIconContainer: {
     width: 42,
@@ -498,10 +502,10 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   folderIconBg: {
-    backgroundColor: '#fff3e0',
+    backgroundColor: Colors.actions.folderWarmBg,
   },
   fileIconBg: {
-    backgroundColor: '#FFF4E5',
+    backgroundColor: Colors.actions.folderBg,
   },
   fileInfo: {
     flex: 1,
@@ -510,11 +514,11 @@ const styles = StyleSheet.create({
   fileName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333333',
+    color: Colors.text.heading,
   },
   fileSize: {
     fontSize: 12,
-    color: '#757575',
+    color: Colors.text.iconMuted,
     marginTop: 2,
   },
   checkboxContainer: {
@@ -526,7 +530,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: '#757575',
+    color: Colors.text.iconMuted,
     fontSize: 13,
   },
   emptyContainer: {
@@ -538,7 +542,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.background.emptyIcon,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -546,12 +550,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#424242',
+    color: Colors.text.emptyTitle,
     marginBottom: 6,
   },
   emptySubtitle: {
     fontSize: 13,
-    color: '#9e9e9e',
+    color: Colors.text.neutral,
     textAlign: 'center',
     lineHeight: 18,
   },

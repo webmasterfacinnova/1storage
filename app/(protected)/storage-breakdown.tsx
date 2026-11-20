@@ -1,13 +1,10 @@
-// app/(protected)/storage-breakdown.tsx
-// Pantalla principal: ¿qué está ocupando espacio en Google Drive?
-// Muestra el almacenamiento por tipo de archivo, archivos más grandes y navegación a explorador de archivos/papelera.
-
 import React, { useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'expo-router';
 import { driveFilesService } from '../../services/drive-files.service';
 import { driveService } from '../../services/drive.service';
+import { Colors } from '../../components/theme/colors';
 import {
   setStorageByTypeLoading,
   setStorageByType,
@@ -61,7 +58,12 @@ const StorageBreakdownScreen = () => {
   }, [onRefresh]);
 
   const usagePercent = quota ? driveService.usagePercentage(quota) : 0;
-  const barColor = usagePercent > 90 ? '#e53935' : usagePercent > 70 ? '#fb8c00' : '#4285f4';
+  const barColor =
+    usagePercent > 90
+      ? Colors.status.quotaCritical
+      : usagePercent > 70
+        ? Colors.status.quotaWarning
+        : Colors.status.quotaNormal;
 
   return (
     <View style={styles.container}>
@@ -113,7 +115,7 @@ const StorageBreakdownScreen = () => {
         <Text style={styles.sectionTitle}>Almacenamiento por tipo de archivo</Text>
 
         {storageByTypeLoading ? (
-          <ActivityIndicator size="large" color="#4285f4" />
+          <ActivityIndicator size="large" color={Colors.status.quotaNormal} />
         ) : storageByType.length > 0 ? (
           <View style={styles.typeList}>
             {storageByType.map((type, index) => (
@@ -146,7 +148,7 @@ const StorageBreakdownScreen = () => {
         <Text style={styles.sectionTitle}>Archivos más grandes</Text>
 
         {largestFilesLoading ? (
-          <ActivityIndicator size="small" color="#4285f4" />
+          <ActivityIndicator size="small" color={Colors.status.quotaNormal} />
         ) : largestFiles.length > 0 ? (
           <View style={styles.fileList}>
             {largestFiles.map((file, index) => (
@@ -191,29 +193,29 @@ const StorageBreakdownScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f7fe',
+    backgroundColor: Colors.background.login,
   },
   header: {
     padding: 16,
-    backgroundColor: '#d7eefb',
+    backgroundColor: Colors.background.headerSoft,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0ecf5',
+    borderBottomColor: Colors.border.headerSoft,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1a237e',
+    color: Colors.text.navy,
   },
   content: {
     flex: 1,
     padding: 16,
   },
   storageCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background.card,
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: Colors.shadow.color,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -222,7 +224,7 @@ const styles = StyleSheet.create({
   storageTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1a237e',
+    color: Colors.text.navy,
     marginBottom: 16,
   },
   quotaRow: {
@@ -236,11 +238,11 @@ const styles = StyleSheet.create({
   quotaValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1a237e',
+    color: Colors.text.navy,
   },
   quotaLabel: {
     fontSize: 14,
-    color: '#5f6368',
+    color: Colors.text.body,
     marginTop: 2,
   },
   progressBarContainer: {
@@ -248,7 +250,7 @@ const styles = StyleSheet.create({
   },
   progressBarBg: {
     height: 8,
-    backgroundColor: '#e0ecf5',
+    backgroundColor: Colors.border.headerSoft,
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -258,14 +260,14 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 12,
-    color: '#5f6368',
+    color: Colors.text.body,
     marginTop: 4,
     textAlign: 'right',
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1a237e',
+    color: Colors.text.navy,
     marginBottom: 12,
     marginTop: 8,
   },
@@ -273,13 +275,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   typeCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: Colors.shadow.color,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -295,11 +297,11 @@ const styles = StyleSheet.create({
   typeLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#1a237e',
+    color: Colors.text.navy,
   },
   typeSize: {
     fontSize: 14,
-    color: '#5f6368',
+    color: Colors.text.body,
     marginTop: 2,
   },
   typeBarContainer: {
@@ -308,7 +310,7 @@ const styles = StyleSheet.create({
   typeBarBg: {
     height: 6,
     width: 100,
-    backgroundColor: '#e0ecf5',
+    backgroundColor: Colors.border.headerSoft,
     borderRadius: 3,
     overflow: 'hidden',
     marginBottom: 4,
@@ -319,19 +321,19 @@ const styles = StyleSheet.create({
   },
   typePercent: {
     fontSize: 12,
-    color: '#5f6368',
+    color: Colors.text.body,
   },
   fileList: {
     marginBottom: 20,
   },
   fileCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: Colors.shadow.color,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -347,27 +349,27 @@ const styles = StyleSheet.create({
   fileName: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#333',
+    color: Colors.text.headingShort,
   },
   fileSize: {
     fontSize: 13,
-    color: '#5f6368',
+    color: Colors.text.body,
     marginTop: 2,
   },
   fileArrow: {
     fontSize: 20,
-    color: '#ccc',
+    color: Colors.border.chevronSoft,
   },
   moreButton: {
     padding: 12,
     alignItems: 'center',
   },
   moreText: {
-    color: '#1a73e8',
+    color: Colors.providers.googleDriveAlt,
     fontSize: 14,
   },
   loadingText: {
-    color: '#999999',
+    color: Colors.text.caption,
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 20,
@@ -376,15 +378,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     padding: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background.card,
     borderTopWidth: 1,
-    borderTopColor: '#e0ecf5',
+    borderTopColor: Colors.border.headerSoft,
   },
   navButton: {
     padding: 8,
   },
   navButtonText: {
-    color: '#1a73e8',
+    color: Colors.providers.googleDriveAlt,
     fontSize: 16,
   },
 });

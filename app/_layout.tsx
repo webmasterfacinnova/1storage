@@ -1,14 +1,13 @@
-// app/_layout.tsx
 import React, { useEffect, useState } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { Provider, useSelector, useDispatch } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { store } from '../store/store';
-import { selectCurrentUser, setCredentials, setLoading } from '../store/slices/authSlice';
+import { selectCurrentUser, setCredentials } from '../store/slices/authSlice';
 import { authService } from '../services/auth.service';
 import { addProvider } from '../store/slices/connectedProvidersSlice';
-import { getSecureData } from '../utils/secureStorage';
+import { Colors } from '../components/theme/colors';
 
 const InitialLayout = () => {
   const user = useSelector(selectCurrentUser);
@@ -17,7 +16,6 @@ const InitialLayout = () => {
   const dispatch = useDispatch();
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // 1️⃣ Restaurar sesión al arrancar la app (equivalente al antiguo App.tsx)
   useEffect(() => {
     const restoreSession = async () => {
       try {
@@ -49,7 +47,6 @@ const InitialLayout = () => {
     restoreSession();
   }, [dispatch]);
 
-  // 2️⃣ Controlar redirección de rutas según el estado del usuario
   useEffect(() => {
     if (isInitializing) return;
 
@@ -62,11 +59,10 @@ const InitialLayout = () => {
     }
   }, [user, segments, isInitializing]);
 
-  // Mostrar un indicador de carga mientras valida la sesión guardada
   if (isInitializing) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF6B35" />
+        <ActivityIndicator size="large" color={Colors.brand.primary} />
       </View>
     );
   }
@@ -89,6 +85,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FAF8F5',
+    backgroundColor: Colors.background.primary,
   },
 });

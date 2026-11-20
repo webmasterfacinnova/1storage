@@ -1,4 +1,3 @@
-// app/(protected)/manager-files.tsx
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
   View,
@@ -22,6 +21,7 @@ import StorageSummaryBar from '../../components/storage/StorageSummaryBar';
 import ProviderSelector from '../../components/storage/ProviderSelector';
 import SortBar, { SortOption } from '../../components/storage/SortBar';
 import EmptyFilesView from '../../components/storage/EmptyFilesView';
+import { Colors } from '../../components/theme/colors';
 
 import { fetchProviderFilesPage } from '../../services/storage-registry.service';
 import { transferService, ProviderType } from '../../services/transfer.service';
@@ -48,14 +48,14 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     id: 'google-drive',
     short: 'GD',
     name: 'Google Drive',
-    color: '#34a853',
+    color: Colors.providers.googleDriveGreen,
     icon: googleDriveIcon,
   },
   onedrive: {
     id: 'onedrive',
     short: 'OD',
     name: 'OneDrive',
-    color: '#0078d4',
+    color: Colors.providers.oneDriveAlt,
     icon: oneDriveIcon,
   },
 };
@@ -265,7 +265,7 @@ const ManagerFilesScreen: React.FC = () => {
         id: 'transfer',
         label: 'Transferir archivo',
         icon: ArrowLeftRight,
-        color: '#1a237e',
+        color: Colors.text.navy,
         onPress: () => handleTransferFile(menuFile),
       },
       {
@@ -419,7 +419,7 @@ const ManagerFilesScreen: React.FC = () => {
   if (loading && previews.length === 0) {
     return (
       <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#1a237e" />
+        <ActivityIndicator size="large" color={Colors.text.navy} />
       </View>
     );
   }
@@ -431,14 +431,14 @@ const ManagerFilesScreen: React.FC = () => {
         options={{ 
           title: "Gestor de Archivos",
           headerShown: true,
-          headerStyle: { backgroundColor: "#FF6600" },
-          headerTintColor: "#FFFFFF",
+          headerStyle: { backgroundColor: Colors.brand.headerOrange },
+          headerTintColor: Colors.text.inverse,
         }} 
       />
 
       <ScrollView
         style={{ flex: 1 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1a237e" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.navy} />}
         contentContainerStyle={{ paddingBottom: 60 }}
         onScroll={onScroll}
         scrollEventThrottle={16}
@@ -506,7 +506,7 @@ const ManagerFilesScreen: React.FC = () => {
 
         {hasMore && (
           <View style={s.lmBtn}>
-            <ActivityIndicator size="small" color="#1a237e" />
+            <ActivityIndicator size="small" color={Colors.text.navy} />
             <Text style={s.lmText}>{filtered.length > 0 ? 'Cargando más…' : 'Buscando…'}</Text>
           </View>
         )}
@@ -563,14 +563,14 @@ const ManagerFilesScreen: React.FC = () => {
 };
 
 const s = StyleSheet.create({
-  container: { flex: 1, minHeight: 0, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, minHeight: 0, backgroundColor: Colors.background.statsBox },
   sec: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
-  secTitle: { fontSize: 16, fontWeight: '700', color: '#333' },
-  secCount: { fontSize: 13, color: '#999' },
+  secTitle: { fontSize: 16, fontWeight: '700', color: Colors.text.headingShort },
+  secCount: { fontSize: 13, color: Colors.text.captionShort },
   lmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
-  lmText: { fontSize: 14, color: '#1a237e', fontWeight: '600' },
+  lmText: { fontSize: 14, color: Colors.text.navy, fontWeight: '600' },
   endRow: { alignItems: 'center', paddingVertical: 20 },
-  endText: { fontSize: 12, color: '#bbb', fontWeight: '500', letterSpacing: 0.5 },
+  endText: { fontSize: 12, color: Colors.text.endText, fontWeight: '500', letterSpacing: 0.5 },
 });
 
 export default ManagerFilesScreen;

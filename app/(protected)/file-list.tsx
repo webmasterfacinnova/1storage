@@ -1,4 +1,3 @@
-// app/(protected)/file-list.tsx
 import React, { useEffect, useCallback, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -7,6 +6,7 @@ import { ArrowLeftRight, Trash2 } from 'lucide-react-native';
 import { driveFilesService } from '../../services/drive-files.service';
 import { oneDriveFilesService } from '../../services/onedrive-files.service';
 import { transferService, ProviderType } from '../../services/transfer.service';
+import { Colors } from '../../components/theme/colors';
 import FileCard from '../../components/storage/FileCard';
 import { TransferConfirmDialog, DialogStep } from '../../components/modals/TransferConfirmDialog';
 import { FileActionsModal, FileActionOption } from '../../components/modals/FileActionsModal';
@@ -246,7 +246,7 @@ const FileListScreen = () => {
     }
   }, [onRefresh]);
 
-  const providerColor = isOneDrive ? '#0078d4' : '#1a73e8';
+  const providerColor = isOneDrive ? Colors.providers.oneDriveAlt : Colors.providers.googleDriveAlt;
   const providerLabel = isOneDrive ? 'OneDrive' : 'Google Drive';
 
   const fileMenuActions: FileActionOption[] = useMemo(() => {
@@ -256,7 +256,7 @@ const FileListScreen = () => {
         id: 'transfer',
         label: 'Transferir archivo',
         icon: ArrowLeftRight,
-        color: '#1a237e',
+        color: Colors.text.navy,
         onPress: () => handleStartTransfer(menuFile),
       },
       {
@@ -380,20 +380,20 @@ const FileListScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f7fe',
+    backgroundColor: Colors.background.login,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: '#d7eefb',
+    backgroundColor: Colors.background.headerSoft,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0ecf5',
+    borderBottomColor: Colors.border.headerSoft,
   },
   backButton: {
     fontSize: 24,
-    color: '#1a73e8',
+    color: Colors.providers.googleDriveAlt,
   },
   titleRow: {
     flex: 1,
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1a237e',
+    color: Colors.text.navy,
   },
   providerLabel: {
     fontSize: 12,
@@ -411,10 +411,10 @@ const styles = StyleSheet.create({
   },
   controls: {
     padding: 12,
-    backgroundColor: '#d7eefb',
+    backgroundColor: Colors.background.headerSoft,
   },
   searchInput: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background.card,
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
@@ -429,27 +429,27 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 6,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background.card,
     borderWidth: 1,
-    borderColor: '#e0ecf5',
+    borderColor: Colors.border.headerSoft,
   },
   sortButtonActive: {
-    backgroundColor: '#1a73e8',
-    borderColor: '#1a73e8',
+    backgroundColor: Colors.providers.googleDriveAlt,
+    borderColor: Colors.providers.googleDriveAlt,
   },
   sortButtonText: {
-    color: '#1a73e8',
+    color: Colors.providers.googleDriveAlt,
     fontSize: 14,
   },
   sortButtonTextActive: {
-    color: '#ffffff',
+    color: Colors.text.inverse,
   },
   content: {
     flex: 1,
     padding: 16,
   },
   loadingText: {
-    color: '#999999',
+    color: Colors.text.caption,
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 20,
