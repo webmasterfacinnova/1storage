@@ -1,10 +1,22 @@
-import React, { useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
-import { useRouter } from 'expo-router';
-import { driveFilesService } from '../../services/drive-files.service';
-import { driveService } from '../../services/drive.service';
-import { Colors } from '../../components/theme/colors';
+import React, { useEffect, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+} from "react-native";
+import { useSelector, useDispatch } from "react-redux";
+import { useRouter } from "expo-router";
+
+import { driveFilesService } from "../../services/drive-files.service";
+import { driveService } from "../../services/drive.service";
+import { Colors } from "../../components/theme/colors";
+import { DriveQuotaCard } from "../../components/storage/DriveQuotaCard";
+import { StorageByTypeList } from "../../components/storage/StorageByTypeList";
+import { LargestFilesList } from "../../components/storage/LargestFilesList";
+import { StorageBottomNav } from "../../components/storage/StorageBottomNav";
+
 import {
   setStorageByTypeLoading,
   setStorageByType,
@@ -16,12 +28,13 @@ import {
   selectStorageByTypeLoading,
   selectLargestFiles,
   selectLargestFilesLoading,
-} from '../../store/slices/driveFilesSlice';
-import { selectDriveQuota } from '../../store/slices/driveSlice';
+} from "../../store/slices/driveFilesSlice";
+import { selectDriveQuota } from "../../store/slices/driveSlice";
 
 const StorageBreakdownScreen = () => {
   const router = useRouter();
   const dispatch = useDispatch();
+
   const quota = useSelector(selectDriveQuota);
   const storageByType = useSelector(selectStorageByType);
   const storageByTypeLoading = useSelector(selectStorageByTypeLoading);
@@ -34,7 +47,9 @@ const StorageBreakdownScreen = () => {
     if (result) {
       dispatch(setStorageByType(result));
     } else {
-      dispatch(setStorageByTypeError('No se pudo obtener el desglose del almacenamiento'));
+      dispatch(
+        setStorageByTypeError("No se pudo obtener el desglose del almacenamiento"),
+      );
     }
   }, [dispatch]);
 
@@ -42,9 +57,16 @@ const StorageBreakdownScreen = () => {
     dispatch(setLargestFilesLoading(true));
     const result = await driveFilesService.getLargestFiles(20);
     if (result) {
-      dispatch(setLargestFiles({ files: result.files, nextPageToken: result.nextPageToken }));
+      dispatch(
+        setLargestFiles({
+          files: result.files,
+          nextPageToken: result.nextPageToken,
+        }),
+      );
     } else {
-      dispatch(setLargestFilesError('No se pudieron obtener los archivos más grandes'));
+      dispatch(
+        setLargestFilesError("No se pudieron obtener los archivos más grandes"),
+      );
     }
   }, [dispatch]);
 
@@ -73,119 +95,65 @@ const StorageBreakdownScreen = () => {
 
       <ScrollView
         style={styles.content}
-        refreshControl={<RefreshControl refreshing={storageByTypeLoading || largestFilesLoading} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={storageByTypeLoading || largestFilesLoading}
+            onRefresh={onRefresh}
+          />
+        }
       >
-        {/* Tarjeta de Cuota de Almacenamiento */}
-        <View style={styles.storageCard}>
-          <Text style={styles.storageTitle}>Almacenamiento de Google Drive</Text>
+        <DriveQuotaCard
+          isLoaded={!!quota}
+          formattedUsage={
+            quota ? driveService.formatBytes(quota.usage) : undefined
+          }
+          hasLimit={!!quota?.limit}
+          formattedLimit={
+            quota?.limit ? driveService.formatBytes(quota.limit) : undefined
+          }
+          usagePercent={usagePercent}
+          barColor={barColor}
+        />
 
-          {quota ? (
-            <>
-              <View style={styles.quotaRow}>
-                <View style={styles.quotaItem}>
-                  <Text style={styles.quotaValue}>{driveService.formatBytes(quota.usage)}</Text>
-                  <Text style={styles.quotaLabel}>Usado</Text>
-                </View>
-                <View style={styles.quotaItem}>
-                  <Text style={styles.quotaValue}>
-                    {quota.limit ? driveService.formatBytes(quota.limit) : 'Ilimitado'}
-                  </Text>
-                  <Text style={styles.quotaLabel}>Total</Text>
-                </View>
-              </View>
+        <Text style={styles.sectionTitle}>
+          Almacenamiento por tipo de archivo
+        </Text>
+        <StorageByTypeList
+          items={storageByType}
+          loading={storageByTypeLoading}
+          barColor={barColor}
+          onSelectType={(type) =>
+            router.push({
+              pathname: "/(protected)/file-list",
+              params: { typeFilter: type },
+            })
+          }
+        />
 
-              {/* Barra de progreso */}
-              {quota.limit && (
-                <View style={styles.progressBarContainer}>
-                  <View style={styles.progressBarBg}>
-                    <View
-                      style={[styles.progressBarFill, { width: `${Math.min(usagePercent, 100)}%`, backgroundColor: barColor }]}
-                    />
-                  </View>
-                  <Text style={styles.progressText}>{usagePercent.toFixed(1)}% usado</Text>
-                </View>
-              )}
-            </>
-          ) : (
-            <Text style={styles.loadingText}>Cargando información de almacenamiento...</Text>
-          )}
-        </View>
-
-        {/* Almacenamiento por tipo */}
-        <Text style={styles.sectionTitle}>Almacenamiento por tipo de archivo</Text>
-
-        {storageByTypeLoading ? (
-          <ActivityIndicator size="large" color={Colors.status.quotaNormal} />
-        ) : storageByType.length > 0 ? (
-          <View style={styles.typeList}>
-            {storageByType.map((type, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.typeCard}
-                onPress={() => router.push({ pathname: '/(protected)/file-list', params: { typeFilter: type.type } })}
-              >
-                <View style={styles.typeIcon}>{type.icon}</View>
-                <View style={styles.typeInfo}>
-                  <Text style={styles.typeLabel}>{type.label}</Text>
-                  <Text style={styles.typeSize}>{driveService.formatBytes(type.size)}</Text>
-                </View>
-                <View style={styles.typeBarContainer}>
-                  <View style={styles.typeBarBg}>
-                    <View
-                      style={[styles.typeBarFill, { width: `${type.percentage}%`, backgroundColor: barColor }]}
-                    />
-                  </View>
-                  <Text style={styles.typePercent}>{type.percentage.toFixed(1)}%</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.loadingText}>No hay desglose de almacenamiento disponible</Text>
-        )}
-
-        {/* Archivos más grandes */}
         <Text style={styles.sectionTitle}>Archivos más grandes</Text>
-
-        {largestFilesLoading ? (
-          <ActivityIndicator size="small" color={Colors.status.quotaNormal} />
-        ) : largestFiles.length > 0 ? (
-          <View style={styles.fileList}>
-            {largestFiles.map((file, index) => (
-              <TouchableOpacity
-                key={file.id}
-                style={styles.fileCard}
-                onPress={() => router.push({ pathname: '/(protected)/file-list', params: { fileId: file.id } })}
-              >
-                <View style={styles.fileIcon}>{file.mimeType.includes('folder') ? '📁' : '📄'}</View>
-                <View style={styles.fileInfo}>
-                  <Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>
-                  <Text style={styles.fileSize}>{file.size ? driveService.formatBytes(file.size) : '—'}</Text>
-                </View>
-                <Text style={styles.fileArrow}>›</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={styles.moreButton} onPress={() => router.push({ pathname: '/(protected)/file-list', params: { sort: 'size' } })}>
-              <Text style={styles.moreText}>Ver todos los archivos más grandes</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <Text style={styles.loadingText}>No se encontraron archivos grandes</Text>
-        )}
+        <LargestFilesList
+          files={largestFiles}
+          loading={largestFilesLoading}
+          onSelectFile={(fileId) =>
+            router.push({
+              pathname: "/(protected)/file-list",
+              params: { fileId },
+            })
+          }
+          onViewAllLargest={() =>
+            router.push({
+              pathname: "/(protected)/file-list",
+              params: { sort: "size" },
+            })
+          }
+        />
       </ScrollView>
 
-      {/* Navegación inferior */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navButton} onPress={() => router.replace('/(protected)/home')}>
-          <Text style={styles.navButtonText}>Inicio</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/(protected)/file-list')}>
-          <Text style={styles.navButtonText}>Archivos</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/(protected)/clean-trash')}>
-          <Text style={styles.navButtonText}>Papelera</Text>
-        </TouchableOpacity>
-      </View>
+      <StorageBottomNav
+        onHomePress={() => router.replace("/(protected)/home")}
+        onFilesPress={() => router.push("/(protected)/file-list")}
+        onTrashPress={() => router.push("/(protected)/clean-trash")}
+      />
     </View>
   );
 };
@@ -203,191 +171,19 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.text.navy,
   },
   content: {
     flex: 1,
     padding: 16,
   },
-  storageCard: {
-    backgroundColor: Colors.background.card,
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: Colors.shadow.color,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  storageTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text.navy,
-    marginBottom: 16,
-  },
-  quotaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  quotaItem: {
-    alignItems: 'center',
-  },
-  quotaValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: Colors.text.navy,
-  },
-  quotaLabel: {
-    fontSize: 14,
-    color: Colors.text.body,
-    marginTop: 2,
-  },
-  progressBarContainer: {
-    marginTop: 8,
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: Colors.border.headerSoft,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 12,
-    color: Colors.text.body,
-    marginTop: 4,
-    textAlign: 'right',
-  },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     color: Colors.text.navy,
     marginBottom: 12,
     marginTop: 8,
-  },
-  typeList: {
-    marginBottom: 20,
-  },
-  typeCard: {
-    backgroundColor: Colors.background.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: Colors.shadow.color,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  typeIcon: {
-    marginRight: 12,
-    fontSize: 24,
-  },
-  typeInfo: {
-    flex: 1,
-  },
-  typeLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.text.navy,
-  },
-  typeSize: {
-    fontSize: 14,
-    color: Colors.text.body,
-    marginTop: 2,
-  },
-  typeBarContainer: {
-    alignItems: 'flex-end',
-  },
-  typeBarBg: {
-    height: 6,
-    width: 100,
-    backgroundColor: Colors.border.headerSoft,
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
-  typeBarFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  typePercent: {
-    fontSize: 12,
-    color: Colors.text.body,
-  },
-  fileList: {
-    marginBottom: 20,
-  },
-  fileCard: {
-    backgroundColor: Colors.background.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: Colors.shadow.color,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  fileIcon: {
-    marginRight: 12,
-    fontSize: 20,
-  },
-  fileInfo: {
-    flex: 1,
-  },
-  fileName: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: Colors.text.headingShort,
-  },
-  fileSize: {
-    fontSize: 13,
-    color: Colors.text.body,
-    marginTop: 2,
-  },
-  fileArrow: {
-    fontSize: 20,
-    color: Colors.border.chevronSoft,
-  },
-  moreButton: {
-    padding: 12,
-    alignItems: 'center',
-  },
-  moreText: {
-    color: Colors.providers.googleDriveAlt,
-    fontSize: 14,
-  },
-  loadingText: {
-    color: Colors.text.caption,
-    fontSize: 14,
-    textAlign: 'center',
-    paddingVertical: 20,
-  },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 12,
-    backgroundColor: Colors.background.card,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.headerSoft,
-  },
-  navButton: {
-    padding: 8,
-  },
-  navButtonText: {
-    color: Colors.providers.googleDriveAlt,
-    fontSize: 16,
   },
 });
 
