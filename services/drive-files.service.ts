@@ -1,4 +1,3 @@
-// services/drive-files.service.ts
 import { getAuthToken } from '../utils/secureStorage';
 import GoogleAuthService from './auth/google-auth.service';
 import GoogleAuthServiceWeb from './auth/google-auth.service.web';
@@ -53,10 +52,6 @@ class DriveFilesService {
   private static readonly FIELDS_FULL = 'files(id,name,mimeType,size,modifiedTime,iconLink,webViewLink,thumbnailLink,parents,trashed),nextPageToken';
   private static readonly PAGE_SIZE = 20;
 
-  /**
-   * Realiza peticiones HTTP a la API de Google Drive manejando el reintento automático
-   * ante un error 401 (Unauthorized) mediante el refresco silencioso del token.
-   */
   private async _fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response | null> {
     let token = await getAuthToken();
     if (!token) return null;
@@ -68,7 +63,6 @@ class DriveFilesService {
 
     let response = await fetch(url, options);
 
-    // Si el token expira (401 Unauthorized), intentamos renovarlo de forma silenciosa
     if (response.status === 401) {
       console.log('[DriveFilesService] 401 recibido. Renovando token de forma silenciosa...');
       try {
@@ -78,7 +72,6 @@ class DriveFilesService {
             ...options.headers,
             Authorization: `Bearer ${newToken}`,
           };
-          // Reintentamos la petición original con el nuevo token
           response = await fetch(url, options);
           console.log('[DriveFilesService] Token renovado y petición reintentada con éxito.');
         }
@@ -256,30 +249,27 @@ class DriveFilesService {
     });
   }
 
+  async moveToTrash(fileId: string): Promise<boolean> {
+    try {
+      const res = await this._fetchWithAuth(`${DRIVE_API_BASE}/files/${fileId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ trashed: true }),
+      });
+      return res ? res.ok : false;
+    } catch {
+      return false;
+    }
+  }
+
   async deleteFilePermanently(fileId: string): Promise<boolean> {
     try {
       const res = await this._fetchWithAuth(`${DRIVE_API_BASE}/files/${fileId}`, {
         method: 'DELETE',
       });
-
-      if (res && res.ok) return true;
-
-      // Si falla por falta de permisos de borrado permanente (403), mover a la papelera
-      if (res && res.status === 403) {
-        const token = await getAuthToken();
-        if (!token) return false;
-        const trashRes = await fetch(`${DRIVE_API_BASE}/files/${fileId}`, {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ trashed: true }),
-        });
-        return trashRes.ok;
-      }
-
-      return false;
+      return res ? res.ok : false;
     } catch {
       return false;
     }
@@ -291,7 +281,9 @@ class DriveFilesService {
         method: 'DELETE',
       });
       return res ? res.ok : false;
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   }
 
   async getStorageByType(): Promise<StorageByType[] | null> {
@@ -311,7 +303,9 @@ class DriveFilesService {
         const data = await res.json();
         allFiles.push(...(data.files || []));
         pt = data.nextPageToken || null;
-      } catch { break; }
+      } catch {
+        break;
+      }
     } while (pt && allFiles.length < 5000);
 
     const typeMap = new Map<string, { size: number; count: number; icon: string }>();
@@ -325,7 +319,14 @@ class DriveFilesService {
     }
     const total = Array.from(typeMap.values()).reduce((s, t) => s + t.size, 0);
     return Array.from(typeMap.entries())
-      .map(([label, d]) => ({ type: label, label, size: d.size, count: d.count, percentage: total > 0 ? (d.size / total) * 100 : 0, icon: d.icon }))
+      .map(([label, d]) => ({
+        type: label,
+        label,
+        size: d.size,
+        count: d.count,
+        percentage: total > 0 ? (d.size / total) * 100 : 0,
+        icon: d.icon,
+      }))
       .sort((a, b) => b.size - a.size);
   }
 
@@ -363,7 +364,9 @@ class DriveFilesService {
         })),
         nextPageToken: data.nextPageToken || null,
       };
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
   private _categorize(mimeType: string): { label: string; icon: string } {

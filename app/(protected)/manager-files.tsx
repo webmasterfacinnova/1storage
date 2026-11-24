@@ -292,19 +292,19 @@ const ManagerFilesScreen: React.FC = () => {
         );
 
         if (deleted) {
-          setPreviews((prev) => prev.filter((f) => f.id !== file.id));
+          setPreviews((prev) => prev.filter((f) => fileKey(f) !== fileKey(file)));
           if (file.provider === "google-drive") {
             dispatch(removeDriveFile(file.id));
           } else {
             dispatch(removeOnedriveFile(file.id));
           }
         } else {
-          Alert.alert("Error", "No se pudo eliminar el archivo.");
+          Alert.alert("Error", "No se pudo mover el archivo a la papelera.");
         }
       } catch (err: any) {
         Alert.alert(
           "Error",
-          err?.message || "Ocurrió un problema al intentar eliminar el archivo.",
+          err?.message || "Ocurrió un problema al intentar mover el archivo a la papelera.",
         );
       } finally {
         setLoading(false);
@@ -447,7 +447,7 @@ const ManagerFilesScreen: React.FC = () => {
         file.provider as ProviderType,
       );
       if (deleted) {
-        setPreviews((prev) => prev.filter((f) => f.id !== file.id));
+        setPreviews((prev) => prev.filter((f) => fileKey(f) !== fileKey(file)));
 
         if (file.provider === "google-drive") {
           dispatch(removeDriveFile(file.id));
@@ -457,13 +457,13 @@ const ManagerFilesScreen: React.FC = () => {
       } else {
         Alert.alert(
           "Aviso",
-          "El archivo se transfirió, pero no se pudo eliminar el original.",
+          "El archivo se transfirió, pero no se pudo mover el original a la papelera.",
         );
       }
     } catch {
       Alert.alert(
         "Error",
-        "Ocurrió un problema al intentar eliminar el archivo original.",
+        "Ocurrió un problema al intentar mover el archivo original a la papelera.",
       );
     } finally {
       setLoading(false);

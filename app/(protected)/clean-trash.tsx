@@ -12,12 +12,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector, useDispatch } from "react-redux";
 
 import { driveFilesService } from "../../services/drive-files.service";
+import { oneDriveFilesService } from "../../services/onedrive-files.service";
+import { transferService, ProviderType } from "../../services/transfer.service";
 import { driveService } from "../../services/drive.service";
 import { Colors } from "../../components/theme/colors";
 import { TrashSummaryCard } from "../../components/trash/TrashSummaryCard";
 import { TrashSelectionToolbar } from "../../components/trash/TrashSelectionToolbar";
 import { TrashedFileItem } from "../../components/trash/TrashedFileItem";
 import { TrashEmptyState } from "../../components/trash/TrashEmptyState";
+import { selectConnectedProviders } from "../../store/slices/connectedProvidersSlice";
 import {
   setTrashedFilesLoading,
   setTrashedFiles,
@@ -26,80 +29,160 @@ import {
   clearTrashedFiles,
   selectTrashedFiles,
   selectTrashedFilesLoading,
-  selectTrashedFilesNextPage,
 } from "../../store/slices/driveFilesSlice";
+import {
+  setTrashedFilesLoading as setODTrashedFilesLoading,
+  setTrashedFiles as setODTrashedFiles,
+  setTrashedFilesError as setODTrashedFilesError,
+  removeTrashedFile as removeODTrashedFile,
+  clearTrashedFiles as clearODTrashedFiles,
+  selectOnedriveTrashedFiles,
+  selectOnedriveTrashedFilesLoading,
+} from "../../store/slices/onedriveFilesSlice";
+
+interface UnifiedTrashEntry {
+  key: string;
+  id: string;
+  provider: ProviderType;
+  name: string;
+  mimeType: string;
+  size: number;
+}
 
 const CleanTrashScreen = () => {
   const dispatch = useDispatch();
 
-  const trashedFiles = useSelector(selectTrashedFiles);
-  const loading = useSelector(selectTrashedFilesLoading);
-  const nextPageToken = useSelector(selectTrashedFilesNextPage);
+  const connectedProviders = useSelector(selectConnectedProviders);
+  const hasGoogleDrive = Boolean(connectedProviders?.["google-drive"]);
+  const hasOneDrive = Boolean(connectedProviders?.["onedrive"]);
+
+  const driveTrashed = useSelector(selectTrashedFiles);
+  const driveLoading = useSelector(selectTrashedFilesLoading);
+
+  const odTrashed = useSelector(selectOnedriveTrashedFiles);
+  const odLoading = useSelector(selectOnedriveTrashedFilesLoading);
 
   const [isDeleting, setIsDeleting] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
-  const fetchTrashedFiles = useCallback(
-    async (append = false) => {
-      dispatch(setTrashedFilesLoading(true));
-      const result = await driveFilesService.getTrashedFiles(
-        50,
-        append ? nextPageToken || undefined : undefined,
-      );
-      if (result) {
-        dispatch(
-          setTrashedFiles({
-            files: result.files,
-            nextPageToken: result.nextPageToken,
-            append,
-          }),
-        );
-      } else {
-        dispatch(
-          setTrashedFilesError(
-            "No se pudieron obtener los archivos de la papelera",
-          ),
-        );
+  const combinedTrashed: UnifiedTrashEntry[] = useMemo(() => {
+    const items: UnifiedTrashEntry[] = [];
+    if (hasGoogleDrive) {
+      for (const f of driveTrashed || []) {
+        items.push({
+          key: `google-drive:${f.id}`,
+          id: f.id,
+          provider: "google-drive",
+          name: f.name,
+          mimeType: f.mimeType,
+          size: f.size || 0,
+        });
       }
-    },
-    [dispatch, nextPageToken],
-  );
+    }
+    if (hasOneDrive) {
+      for (const f of odTrashed || []) {
+        items.push({
+          key: `onedrive:${f.id}`,
+          id: f.id,
+          provider: "onedrive",
+          name: f.name,
+          mimeType: f.mimeType,
+          size: f.size || 0,
+        });
+      }
+    }
+    return items;
+  }, [hasGoogleDrive, hasOneDrive, driveTrashed, odTrashed]);
+
+  const loading =
+    (hasGoogleDrive && driveLoading) || (hasOneDrive && odLoading);
+
+  const fetchAllTrashed = useCallback(async () => {
+    const tasks: Promise<void>[] = [];
+
+    if (hasGoogleDrive) {
+      tasks.push(
+        (async () => {
+          dispatch(setTrashedFilesLoading(true));
+          const res = await driveFilesService.getTrashedFiles(100);
+          if (res) {
+            dispatch(
+              setTrashedFiles({
+                files: res.files,
+                nextPageToken: res.nextPageToken,
+                append: false,
+              }),
+            );
+          } else {
+            dispatch(
+              setTrashedFilesError(
+                "No se pudieron obtener los archivos de papelera de Google Drive",
+              ),
+            );
+          }
+        })(),
+      );
+    }
+
+    if (hasOneDrive) {
+      tasks.push(
+        (async () => {
+          dispatch(setODTrashedFilesLoading(true));
+          const res = await oneDriveFilesService.getTrashedFiles(100);
+          if (res) {
+            dispatch(
+              setODTrashedFiles({
+                files: res.files,
+                nextPageToken: res.nextPageToken,
+                append: false,
+              }),
+            );
+          } else {
+            dispatch(
+              setODTrashedFilesError(
+                "No se pudieron obtener los archivos de papelera de OneDrive",
+              ),
+            );
+          }
+        })(),
+      );
+    }
+
+    await Promise.all(tasks);
+  }, [dispatch, hasGoogleDrive, hasOneDrive]);
 
   const onRefresh = useCallback(() => {
-    setSelectedFiles(new Set());
-    fetchTrashedFiles(false);
-  }, [fetchTrashedFiles]);
+    setSelectedKeys(new Set());
+    fetchAllTrashed();
+  }, [fetchAllTrashed]);
 
   useEffect(() => {
     onRefresh();
-  }, []);
+  }, [onRefresh]);
 
-  const handleSelectFile = useCallback((fileId: string) => {
-    setSelectedFiles((prev) => {
+  const handleSelectFile = useCallback((key: string) => {
+    setSelectedKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(fileId)) {
-        next.delete(fileId);
-      } else {
-        next.add(fileId);
-      }
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }, []);
 
   const handleSelectAll = useCallback(() => {
-    setSelectedFiles((prev) =>
-      prev.size === trashedFiles.length
+    setSelectedKeys((prev) =>
+      prev.size === combinedTrashed.length
         ? new Set()
-        : new Set(trashedFiles.map((f) => f.id)),
+        : new Set(combinedTrashed.map((f) => f.key)),
     );
-  }, [trashedFiles]);
+  }, [combinedTrashed]);
 
   const handleDeleteSelected = async () => {
-    if (selectedFiles.size === 0) return;
+    if (selectedKeys.size === 0) return;
 
     Alert.alert(
       "Eliminar permanentemente",
-      `¿Estás seguro de que deseas eliminar permanentemente ${selectedFiles.size} archivo(s)? Esta acción no se puede deshacer.`,
+      `¿Estás seguro de que deseas eliminar permanentemente ${selectedKeys.size} archivo(s)? Esta acción no se puede deshacer.`,
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -108,15 +191,26 @@ const CleanTrashScreen = () => {
           onPress: async () => {
             setIsDeleting(true);
             let successCount = 0;
-            for (const fileId of selectedFiles) {
-              const success =
-                await driveFilesService.deleteFilePermanently(fileId);
-              if (success) {
-                dispatch(removeTrashedFile(fileId));
+            const targets = combinedTrashed.filter((item) =>
+              selectedKeys.has(item.key),
+            );
+
+            for (const item of targets) {
+              const ok = await transferService.deletePermanently(
+                item.id,
+                item.provider,
+              );
+              if (ok) {
+                if (item.provider === "google-drive") {
+                  dispatch(removeTrashedFile(item.id));
+                } else {
+                  dispatch(removeODTrashedFile(item.id));
+                }
                 successCount++;
               }
             }
-            setSelectedFiles(new Set());
+
+            setSelectedKeys(new Set());
             setIsDeleting(false);
             Alert.alert(
               "Eliminado(s)",
@@ -139,18 +233,34 @@ const CleanTrashScreen = () => {
           style: "destructive",
           onPress: async () => {
             setIsDeleting(true);
-            const success = await driveFilesService.emptyTrash();
-            if (success) {
-              dispatch(clearTrashedFiles());
-              setSelectedFiles(new Set());
+            let allOk = true;
+
+            if (hasGoogleDrive) {
+              const okDrive = await driveFilesService.emptyTrash();
+              if (okDrive) dispatch(clearTrashedFiles());
+              else allOk = false;
+            }
+
+            if (hasOneDrive) {
+              const okOD = await oneDriveFilesService.emptyTrash();
+              if (okOD) dispatch(clearODTrashedFiles());
+              else allOk = false;
+            }
+
+            setSelectedKeys(new Set());
+            setIsDeleting(false);
+
+            if (allOk) {
               Alert.alert(
                 "Papelera vaciada",
                 "Todos los archivos han sido eliminados permanentemente.",
               );
             } else {
-              Alert.alert("Error", "No se pudo vaciar la papelera.");
+              Alert.alert(
+                "Aviso",
+                "No se pudieron vaciar todos los elementos de la papelera.",
+              );
             }
-            setIsDeleting(false);
           },
         },
       ],
@@ -158,8 +268,8 @@ const CleanTrashScreen = () => {
   };
 
   const totalTrashSize = useMemo(
-    () => trashedFiles.reduce((sum, file) => sum + (file.size || 0), 0),
-    [trashedFiles],
+    () => combinedTrashed.reduce((sum, file) => sum + (file.size || 0), 0),
+    [combinedTrashed],
   );
 
   return (
@@ -176,15 +286,15 @@ const CleanTrashScreen = () => {
           contentContainerStyle={styles.scrollContent}
         >
           <TrashSummaryCard
-            fileCount={trashedFiles.length}
+            fileCount={combinedTrashed.length}
             formattedTotalSize={driveService.formatBytes(totalTrashSize)}
             isDeleting={isDeleting}
             onEmptyTrash={handleEmptyTrash}
           />
 
           <TrashSelectionToolbar
-            selectedCount={selectedFiles.size}
-            totalCount={trashedFiles.length}
+            selectedCount={selectedKeys.size}
+            totalCount={combinedTrashed.length}
             isDeleting={isDeleting}
             onSelectAll={handleSelectAll}
             onDeleteSelected={handleDeleteSelected}
@@ -193,27 +303,27 @@ const CleanTrashScreen = () => {
           <View style={styles.secHeader}>
             <Text style={styles.secTitle}>Archivos en papelera</Text>
             <Text style={styles.secCount}>
-              {trashedFiles.length} archivo
-              {trashedFiles.length !== 1 ? "s" : ""}
+              {combinedTrashed.length} archivo
+              {combinedTrashed.length !== 1 ? "s" : ""}
             </Text>
           </View>
 
-          {loading && trashedFiles.length === 0 ? (
+          {loading && combinedTrashed.length === 0 ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.brand.primary} />
               <Text style={styles.loadingText}>Cargando papelera...</Text>
             </View>
-          ) : trashedFiles.length > 0 ? (
-            trashedFiles.map((file) => (
+          ) : combinedTrashed.length > 0 ? (
+            combinedTrashed.map((file) => (
               <TrashedFileItem
-                key={file.id}
-                id={file.id}
+                key={file.key}
+                id={file.key}
                 name={file.name}
                 mimeType={file.mimeType}
                 formattedSize={
                   file.size ? driveService.formatBytes(file.size) : "—"
                 }
-                isSelected={selectedFiles.has(file.id)}
+                isSelected={selectedKeys.has(file.key)}
                 onToggleSelect={handleSelectFile}
               />
             ))

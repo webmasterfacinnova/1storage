@@ -1,4 +1,3 @@
-// services/onedrive-files.service.ts
 import { getValidOneDriveToken } from './onedrive-token';
 import OneDriveAuthService from './auth/onedrive-auth.service';
 
@@ -132,7 +131,6 @@ class OneDriveFilesService {
   }
 
   async uploadFile(blob: Blob, fileName: string): Promise<OneDriveFile | null> {
-    // Agregamos @microsoft.graph.conflictBehavior=replace para evitar que OneDrive autorenombre el archivo si ya existe
     const url = `${GRAPH_API_BASE}/me/drive/root:/${encodeURIComponent(fileName)}:/content?@microsoft.graph.conflictBehavior=replace`;
     const token = await this._getToken();
     if (!token) return null;
@@ -230,13 +228,24 @@ class OneDriveFilesService {
     pageSize: number = 50,
     pageToken?: string
   ): Promise<{ files: OneDriveFile[]; nextPageToken: string | null } | null> {
-    const endpoint = `${GRAPH_API_BASE}/me/drive/special/trash/children?$top=${pageSize}&$expand=thumbnails&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
-    const url = pageToken || endpoint;
+    if (pageToken) {
+      const response = await this._fetchWithAuth(pageToken);
+      if (!response || !response.ok) return { files: [], nextPageToken: null };
+      const data = await response.json();
+      const files: OneDriveFile[] = (data.value || []).map((item: any) => this._mapOneDriveItem(item));
+      return { files, nextPageToken: data['@odata.nextLink'] || null };
+    }
 
-    const response = await this._fetchWithAuth(url);
+    const endpoint = `${GRAPH_API_BASE}/me/drive/items/deleted?$top=${pageSize}&$expand=thumbnails&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl`;
+    const response = await this._fetchWithAuth(endpoint);
 
-    if (!response || !response.ok) {
-      if (response) console.error('OneDrive Trash API error:', response.status, await response.text());
+    if (!response) return null;
+
+    if (!response.ok) {
+      if (response.status === 400 || response.status === 404) {
+        return { files: [], nextPageToken: null };
+      }
+      console.error('OneDrive Trash API error:', response.status, await response.text());
       return null;
     }
 
@@ -247,19 +256,36 @@ class OneDriveFilesService {
     return { files, nextPageToken };
   }
 
-  async deleteFilePermanently(fileId: string): Promise<boolean> {
-    const token = await this._getToken();
-    if (!token) return false;
-
+  async moveToTrash(fileId: string): Promise<boolean> {
     try {
-      const res: Response = await fetch(`${GRAPH_API_BASE}/me/drive/items/${fileId}`, {
+      const res = await this._fetchWithAuth(`${GRAPH_API_BASE}/me/drive/items/${fileId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
       });
-      return res.ok;
+      return res ? res.ok || res.status === 204 : false;
     } catch {
       return false;
     }
+  }
+
+  async deleteFilePermanently(fileId: string): Promise<boolean> {
+    try {
+      const res = await this._fetchWithAuth(`${GRAPH_API_BASE}/me/drive/items/${fileId}`, {
+        method: 'DELETE',
+      });
+      return res ? res.ok || res.status === 204 : false;
+    } catch {
+      return false;
+    }
+  }
+
+  async emptyTrash(): Promise<boolean> {
+    const trashed = await this.getTrashedFiles(100);
+    if (!trashed) return false;
+    for (const item of trashed.files) {
+      const ok = await this.deleteFilePermanently(item.id);
+      if (!ok) return false;
+    }
+    return true;
   }
 
   async getStorageByType(): Promise<StorageByType[] | null> {
