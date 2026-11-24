@@ -1,6 +1,7 @@
 // components/storage/HeaderBar.tsx
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { ArrowLeft } from 'lucide-react-native';
 
 interface HeaderBarProps {
   title: string;
@@ -9,27 +10,32 @@ interface HeaderBarProps {
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({ title, onBack, onLayout }) => (
-  <View style={s.hdr} onLayout={onLayout}>
-    <TouchableOpacity onPress={onBack} style={s.back}>
-      <Text style={s.backTxt}>‹</Text>
+  <View style={s.headerContainer} onLayout={onLayout}>
+    <TouchableOpacity onPress={onBack} style={s.backButton} activeOpacity={0.7}>
+      <ArrowLeft size={24} color="#ffffff" />
     </TouchableOpacity>
-    <Text style={s.title}>{title}</Text>
+    <Text style={s.headerTitle}>{title}</Text>
+    <View style={{ width: 24 }} />
   </View>
 );
 
 const s = StyleSheet.create({
-  hdr: {
+  headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ff6600', // Color naranja de tu cabecera
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
   },
-  back: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
-  backTxt: { fontSize: 28, color: '#1a237e', fontWeight: '300', lineHeight: 30 },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#1a237e' },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
 });
 
 export default HeaderBar;

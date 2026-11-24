@@ -1,5 +1,9 @@
-// services/drive-files.service.ts
 import { getAuthToken } from '../utils/secureStorage';
+import GoogleAuthService from './auth/google-auth.service';
+import GoogleAuthServiceWeb from './auth/google-auth.service.web';
+import { Platform } from 'react-native';
+
+const googleAuth = Platform.OS === 'web' ? new GoogleAuthServiceWeb() : new GoogleAuthService();
 
 export interface FileDetails {
   size: number | null;
@@ -48,10 +52,39 @@ class DriveFilesService {
   private static readonly FIELDS_FULL = 'files(id,name,mimeType,size,modifiedTime,iconLink,webViewLink,thumbnailLink,parents,trashed),nextPageToken';
   private static readonly PAGE_SIZE = 20;
 
-  async checkFileExists(fileName: string, folderId: string = 'root'): Promise<DriveFile | null> {
-    const token = await getAuthToken();
+  private async _fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response | null> {
+    let token = await getAuthToken();
     if (!token) return null;
 
+    options.headers = {
+      ...options.headers,
+      Authorization: `Bearer ${token}`,
+    };
+
+    let response = await fetch(url, options);
+
+    if (response.status === 401) {
+      console.log('[DriveFilesService] 401 recibido. Renovando token de forma silenciosa...');
+      try {
+        const newToken = await googleAuth.refreshAccessToken();
+        if (newToken) {
+          options.headers = {
+            ...options.headers,
+            Authorization: `Bearer ${newToken}`,
+          };
+          response = await fetch(url, options);
+          console.log('[DriveFilesService] Token renovado y petición reintentada con éxito.');
+        }
+      } catch (err) {
+        console.error('[DriveFilesService] Error al intentar refrescar el token:', err);
+        return null;
+      }
+    }
+
+    return response;
+  }
+
+  async checkFileExists(fileName: string, folderId: string = 'root'): Promise<DriveFile | null> {
     const safeName = fileName.replace(/'/g, "\\'");
     const query = `'${folderId}' in parents and name = '${safeName}' and trashed = false`;
     const params = new URLSearchParams({
@@ -61,10 +94,8 @@ class DriveFilesService {
     });
 
     try {
-      const res = await fetch(`${DRIVE_API_BASE}/files?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return null;
+      const res = await this._fetchWithAuth(`${DRIVE_API_BASE}/files?${params}`);
+      if (!res || !res.ok) return null;
       const data = await res.json();
       return data.files && data.files.length > 0 ? data.files[0] : null;
     } catch {
@@ -76,9 +107,6 @@ class DriveFilesService {
     pageSize: number = DriveFilesService.PAGE_SIZE,
     pageToken?: string,
   ): Promise<{ files: DriveFilePreview[]; nextPageToken: string | null } | null> {
-    const token = await getAuthToken();
-    if (!token) return null;
-
     const params = new URLSearchParams({
       pageSize: String(Math.min(pageSize, 1000)),
       fields: DriveFilesService.FIELDS_PREVIEW,
@@ -88,10 +116,8 @@ class DriveFilesService {
     if (pageToken) params.set('pageToken', pageToken);
 
     try {
-      const res = await fetch(`${DRIVE_API_BASE}/files?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return null;
+      const res = await this._fetchWithAuth(`${DRIVE_API_BASE}/files?${params}`);
+      if (!res || !res.ok) return null;
 
       const data = await res.json();
       return {
@@ -119,15 +145,11 @@ class DriveFilesService {
   }
 
   async getDetail(fileId: string): Promise<FileDetails | null> {
-    const token = await getAuthToken();
-    if (!token) return null;
-
     try {
-      const res = await fetch(
-        `${DRIVE_API_BASE}/files/${fileId}?fields=id,size,modifiedTime,webViewLink,thumbnailLink,iconLink`,
-        { headers: { Authorization: `Bearer ${token}` } },
+      const res = await this._fetchWithAuth(
+        `${DRIVE_API_BASE}/files/${fileId}?fields=id,size,modifiedTime,webViewLink,thumbnailLink,iconLink`
       );
-      if (!res.ok) return null;
+      if (!res || !res.ok) return null;
 
       const f = await res.json();
       return {
@@ -143,13 +165,9 @@ class DriveFilesService {
   }
 
   async downloadFile(fileId: string): Promise<Blob | null> {
-    const token = await getAuthToken();
-    if (!token) return null;
     try {
-      const res = await fetch(`${DRIVE_API_BASE}/files/${fileId}?alt=media`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return null;
+      const res = await this._fetchWithAuth(`${DRIVE_API_BASE}/files/${fileId}?alt=media`);
+      if (!res || !res.ok) return null;
       return await res.blob();
     } catch (err) {
       console.error('downloadFile Drive error:', err);
@@ -158,9 +176,6 @@ class DriveFilesService {
   }
 
   async uploadFile(blob: Blob, name: string, mimeType: string): Promise<DriveFile | null> {
-    const token = await getAuthToken();
-    if (!token) return null;
-
     const metadata = { name, mimeType };
     const formData = new FormData();
 
@@ -168,11 +183,26 @@ class DriveFilesService {
     formData.append('file', blob);
 
     try {
-      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      const token = await getAuthToken();
+      if (!token) return null;
+
+      let res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
+
+      if (res.status === 401) {
+        const newToken = await googleAuth.refreshAccessToken();
+        if (newToken) {
+          res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${newToken}` },
+            body: formData,
+          });
+        }
+      }
+
       if (!res.ok) return null;
       return await res.json();
     } catch (err) {
@@ -219,51 +249,44 @@ class DriveFilesService {
     });
   }
 
-  async deleteFilePermanently(fileId: string): Promise<boolean> {
-    const token = await getAuthToken();
-    if (!token) return false;
+  async moveToTrash(fileId: string): Promise<boolean> {
     try {
-      const res = await fetch(`${DRIVE_API_BASE}/files/${fileId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await this._fetchWithAuth(`${DRIVE_API_BASE}/files/${fileId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ trashed: true }),
       });
-
-      if (res.ok) return true;
-
-      // Si falla por falta de permisos de borrado permanente (403), mover a la papelera
-      if (res.status === 403) {
-        const trashRes = await fetch(`${DRIVE_API_BASE}/files/${fileId}`, {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ trashed: true }),
-        });
-        return trashRes.ok;
-      }
-
+      return res ? res.ok : false;
+    } catch {
       return false;
+    }
+  }
+
+  async deleteFilePermanently(fileId: string): Promise<boolean> {
+    try {
+      const res = await this._fetchWithAuth(`${DRIVE_API_BASE}/files/${fileId}`, {
+        method: 'DELETE',
+      });
+      return res ? res.ok : false;
     } catch {
       return false;
     }
   }
 
   async emptyTrash(): Promise<boolean> {
-    const token = await getAuthToken();
-    if (!token) return false;
     try {
-      const res = await fetch(`${DRIVE_API_BASE}/files/trash`, {
+      const res = await this._fetchWithAuth(`${DRIVE_API_BASE}/files/trash`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
       });
-      return res.ok;
-    } catch { return false; }
+      return res ? res.ok : false;
+    } catch {
+      return false;
+    }
   }
 
   async getStorageByType(): Promise<StorageByType[] | null> {
-    const token = await getAuthToken();
-    if (!token) return null;
     let allFiles: any[] = [];
     let pt: string | null = null;
 
@@ -275,14 +298,14 @@ class DriveFilesService {
       });
       if (pt) params.set('pageToken', pt);
       try {
-        const res = await fetch(`${DRIVE_API_BASE}/files?${params}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) break;
+        const res = await this._fetchWithAuth(`${DRIVE_API_BASE}/files?${params}`);
+        if (!res || !res.ok) break;
         const data = await res.json();
         allFiles.push(...(data.files || []));
         pt = data.nextPageToken || null;
-      } catch { break; }
+      } catch {
+        break;
+      }
     } while (pt && allFiles.length < 5000);
 
     const typeMap = new Map<string, { size: number; count: number; icon: string }>();
@@ -296,7 +319,14 @@ class DriveFilesService {
     }
     const total = Array.from(typeMap.values()).reduce((s, t) => s + t.size, 0);
     return Array.from(typeMap.entries())
-      .map(([label, d]) => ({ type: label, label, size: d.size, count: d.count, percentage: total > 0 ? (d.size / total) * 100 : 0, icon: d.icon }))
+      .map(([label, d]) => ({
+        type: label,
+        label,
+        size: d.size,
+        count: d.count,
+        percentage: total > 0 ? (d.size / total) * 100 : 0,
+        icon: d.icon,
+      }))
       .sort((a, b) => b.size - a.size);
   }
 
@@ -307,8 +337,6 @@ class DriveFilesService {
     orderBy?: string;
     query: string;
   }): Promise<{ files: DriveFile[]; nextPageToken: string | null } | null> {
-    const token = await getAuthToken();
-    if (!token) return null;
     const params = new URLSearchParams({
       pageSize: String(Math.min(opts.pageSize, 1000)),
       fields: opts.fields,
@@ -318,10 +346,8 @@ class DriveFilesService {
     if (opts.orderBy) params.set('orderBy', opts.orderBy);
 
     try {
-      const res = await fetch(`${DRIVE_API_BASE}/files?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return null;
+      const res = await this._fetchWithAuth(`${DRIVE_API_BASE}/files?${params}`);
+      if (!res || !res.ok) return null;
       const data = await res.json();
       return {
         files: (data.files || []).map((f: any) => ({
@@ -338,7 +364,9 @@ class DriveFilesService {
         })),
         nextPageToken: data.nextPageToken || null,
       };
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
   private _categorize(mimeType: string): { label: string; icon: string } {

@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Image, StyleSheet, View } from "react-native";
+import { Colors } from "../../components/theme/colors";
 
 export default function ProtectedLayout() {
   return (
@@ -9,9 +10,9 @@ export default function ProtectedLayout() {
       <Stack
         screenOptions={{
           // headerShown: false,
-          contentStyle: { backgroundColor: "#FAF8F5" },
-          headerStyle: { backgroundColor: "#FF6B35" },
-          headerTintColor: "#FFFFFF",
+          contentStyle: { backgroundColor: Colors.background.primary },
+          headerStyle: { backgroundColor: Colors.brand.primary },
+          headerTintColor: Colors.text.inverse,
           animation: "slide_from_right",
         }}
       >
@@ -27,7 +28,7 @@ export default function ProtectedLayout() {
                     width: 40,
                     height: 40,
                     marginLeft: 10,
-                    backgroundColor: "#FFF",
+                    backgroundColor: Colors.background.card,
                     borderRadius: 10,
                     padding: 5,
                     marginRight: 10,
@@ -45,7 +46,7 @@ export default function ProtectedLayout() {
         <Stack.Screen name="clean-trash" options={{ title: "Papelera" }} />
         <Stack.Screen
           name="manager-files"
-          options={{ title: "Gestior de Archivos" }}
+          options={{ title: "Gestor de Archivos" }}
         />
         <Stack.Screen
           name="add-provider"
@@ -62,6 +63,6 @@ export default function ProtectedLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAF8F5",
+    backgroundColor: Colors.background.primary,
   },
 });

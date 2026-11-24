@@ -1,4 +1,3 @@
-// app/login.tsx
 import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Image, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
@@ -7,6 +6,7 @@ import { setLoading, setCredentials, setError } from '../store/slices/authSlice'
 import { selectAuthLoading, selectAuthError } from '../store/slices/authSlice';
 import { addProvider } from '../store/slices/connectedProvidersSlice';
 import GoogleSignInButton from '../components/auth/GoogleSignInButton';
+import { Colors } from '../components/theme/colors';
 
 export default function LoginRoute() {
   const dispatch = useDispatch();
@@ -83,7 +83,7 @@ export default function LoginRoute() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f7fe',
+    backgroundColor: Colors.background.login,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -98,12 +98,12 @@ const styles = StyleSheet.create({
   },
   welcome: {
     fontSize: 18,
-    color: '#5f6368',
+    color: Colors.text.body,
     textAlign: 'center',
     marginBottom: 32,
   },
   error: {
-    color: '#d32f2f',
+    color: Colors.text.error,
     textAlign: 'center',
     marginTop: 20,
     fontSize: 14,
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: 30,
     fontSize: 12,
-    color: '#999999',
+    color: Colors.text.caption,
     textAlign: 'center',
   },
 });
